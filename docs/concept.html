@@ -1,0 +1,481 @@
+<title>מי מכיר?</title>
+<meta name="description" content="מסמך קונספט לאפליקציית משחק ניחושים משפחתי שבו ה-AI בונה את החידון יחד איתך">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Assistant:wght@400;500;600;700&family=Heebo:wght@400;500;700&display=swap">
+
+<style>
+  :root{
+    --paper:#FBF6F2;
+    --surface:#FFFFFF;
+    --surface-2:#F4EBE4;
+    --ink:#2C2530;
+    --ink-soft:#5B525F;
+    --ink-faint:#8B7F8D;
+    --line:#E6DACF;
+    --line-soft:#EFE6DD;
+    --grape:#7A3FA0;
+    --grape-deep:#5A2B7C;
+    --coral:#DD5C3C;
+    --teal:#1E8F84;
+    --amber:#D9982E;
+    --shadow:0 1px 2px rgba(44,37,48,.05), 0 12px 32px -12px rgba(44,37,48,.14);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --paper:#191420;
+      --surface:#221B2B;
+      --surface-2:#2C2436;
+      --ink:#F2ECF3;
+      --ink-soft:#C6BBC9;
+      --ink-faint:#8F8395;
+      --line:#382E44;
+      --line-soft:#2E2639;
+      --grape:#C89DE8;
+      --grape-deep:#B380DA;
+      --coral:#F0825F;
+      --teal:#54C6B7;
+      --amber:#ECBB5E;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 16px 40px -14px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#191420;
+    --surface:#221B2B;
+    --surface-2:#2C2436;
+    --ink:#F2ECF3;
+    --ink-soft:#C6BBC9;
+    --ink-faint:#8F8395;
+    --line:#382E44;
+    --line-soft:#2E2639;
+    --grape:#C89DE8;
+    --grape-deep:#B380DA;
+    --coral:#F0825F;
+    --teal:#54C6B7;
+    --amber:#ECBB5E;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 16px 40px -14px rgba(0,0,0,.55);
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    direction:rtl;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Assistant","Segoe UI",Tahoma,sans-serif;
+    font-size:18px;
+    line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .wrap{max-width:720px;margin:0 auto;padding:0 24px}
+
+  /* ---- rhythm ---- */
+  section{padding:56px 0;border-top:1px solid var(--line-soft)}
+  section:first-of-type{border-top:0}
+  .stack{display:flex;flex-direction:column;gap:20px}
+  .stack-sm{display:flex;flex-direction:column;gap:12px}
+
+  /* ---- type ---- */
+  h1,h2,h3{font-family:"Frank Ruhl Libre",Georgia,serif;line-height:1.25;text-wrap:balance;font-weight:900}
+  h1{font-size:clamp(2.2rem,7vw,3.3rem);letter-spacing:-.01em}
+  h2{font-size:clamp(1.6rem,4.5vw,2.1rem);font-weight:700}
+  h3{font-size:1.15rem;font-weight:700}
+  p{color:var(--ink-soft)}
+  strong{color:var(--ink);font-weight:700}
+  .lead{font-size:1.2rem;color:var(--ink-soft);line-height:1.75}
+
+  .eyebrow{
+    font-family:"Heebo",sans-serif;
+    font-size:.8rem;font-weight:700;
+    letter-spacing:.14em;
+    color:var(--grape);
+    display:flex;align-items:center;gap:10px;
+  }
+  .eyebrow::after{content:"";flex:0 0 34px;height:2px;background:var(--grape);opacity:.5;border-radius:2px}
+
+  /* ---- hero ---- */
+  header{padding:72px 0 8px}
+  .tag{
+    display:inline-block;
+    font-family:"Heebo",sans-serif;font-size:.78rem;font-weight:700;
+    letter-spacing:.08em;
+    color:var(--ink-faint);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:5px 14px;
+    margin-bottom:26px;
+  }
+  .hero-note{
+    margin-top:26px;
+    font-family:"Heebo",sans-serif;
+    font-size:.9rem;color:var(--ink-faint);
+  }
+
+  /* ---- sample card ---- */
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:16px;
+    box-shadow:var(--shadow);
+    padding:24px;
+  }
+  .qcard-meta{
+    font-family:"Heebo",sans-serif;font-size:.8rem;font-weight:700;
+    letter-spacing:.1em;color:var(--ink-faint);margin-bottom:10px;
+  }
+  .qcard-q{font-family:"Frank Ruhl Libre",serif;font-weight:700;font-size:1.3rem;color:var(--ink);margin-bottom:18px}
+  .opts{display:flex;flex-direction:column;gap:9px;list-style:none}
+  .opt{
+    display:flex;align-items:center;gap:12px;
+    padding:11px 14px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    font-size:1rem;color:var(--ink-soft);
+  }
+  .opt .dot{flex:0 0 16px;height:16px;border-radius:50%;border:2px solid var(--line)}
+  .opt.correct{
+    border-color:var(--teal);
+    background:color-mix(in srgb,var(--teal) 12%,transparent);
+    color:var(--ink);font-weight:600;
+  }
+  .opt.correct .dot{border-color:var(--teal);background:var(--teal)}
+  .opt.correct .who{
+    margin-inline-start:auto;
+    font-family:"Heebo",sans-serif;font-size:.78rem;font-weight:700;
+    color:var(--teal);letter-spacing:.02em;
+  }
+  .qcard-cap{margin-top:16px;font-size:.9rem;color:var(--ink-faint);line-height:1.6}
+
+  /* ---- numbered flow ---- */
+  ol.flow{list-style:none;counter-reset:step;display:flex;flex-direction:column;gap:2px}
+  ol.flow li{
+    counter-increment:step;
+    position:relative;
+    padding:16px 52px 16px 0;
+    border-inline-start:2px solid var(--line);
+    margin-inline-start:15px;
+  }
+  ol.flow li:first-child{padding-top:4px}
+  ol.flow li:last-child{padding-bottom:4px}
+  ol.flow li::before{
+    content:counter(step);
+    position:absolute;
+    inset-inline-start:-16px;top:14px;
+    width:30px;height:30px;
+    display:grid;place-items:center;
+    background:var(--paper);
+    border:2px solid var(--grape);
+    color:var(--grape);
+    border-radius:50%;
+    font-family:"Heebo",sans-serif;font-weight:700;font-size:.85rem;
+  }
+  ol.flow li:first-child::before{top:4px}
+  .flow .actor{
+    font-family:"Heebo",sans-serif;font-size:.76rem;font-weight:700;
+    letter-spacing:.08em;color:var(--grape);
+    display:block;margin-bottom:2px;
+  }
+  .flow .actor.sys{color:var(--amber)}
+  .flow .actor.ai{color:var(--teal)}
+  .flow b{color:var(--ink);font-weight:700}
+  .flow p{font-size:1rem}
+
+  /* ---- format grid ---- */
+  .grid{display:grid;grid-template-columns:1fr;gap:14px}
+  @media(min-width:560px){.grid{grid-template-columns:1fr 1fr}}
+  .fmt{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px 18px 20px;
+  }
+  .fmt h3{font-size:1.02rem;margin-bottom:6px;font-family:"Assistant",sans-serif;font-weight:700;color:var(--ink)}
+  .fmt p{font-size:.94rem;line-height:1.55}
+  .fmt .kicker{
+    font-family:"Heebo",sans-serif;font-size:.72rem;font-weight:700;
+    letter-spacing:.1em;color:var(--coral);display:block;margin-bottom:8px;
+  }
+
+  /* ---- checklist ---- */
+  ul.checks{list-style:none;display:flex;flex-direction:column;gap:14px}
+  ul.checks li{
+    padding-inline-start:30px;position:relative;
+    font-size:1rem;color:var(--ink-soft);line-height:1.6;
+  }
+  ul.checks li::before{
+    content:"";position:absolute;inset-inline-start:0;top:.55em;
+    width:12px;height:12px;border:2px solid var(--grape);border-radius:3px;
+  }
+  ul.checks li b{color:var(--ink);font-weight:700}
+
+  /* ---- callout ---- */
+  .callout{
+    background:var(--surface-2);
+    border-radius:16px;
+    padding:26px 26px 28px;
+    border:1px solid var(--line-soft);
+  }
+  .callout .eyebrow{color:var(--coral)}
+  .callout .eyebrow::after{background:var(--coral)}
+  .callout p{color:var(--ink-soft)}
+  .callout p + p{margin-top:12px}
+
+  footer{
+    padding:44px 0 72px;
+    border-top:1px solid var(--line-soft);
+    font-family:"Heebo",sans-serif;
+    font-size:.85rem;color:var(--ink-faint);
+    text-align:center;
+  }
+
+  a{color:var(--grape)}
+  :focus-visible{outline:2px solid var(--grape);outline-offset:3px;border-radius:4px}
+
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:opacity .6s ease,transform .6s ease}
+  @media (prefers-reduced-motion:reduce){
+    .reveal{opacity:1;transform:none}
+    .reveal.in{transition:none}
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="reveal">
+    <span class="tag">מסמך קונספט · שם עבודה: "מי מכיר?"</span>
+    <h1>ה-AI בונה את החידון יחד איתך — המשפחה רק צריכה לנחש</h1>
+    <p class="lead">
+      משפחה באוטו, טיסה ארוכה, תור במרפאה — רגע של שעמום. מישהו לוחץ כפתור,
+      ותוך פחות משתי דקות יש חידון קצר שנשלח לכל השאר. כל אחד עונה בטלפון שלו,
+      התוצאות חוזרות למחבר, ומתחילות ההשוואות והצחוקים.
+    </p>
+    <p class="hero-note">גרסה 0.1 · 27 באוגוסט 2026 · טיוטה לפיתוח הרעיון</p>
+  </header>
+
+  <section class="reveal">
+    <div class="stack">
+      <span class="eyebrow">הרעיון במשפט</span>
+      <h2>מנוע אחד: הופך תשובה אמיתית לחידון משכנע</h2>
+      <p>
+        החלק הקשה בבניית חידון הוא לא השאלות — אלא להמציא <strong>מסיחים טובים</strong>:
+        תשובות שגויות שנשמעות אמיתיות מספיק כדי לבלבל. זה בדיוק מה שה-AI עושה כאן.
+      </p>
+      <p>
+        המשתמש נותן שאלה ותשובה נכונה אחת. ה-AI מוסיף שלוש תשובות שגויות סבירות,
+        אחרים מנחשים, המערכת נותנת ציון, ובסוף חושפים מי צדק. "כמה אתה מכיר אותי"
+        הוא רק הפורמט הראשון שרץ על המנוע הזה.
+      </p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="stack">
+      <span class="eyebrow">רגע מתוך המשחק</span>
+      <div class="card">
+        <div class="qcard-meta">שאלה 3 מתוך 5 · השאלון של אבא</div>
+        <div class="qcard-q">מה הסרט האהוב עליי?</div>
+        <ul class="opts">
+          <li class="opt correct"><span class="dot"></span> שושנק <span class="who">נועה קלעה</span></li>
+          <li class="opt"><span class="dot"></span> מטריקס</li>
+          <li class="opt"><span class="dot"></span> הסנדק</li>
+          <li class="opt"><span class="dot"></span> פורסט גאמפ</li>
+        </ul>
+        <p class="qcard-cap">אבא סימן את "שושנק" בתור התשובה הנכונה. ה-AI הוסיף את שלוש האחרות. נועה הייתה היחידה שקלעה.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="stack">
+      <span class="eyebrow">איך זה עובד</span>
+      <h2>הזרימה מקצה לקצה</h2>
+      <p>רצף קבוע של שישה שלבים. כל מה שבין החיבור לחשיפה קורה בתוך האפליקציה.</p>
+      <ol class="flow">
+        <li>
+          <span class="actor">המחבר</span>
+          <p>בוחר נושא ובונה שאלון קצר על עצמו. לכל שאלה — <b>תשובה נכונה אחת</b>. בלי הקלדה ובלי לדבר בקול (ראו "חיבור שקט").</p>
+        </li>
+        <li>
+          <span class="actor ai">ה-AI</span>
+          <p>מוסיף <b>שלושה מסיחים</b> לכל שאלה — תשובות שגויות שנשמעות אמיתיות. כל שאלה הופכת לשאלה אמריקאית עם ארבע אפשרויות.</p>
+        </li>
+        <li>
+          <span class="actor sys">המערכת</span>
+          <p>שולחת את השאלון לכל מי שהמחבר בחר. כל נמען מקבל התראה בטלפון שלו.</p>
+        </li>
+        <li>
+          <span class="actor">העונים</span>
+          <p>כל אחד עונה בנפרד בטלפון שלו, בלי לראות את התשובות של האחרים.</p>
+        </li>
+        <li>
+          <span class="actor sys">המערכת</span>
+          <p>משווה כל תשובה לתשובה הנכונה ומחשבת ציון לכל עונה — וגם דירוג ביניהם.</p>
+        </li>
+        <li>
+          <span class="actor sys">המערכת</span>
+          <p>המחבר מקבל את התוצאות: הציונים, ומה כל אחד ענה בכל שאלה. עכשיו חושפים ביחד.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="stack">
+      <span class="eyebrow">חיבור שקט</span>
+      <h2>אפס הקלדה, אפס קול</h2>
+      <p>
+        שלב החיבור הוא הרגע שבו אנשים נוטשים. קול לא מתאים — כולם באותו מרחב וישמעו את התשובות.
+        הקלדה איטית ומלאת שגיאות. הפתרון: <strong>ה-AI מציע את השאלה וגם כמה תשובות אפשריות, והמחבר רק מקייש על הנכונה.</strong>
+      </p>
+      <div class="stack-sm">
+        <p><strong>1.</strong> המחבר בוחר נושא — "שאלון עליי", "ילדות", "הטיול לרומא".</p>
+        <p><strong>2.</strong> ה-AI מציג שאלה ו־6–8 אפשרויות. המחבר מקייש על הנכונה.</p>
+        <p><strong>3.</strong> אין אפשרות מתאימה? כפתור "אחר" ואז מילה אחת — גם עם שגיאת כתיב, ה-AI מתקן.</p>
+        <p><strong>4.</strong> ה-AI לוקח את הבחירה + שלוש מהרשימה כמסיחים. השאלה מוכנה.</p>
+        <p><strong>5.</strong> "שאלה הבאה" או "מספיק, שלח".</p>
+      </div>
+      <div class="callout">
+        <span class="eyebrow">מאגר שאלות שמשתפר מעצמו</span>
+        <p>
+          מאגר התחלתי של כמה מאות שאלות מסווגות לפי נושא — יש תוכן מהיום הראשון, ולרוב אין צורך בקריאת AI בכלל.
+        </p>
+        <p>
+          כשה-AI כן ממציא שאלה חדשה, היא נכנסת ל<strong>תור אישור</strong> לפני שהיא מצטרפת למאגר הציבורי — כדי שלא יתמלא בכפילויות או בזבל. דירוג משתמשים ("השאלה הייתה כיפית?") מקדם שאלות טובות.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="stack">
+      <span class="eyebrow">השחקנים</span>
+      <h2>מחבר אחד, כמה עונים, כולם באותו חדר</h2>
+      <p>
+        אבא מחבר שאלון על עצמו ושולח לאמא ולשני הילדים. כל אחד עונה בשקט בטלפון שלו.
+        כשכולם סיימו, המחבר חושף שאלה-שאלה: <em>"מה הסרט האהוב עליי? אמא אמרה שושנק, יונתן אמר מטריקס, נועה קלעה."</em>
+      </p>
+      <p>
+        לוח התוצאות עונה על שאלה אחת: <strong>מי מכיר את אבא הכי טוב.</strong> התחרות בין העונים היא מה שמייצר את הצחוקים,
+        והחשיפה המשותפת בסוף היא הרגע החברתי.
+      </p>
+      <p>
+        לאורך זמן אפשר לשמור סטטיסטיקה: <em>"יונתן מכיר את אבא ב-72% בממוצע על פני 8 משחקים."</em>
+      </p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="stack">
+      <span class="eyebrow">מעבר ל"כמה אתה מכיר אותי"</span>
+      <h2>אותו מנוע, פורמטים אחרים</h2>
+      <div class="grid">
+        <div class="fmt">
+          <span class="kicker">חברתי</span>
+          <h3>מי אמר את זה?</h3>
+          <p>כל אחד שולח עובדה מצחיקה על עצמו, כולם מנחשים של מי היא.</p>
+        </div>
+        <div class="fmt">
+          <span class="kicker">חברתי</span>
+          <h3>נחשו את התשובה של סבתא</h3>
+          <p>שאלות טריוויה כלליות — מנחשים איך <em>היא</em> תענה, לא מה נכון.</p>
+        </div>
+        <div class="fmt">
+          <span class="kicker">אירועים</span>
+          <h3>מסיבת רווקות / גיבוש צוות</h3>
+          <p>שאלון על החתן או על המנהל, כולם מנחשים ביחד.</p>
+        </div>
+        <div class="fmt">
+          <span class="kicker">ידע</span>
+          <h3>מורה שבונה מבחן</h3>
+          <p>כותב שאלה ותשובה, ה-AI מייצר את המסיחים — החלק הכי מעצבן בהכנת מבחן.</p>
+        </div>
+        <div class="fmt">
+          <span class="kicker">ידע</span>
+          <h3>טריוויה משפחתית</h3>
+          <p>סבא בונה שאלון על ההיסטוריה המשפחתית לכל הנכדים.</p>
+        </div>
+        <div class="fmt">
+          <span class="kicker">תוכן</span>
+          <h3>כמה אתה מכיר את הסדרה</h3>
+          <p>מעריצים בונים חידונים אחד לשני, או שאלון על יעד לפני טיול.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="stack">
+      <span class="eyebrow">זהות והזמנות</span>
+      <h2>משתמשים לפי מספר טלפון</h2>
+      <p>
+        המודל כמו וואטסאפ: זהות = מספר טלפון, אימות בקוד חד-פעמי ב-SMS. זה נותן זהות יציבה
+        ומאפשר גם לשחק מרחוק (סבתא בחו"ל, אח בצבא), לא רק כשכולם באוטו.
+      </p>
+      <div class="callout">
+        <span class="eyebrow">שווה לשים לב</span>
+        <p>
+          "שליחה רק לנייד רשום" יוצרת בעיית ביצה ותרנגולת — אי אפשר לשחק עם מי שעדיין לא התקין.
+        </p>
+        <p>
+          עדיף: שליחה לכל מספר, ואם הוא לא רשום — הנמען מקבל הזמנה להתקין, והשאלון מחכה לו אחרי הרישום.
+          זה גם מה שמניע צמיחה. הגבלה למספרים רשומים בלבד מתאימה יותר לשלב מאוחר.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="stack">
+      <span class="eyebrow">שאלות פתוחות להחלטה</span>
+      <h2>מה עוד צריך לסגור</h2>
+      <ul class="checks">
+        <li><b>פלטפורמה:</b> iOS + Android בקוד משותף (React Native / Flutter)?</li>
+        <li><b>שלב החשיפה:</b> מכשיר אחד משותף שכולם מסתכלים עליו, או כל אחד רואה בטלפון שלו בקצב של המחבר?</li>
+        <li><b>אורך השאלון:</b> 5 שאלות ל"רגע שעמום באוטו", או 10?</li>
+        <li><b>עלות ה-AI:</b> קריאה ל-API עולה אגורות בודדות לשאלון אבל מצטברת — מי מממן, ואיך מצמצמים קריאות בעזרת המאגר?</li>
+        <li><b>כיווניות:</b> העונים גם בונים שאלון חזרה באותו משחק, או שזה מהלך נפרד?</li>
+        <li><b>מצב "ביחד" בלי רישום:</b> להתחיל משחק מקומי עם קוד הצטרפות, בלי חשבונות בכלל?</li>
+        <li><b>מסך אישור מסיחים:</b> להוסיף שלב שבו המחבר מאשר את ארבע התשובות לפני שליחה, למקרה שמסיח יצא בעייתי?</li>
+        <li><b>בקרת מאגר:</b> מי מאשר שאלות חדשות שה-AI ממציא — אוטומטי, ידני, או דירוג קהילתי?</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="stack">
+      <span class="eyebrow">למה זה יכול לעבוד</span>
+      <h2>ה-hook הוא המסיחים, לא הנושא</h2>
+      <p>
+        כל אחד יכול לפתוח טופס גוגל ולכתוב שאלות. מה שאף אחד לא רוצה לעשות זה לשבת ולהמציא
+        שלוש תשובות שגויות משכנעות לכל שאלה. <strong>זה בדיוק החלק שה-AI פותר — וזה מה שהופך את הכלי ממחולל טפסים למשחק.</strong>
+      </p>
+      <p>
+        השלב הבא המתבקש: אב-טיפוס דק שמריץ את הזרימה המלאה על נושא אחד ("כמה אתה מכיר אותי"),
+        עם 5 שאלות, כדי לבדוק אם הצחוקים באמת קורים.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    מי מכיר? · מסמך קונספט · נכתב לצורך פיתוח הרעיון, לא מפרט מחייב
+  </footer>
+
+</div>
+
+<script>
+  (function(){
+    var els = document.querySelectorAll('.reveal');
+    if(!('IntersectionObserver' in window)){
+      els.forEach(function(e){e.classList.add('in')});
+      return;
+    }
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
+      });
+    },{rootMargin:'0px 0px -8% 0px',threshold:.08});
+    els.forEach(function(e){io.observe(e)});
+  })();
+</script>
