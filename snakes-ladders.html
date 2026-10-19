@@ -1,0 +1,483 @@
+<title>סולמות ונחשים של ידע</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Layout: board on one side, a control panel (players, die, question) on the other; stacks on phones */
+:root {
+  --bg: #eef3f2;
+  --panel: #fbfdfc;
+  --ink: #17282a;
+  --muted: #5a6e70;
+  --line: #cfdcda;
+  --cell-a: #e3eeec;
+  --cell-b: #cfe1dd;
+  --accent: #0e6a6a;
+  --accent-ink: #ffffff;
+  --ladder: #b77a1f;
+  --snake: #7b3fa3;
+  --snake-belly: #c9a3e0;
+  --good: #1d7a46;
+  --good-soft: #def2e5;
+  --bad: #b3261e;
+  --bad-soft: #f8e2df;
+  --p1: #d64545; --p2: #2f6fd6; --p3: #d89b00; --p4: #2e9a5a;
+  --display: "Rubik", "Segoe UI", Arial, sans-serif;
+  --body: "Assistant", "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101818; --panel: #172222; --ink: #e3eeec; --muted: #94a9a8; --line: #2b3b3a;
+    --cell-a: #1b2928; --cell-b: #223634; --accent: #4fc2bd; --accent-ink: #0d1a1a;
+    --ladder: #e0a64a; --snake: #b07ad6; --snake-belly: #5d3a78;
+    --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d;
+    --p1: #f07070; --p2: #6e9ef0; --p3: #f0c040; --p4: #5cc48a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101818; --panel: #172222; --ink: #e3eeec; --muted: #94a9a8; --line: #2b3b3a;
+  --cell-a: #1b2928; --cell-b: #223634; --accent: #4fc2bd; --accent-ink: #0d1a1a;
+  --ladder: #e0a64a; --snake: #b07ad6; --snake-belly: #5d3a78;
+  --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d;
+  --p1: #f07070; --p2: #6e9ef0; --p3: #f0c040; --p4: #5cc48a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5; direction: rtl; }
+.wrap {
+  max-width: 1180px; margin: 0 auto; padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(24px, 4.5vw, 34px); margin: 0 0 14px; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 18px; margin: 0; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn {
+  font: 700 16px var(--body); padding: 10px 20px; border-radius: 8px; cursor: pointer;
+  border: 2px solid var(--accent); background: var(--accent); color: var(--accent-ink);
+}
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: default; }
+
+/* setup */
+.setup { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px; display: grid; gap: 22px; max-width: 640px; }
+.field { display: grid; gap: 10px; }
+.field > label, .field > .lbl { font-weight: 700; }
+.hint { color: var(--muted); font-size: 14px; margin: 0; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button {
+  min-width: 44px; padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--line);
+  background: transparent; cursor: pointer; font-family: var(--display); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.names { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.names .nm { display: flex; align-items: center; gap: 8px; }
+.names input {
+  flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--line);
+  background: var(--bg); color: var(--ink); font: inherit;
+}
+.chip { width: 16px; height: 16px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--line); }
+.err { color: var(--bad); font-weight: 600; margin: 0; }
+
+/* game */
+.game { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .game { grid-template-columns: 1fr; } }
+.board-wrap { position: relative; width: 100%; max-width: 680px; aspect-ratio: 1; justify-self: center; }
+.board {
+  position: absolute; inset: 0; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(10, 1fr);
+  border-radius: 10px; overflow: hidden; border: 2px solid var(--line); direction: ltr;
+}
+.cell { position: relative; background: var(--cell-a); border: .5px solid var(--line); }
+.cell.alt { background: var(--cell-b); }
+.cell .n { position: absolute; top: 3px; right: 5px; font: 700 clamp(8px, 1.5vw, 12px) var(--display); color: var(--muted); font-variant-numeric: tabular-nums; }
+.cell.end { background: var(--accent); }
+.cell.end .n { color: var(--accent-ink); }
+.cell .tag { position: absolute; bottom: 3px; left: 0; right: 0; text-align: center; font: 700 clamp(7px, 1.2vw, 11px) var(--display); color: var(--muted); }
+.cell.end .tag { color: var(--accent-ink); }
+svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.tokens { position: absolute; inset: 0; pointer-events: none; }
+.token {
+  position: absolute; width: 4.6%; height: 4.6%; border-radius: 50%;
+  border: 2px solid var(--panel); box-shadow: 0 2px 4px rgb(0 0 0 / .35);
+  transform: translate(-50%, -50%);
+}
+@media (prefers-reduced-motion: no-preference) { .token { transition: left .16s ease, top .16s ease; } }
+
+.side { display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.players { display: grid; gap: 6px; }
+.pl { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 8px; border: 1.5px solid transparent; }
+.pl.turn { border-color: var(--accent); background: var(--bg); }
+.pl .name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl .sq, .pl .pts { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; white-space: nowrap; }
+.pl .pts b { color: var(--ink); font-family: var(--display); font-size: 16px; }
+.turn-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.die {
+  width: 58px; height: 58px; border-radius: 12px; border: 2px solid var(--ink); background: var(--panel);
+  display: grid; place-items: center; font: 800 24px var(--display); flex: none; font-variant-numeric: tabular-nums;
+}
+.turn-text .sub.ladder { color: var(--ladder); font-weight: 600; }
+.turn-text .sub.snake { color: var(--snake); font-weight: 600; }
+.rank { display: grid; gap: 6px; text-align: right; }
+.rank .pl { grid-template-columns: auto auto 1fr auto auto; }
+.rank .place { font: 800 16px var(--display); color: var(--muted); font-variant-numeric: tabular-nums; }
+.turn-text { flex: 1; min-width: 0; }
+.turn-text .who { font-family: var(--display); font-weight: 700; font-size: 18px; }
+.turn-text .sub { color: var(--muted); font-size: 14px; }
+
+.qhead { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+.lvl { font-family: var(--display); font-weight: 700; color: var(--accent); }
+.qtext { font-weight: 700; font-size: 18px; margin: 0; }
+.opts { display: grid; gap: 8px; }
+.opt {
+  display: flex; gap: 10px; align-items: center; padding: 9px 12px; border-radius: 8px;
+  border: 1.5px solid var(--line); background: transparent; cursor: pointer; text-align: right;
+}
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt .k { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--muted); display: grid; place-items: center; font: 700 13px var(--display); flex: none; }
+.opt.right { border-color: var(--good); background: var(--good-soft); }
+.opt.right .k { background: var(--good); border-color: var(--good); color: var(--panel); }
+.opt.wrong { border-color: var(--bad); background: var(--bad-soft); }
+.opt.wrong .k { background: var(--bad); border-color: var(--bad); color: var(--panel); }
+.feedback { padding: 10px 12px; border-radius: 8px; font-weight: 600; }
+.feedback.ok { background: var(--good-soft); color: var(--good); }
+.feedback.no { background: var(--bad-soft); color: var(--bad); }
+.feedback .ex { display: block; font-weight: 400; color: var(--ink); margin-top: 4px; font-size: 15px; }
+.log { color: var(--muted); font-size: 14px; margin: 0; }
+.more { border-top: 1px dashed var(--line); padding-top: 10px; }
+.more summary { cursor: pointer; font-family: var(--display); font-weight: 700; color: var(--accent); }
+.more p { margin: 8px 0 0; font-size: 15px; line-height: 1.65; max-width: 62ch; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 18px; height: 4px; border-radius: 2px; display: inline-block; }
+.win { text-align: center; }
+.win .big { font: 800 28px var(--display); }
+</style>
+
+<div class="wrap">
+  <h1>סולמות ונחשים של ידע</h1>
+
+  <section class="setup" id="setup">
+    <div class="field">
+      <span class="lbl">מספר שחקנים</span>
+      <div class="seg" id="count" role="group" aria-label="מספר שחקנים"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">שמות</span>
+      <div class="names" id="names"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">רמת קושי</span>
+      <div class="seg" id="levels" role="group" aria-label="רמת קושי"></div>
+      <p class="hint" id="range"></p>
+    </div>
+    <p class="err" id="loadErr" hidden></p>
+    <div><button class="btn" id="startBtn" type="button">התחלת משחק</button></div>
+  </section>
+
+  <section class="game" id="game" hidden>
+    <div class="board-wrap" id="boardWrap">
+      <div class="board" id="board"></div>
+      <svg class="over" id="over" viewBox="0 0 100 100" aria-hidden="true"></svg>
+      <div class="tokens" id="tokens"></div>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <div class="players" id="players"></div>
+        <div class="legend">
+          <span><i style="background: var(--ladder)"></i>סולם: עולים</span>
+          <span><i style="background: var(--snake)"></i>נחש: יורדים</span>
+        </div>
+      </div>
+
+      <div class="card" id="turnCard">
+        <div class="turn-row">
+          <div class="die" id="die" aria-label="המשבצת הנוכחית">1</div>
+          <div class="turn-text">
+            <div class="who" id="who"></div>
+            <div class="sub" id="sub"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="qCard" hidden>
+        <div class="qhead"><span class="lvl" id="qLvl"></span><span id="qCat"></span></div>
+        <p class="qtext" id="qText"></p>
+        <div class="opts" id="qOpts"></div>
+        <div class="feedback" id="fb" hidden></div>
+        <p class="log" id="log" hidden></p>
+        <details class="more" id="more" open hidden><summary>הרחבה: עוד על הנושא</summary><p id="moreText"></p></details>
+        <div><button class="btn" id="nextBtn" type="button" hidden>התור הבא</button></div>
+      </div>
+
+      <div class="card win" id="winCard" hidden>
+        <div class="big" id="winText"></div>
+        <div class="rank" id="rank"></div>
+        <p class="log" id="winSub"></p>
+        <div><button class="btn" id="againBtn" type="button">משחק חדש</button></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const LADDERS = { 4: 14, 9: 31, 21: 42, 28: 84, 51: 67, 72: 91, 80: 99 };
+const SNAKES  = { 17: 7, 54: 34, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 79 };
+const COLORS = ["var(--p1)", "var(--p2)", "var(--p3)", "var(--p4)"];
+const LETTERS = ["א", "ב", "ג", "ד"];
+const $ = id => document.getElementById(id);
+
+let setup = { count: 2, level: 5, names: ["שחקן 1", "שחקן 2", "שחקן 3", "שחקן 4"] };
+let bank = {};      // level -> questions[]
+let G = null;       // game state
+
+// ---------- board geometry (square 1 bottom-right, rows snake upward) ----------
+function pos(s) {
+  const i = s - 1, row = Math.floor(i / 10), k = i % 10;
+  const col = row % 2 === 0 ? 9 - k : k;   // col 0 = left edge
+  return { col, row: 9 - row, x: col * 10 + 5, y: (9 - row) * 10 + 5 };
+}
+
+function drawBoard() {
+  const b = $("board"); b.innerHTML = "";
+  for (let s = 1; s <= 100; s++) {
+    const p = pos(s), c = document.createElement("div");
+    c.className = "cell" + ((p.col + p.row) % 2 ? " alt" : "") + (s === 100 ? " end" : "");
+    c.style.gridColumn = p.col + 1; c.style.gridRow = p.row + 1;
+    c.innerHTML = `<span class="n">${s}</span>` + (s === 1 ? `<span class="tag">התחלה</span>` : s === 100 ? `<span class="tag">סיום</span>` : "");
+    b.appendChild(c);
+  }
+  const NS = "http://www.w3.org/2000/svg", svg = $("over"); svg.innerHTML = "";
+  const el = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); svg.appendChild(e); return e; };
+  for (const [a, b2] of Object.entries(LADDERS)) {
+    const p = pos(+a), q = pos(b2);
+    const dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy), nx = -dy / len * 1.7, ny = dx / len * 1.7;
+    const style = "stroke: var(--ladder); stroke-linecap: round; fill: none";
+    el("line", { x1: p.x + nx, y1: p.y + ny, x2: q.x + nx, y2: q.y + ny, style: style + "; stroke-width: .9" });
+    el("line", { x1: p.x - nx, y1: p.y - ny, x2: q.x - nx, y2: q.y - ny, style: style + "; stroke-width: .9" });
+    const steps = Math.floor(len / 3.2);
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps, cx = p.x + dx * t, cy = p.y + dy * t;
+      el("line", { x1: cx + nx, y1: cy + ny, x2: cx - nx, y2: cy - ny, style: style + "; stroke-width: .6" });
+    }
+  }
+  for (const [a, b2] of Object.entries(SNAKES)) {
+    const h = pos(+a), t = pos(b2);
+    const dx = t.x - h.x, dy = t.y - h.y, len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len, w = Math.min(6, len / 4);
+    const c1 = { x: h.x + dx * .33 + nx * w, y: h.y + dy * .33 + ny * w };
+    const c2 = { x: h.x + dx * .66 - nx * w, y: h.y + dy * .66 - ny * w };
+    const d = `M${h.x},${h.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${t.x},${t.y}`;
+    el("path", { d, style: "stroke: var(--snake); stroke-width: 2.4; stroke-linecap: round; fill: none; opacity: .9" });
+    el("path", { d, style: "stroke: var(--snake-belly); stroke-width: .7; stroke-linecap: round; fill: none; stroke-dasharray: 1.2 1.6" });
+    el("circle", { cx: h.x, cy: h.y, r: 2.1, style: "fill: var(--snake)" });
+    el("circle", { cx: h.x - .7, cy: h.y - .5, r: .45, style: "fill: var(--panel)" });
+    el("circle", { cx: h.x + .7, cy: h.y - .5, r: .45, style: "fill: var(--panel)" });
+  }
+}
+
+function drawTokens() {
+  const box = $("tokens"); box.innerHTML = "";
+  const offs = [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]];
+  G.players.forEach((p, i) => {
+    const q = pos(p.sq), t = document.createElement("div");
+    t.className = "token"; t.style.background = COLORS[i];
+    t.style.left = (q.x + offs[i][0]) + "%"; t.style.top = (q.y + offs[i][1]) + "%";
+    t.title = p.name; box.appendChild(t);
+  });
+}
+
+// ---------- setup ----------
+function levelRange(L) { return [Math.max(1, L - 2), L]; }
+function renderSetup() {
+  const cnt = $("count"); cnt.innerHTML = "";
+  for (let n = 1; n <= 4; n++) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = n;
+    b.setAttribute("aria-pressed", n === setup.count);
+    b.onclick = () => { setup.count = n; renderSetup(); };
+    cnt.appendChild(b);
+  }
+  const nm = $("names"); nm.innerHTML = "";
+  for (let i = 0; i < setup.count; i++) {
+    const row = document.createElement("div"); row.className = "nm";
+    row.innerHTML = `<span class="chip" style="background:${COLORS[i]}"></span><input id="name${i}" maxlength="16" aria-label="שם שחקן ${i + 1}">`;
+    const inp = row.querySelector("input"); inp.value = setup.names[i];
+    inp.oninput = () => { setup.names[i] = inp.value; };
+    nm.appendChild(row);
+  }
+  const lv = $("levels"); lv.innerHTML = "";
+  for (let L = 1; L <= 10; L++) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = L;
+    b.setAttribute("aria-pressed", L === setup.level);
+    b.onclick = () => { setup.level = L; renderSetup(); };
+    lv.appendChild(b);
+  }
+  const [lo, hi] = levelRange(setup.level);
+  $("range").textContent = (lo === hi ? `כל השאלות ברמה ${lo}.` : `השאלות יהיו ברמות ${lo}–${hi}.`) +
+    " תשובה נכונה מוסיפה נקודות כמספר הרמה של השאלה, ותשובה שגויה מורידה את אותו מספר.";
+}
+
+async function loadLevels(levels) {
+  const need = levels.filter(l => !bank[l]);
+  await Promise.all(need.map(async l => {
+    const r = await fetch(`questions/level-${String(l).padStart(2, "0")}.json`);
+    if (!r.ok) throw new Error(l);
+    bank[l] = (await r.json()).questions;
+  }));
+}
+
+$("startBtn").onclick = async () => {
+  const [lo, hi] = levelRange(setup.level), levels = [];
+  for (let l = lo; l <= hi; l++) levels.push(l);
+  $("loadErr").hidden = true;
+  try { await loadLevels(levels); }
+  catch (e) {
+    $("loadErr").textContent = "לא הצלחתי לטעון את קובצי השאלות מהתיקייה questions. אם פתחת את הקובץ ישירות מהמחשב, צריך להריץ אותו דרך שרת מקומי.";
+    $("loadErr").hidden = false; return;
+  }
+  G = {
+    level: setup.level, levels,
+    players: Array.from({ length: setup.count }, (_, i) => ({ name: (setup.names[i] || "").trim() || `שחקן ${i + 1}`, sq: 1, pts: 0, right: 0, asked: 0 })),
+    turn: 0, phase: "question", q: null, used: [], pick: null, msg: "", winner: null
+  };
+  G.q = pickQuestion();
+  showGame();
+};
+
+// ---------- game ----------
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function pickQuestion() {
+  let pool = [];
+  for (const l of G.levels) for (const q of bank[l]) if (!G.used.includes(q.id)) pool.push({ ...q, level: l });
+  if (!pool.length) { G.used = []; return pickQuestion(); }
+  const q = pool[Math.floor(Math.random() * pool.length)];
+  G.used.push(q.id);
+  return { id: q.id, level: q.level, cat: q.cat, q: q.q, options: q.options, answer: q.answer, explain: q.explain, expansion: q.expansion || "", order: shuffle([0, 1, 2, 3]) };
+}
+
+function showGame() {
+  $("setup").hidden = true; $("game").hidden = false;
+  drawBoard(); render();
+}
+
+function render() {
+  drawTokens();
+  const pl = $("players"); pl.innerHTML = "";
+  G.players.forEach((p, i) => {
+    const r = document.createElement("div"); r.className = "pl" + (i === G.turn && !G.winner ? " turn" : "");
+    r.innerHTML = `<span class="chip" style="background:${COLORS[i]}"></span><span class="name"></span><span class="sq">משבצת ${p.sq} · ${p.asked} תורות</span><span class="pts"><b>${p.pts}</b> נק'</span>`;
+    r.querySelector(".name").textContent = p.name;
+    pl.appendChild(r);
+  });
+  const cur = G.players[G.turn];
+  $("die").textContent = cur.sq;
+  $("who").textContent = G.winner ? "המשחק הסתיים" : `התור של ${cur.name}`;
+  const sub = $("sub");
+  sub.className = "sub";
+  if (G.winner) sub.textContent = "";
+  else if (G.phase !== "question") sub.textContent = "";
+  else if (LADDERS[cur.sq]) { sub.className = "sub ladder"; sub.textContent = `אתה על סולם. תשובה נכונה תעלה אותך למשבצת ${LADDERS[cur.sq]}.`; }
+  else if (SNAKES[cur.sq]) { sub.className = "sub snake"; sub.textContent = `אתה על ראש נחש. תשובה שגויה תוריד אותך למשבצת ${SNAKES[cur.sq]}.`; }
+  else sub.textContent = "תשובה נכונה מקדמת אותך משבצת אחת.";
+
+  $("qCard").hidden = !G.q;
+  if (G.q) {
+    const q = G.q;
+    $("qLvl").textContent = `רמה ${q.level} · ${q.level} נק'`;
+    $("qCat").textContent = q.cat;
+    $("qText").textContent = q.q;
+    const box = $("qOpts"); box.innerHTML = "";
+    q.order.forEach((oi, k) => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "opt"; b.id = "opt" + k;
+      b.innerHTML = `<span class="k">${LETTERS[k]}</span><span></span>`;
+      b.lastChild.textContent = q.options[oi];
+      if (G.phase !== "question") {
+        b.disabled = true;
+        if (oi === q.answer) b.classList.add("right");
+        else if (oi === G.pick) b.classList.add("wrong");
+      } else b.onclick = () => answer(oi);
+      box.appendChild(b);
+    });
+    const fb = $("fb");
+    if (G.phase === "question") fb.hidden = true;
+    else {
+      const ok = G.pick === q.answer;
+      fb.hidden = false; fb.className = "feedback " + (ok ? "ok" : "no");
+      fb.textContent = ok ? `נכון! +${q.level} נקודות` : `לא נכון, −${q.level} נקודות. התשובה: ${q.options[q.answer]}`;
+      if (q.explain) { const s = document.createElement("span"); s.className = "ex"; s.textContent = q.explain; fb.appendChild(s); }
+    }
+    $("log").hidden = !G.msg; $("log").textContent = G.msg;
+    $("more").hidden = G.phase === "question" || !q.expansion;
+    $("moreText").textContent = q.expansion;
+    $("nextBtn").hidden = G.phase !== "done" || !!G.winner;
+  }
+
+  $("winCard").hidden = !G.winner;
+  if (G.winner) {
+    const w = G.players[G.winner - 1];
+    $("winText").textContent = `${w.name} הגיע/ה ראשון/ה למשבצת 100!`;
+    // ranking: whoever reached 100 first, then by square, then by points
+    const order = G.players.map((p, i) => ({ p, i })).sort((a, b) =>
+      (b.i === G.winner - 1) - (a.i === G.winner - 1) || b.p.sq - a.p.sq || b.p.pts - a.p.pts);
+    const rk = $("rank"); rk.innerHTML = "";
+    order.forEach(({ p, i }, n) => {
+      const r = document.createElement("div"); r.className = "pl";
+      r.innerHTML = `<span class="place">${n + 1}</span><span class="chip" style="background:${COLORS[i]}"></span><span class="name"></span><span class="sq">משבצת ${p.sq} · ${p.asked} תורות · ${p.right} נכונות</span><span class="pts"><b>${p.pts}</b> נק'</span>`;
+      r.querySelector(".name").textContent = p.name;
+      rk.appendChild(r);
+    });
+    $("winSub").textContent = `${w.name} הגיע/ה ל-100 אחרי ${w.asked} תורות.`;
+  }
+}
+
+function answer(oi) {
+  const p = G.players[G.turn], q = G.q, ok = oi === q.answer, from = p.sq;
+  G.pick = oi; p.asked++;
+  // expansions this player has read; groundwork for questions drawn from them later
+  (p.seen = p.seen || []).push(q.id);
+  let msg;
+  if (ok) {
+    p.pts += q.level; p.right++;
+    if (LADDERS[from]) { p.sq = LADDERS[from]; msg = `טיפוס בסולם! ${p.name} עלה/תה ממשבצת ${from} למשבצת ${p.sq}.`; }
+    else {
+      p.sq = from + 1;
+      msg = (SNAKES[from] ? `ניצלת מהנחש! ` : "") + `${p.name} התקדם/ה למשבצת ${p.sq}.`;
+    }
+  } else {
+    p.pts -= q.level;
+    if (SNAKES[from]) { p.sq = SNAKES[from]; msg = `${p.name} החליק/ה בנחש ממשבצת ${from} למשבצת ${p.sq}.`; }
+    else msg = `${p.name} נשאר/ת במשבצת ${from}.`;
+  }
+  if (p.sq !== from) {
+    if (LADDERS[p.sq]) msg += ` נחתת על סולם: בתור הבא תשובה נכונה תעלה אותך למשבצת ${LADDERS[p.sq]}.`;
+    else if (SNAKES[p.sq]) msg += ` זהירות, ראש נחש: בתור הבא תשובה שגויה תוריד אותך למשבצת ${SNAKES[p.sq]}.`;
+  }
+  if (p.sq === 100) G.winner = G.turn + 1;
+  G.msg = msg; G.phase = "done";
+  render();
+  if (!G.winner) $("nextBtn").focus();
+}
+
+$("nextBtn").onclick = () => {
+  G.turn = (G.turn + 1) % G.players.length;
+  G.q = pickQuestion(); G.pick = null; G.msg = ""; G.phase = "question";
+  render();
+  $("turnCard").scrollIntoView({ block: "nearest" });
+};
+$("againBtn").onclick = () => { G = null; $("game").hidden = true; $("setup").hidden = false; renderSetup(); };
+
+// ---------- boot ----------
+function start(data) {
+  if (data && data.setup) setup = data.setup;
+  if (data && data.bank) bank = data.bank;
+  renderSetup();
+  if (data && data.G) {
+    G = data.G;
+    if (G.phase === "roll" || G.phase === "moving" || !G.q) { G.q = pickQuestion(); G.pick = null; G.phase = "question"; }
+    showGame();
+  }
+}
+window.claude?.hot?.snapshot?.(() => ({ setup, bank, G }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
