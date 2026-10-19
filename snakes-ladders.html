@@ -356,7 +356,7 @@ function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { co
 // wrong answers cost less the harder the question: level 1 costs 10, level 10 costs 1
 const penalty = level => 11 - level;
 const EXP_CHANCE = 0.4;   // chance of a question drawn from an expansion already read
-const EXP_DELAY = 3;      // a follow-up comes back only after this many turns, so it tests memory
+const EXP_DELAY = 10;     // a follow-up comes back only after this many turns, so it tests memory
 const turnsPlayed = () => G.players.reduce((n, p) => n + p.asked, 0);
 const any = a => a[Math.floor(Math.random() * a.length)];
 function pickQuestion() {
