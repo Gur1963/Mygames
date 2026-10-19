@@ -193,6 +193,7 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
           <span><i style="background: var(--ladder)"></i>סולם: עולים</span>
           <span><i style="background: var(--snake)"></i>נחש: יורדים</span>
         </div>
+        <div><button class="btn ghost" id="resetBtn" type="button">משחק חדש</button></div>
       </div>
 
       <div class="card" id="turnCard">
@@ -492,7 +493,16 @@ $("swapBtn").onclick = () => {
   G.q = pickQuestion(); G.swapped = true;
   render(); $("opt0").focus();
 };
-$("againBtn").onclick = () => { G = null; try { localStorage.removeItem(SAVE_KEY); } catch (e) {} $("game").hidden = true; $("setup").hidden = false; renderSetup(); };
+function newGame() { G = null; try { localStorage.removeItem(SAVE_KEY); } catch (e) {} $("game").hidden = true; $("setup").hidden = false; renderSetup(); }
+$("againBtn").onclick = newGame;
+// mid-game reset asks for a second click, since the current game is lost
+let resetArmed = null;
+$("resetBtn").onclick = () => {
+  const b = $("resetBtn");
+  if (resetArmed) { clearTimeout(resetArmed); resetArmed = null; b.textContent = "משחק חדש"; newGame(); return; }
+  b.textContent = "המשחק הנוכחי יימחק. ללחוץ שוב לאישור";
+  resetArmed = setTimeout(() => { resetArmed = null; b.textContent = "משחק חדש"; }, 4000);
+};
 
 // ---------- persistence: a reload or an update of the page resumes the game ----------
 const SAVE_KEY = "snl-game";
