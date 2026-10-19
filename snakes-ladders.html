@@ -159,6 +159,7 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
 
 <div class="wrap">
   <h1>סולמות ונחשים של ידע</h1>
+  <p class="err" id="crash" hidden></p>
 
   <section class="setup" id="setup">
     <div class="field">
@@ -378,6 +379,7 @@ function showGame() {
 }
 
 function render() {
+  persist();
   drawTokens();
   const pl = $("players"); pl.innerHTML = "";
   G.players.forEach((p, i) => {
@@ -490,19 +492,33 @@ $("swapBtn").onclick = () => {
   G.q = pickQuestion(); G.swapped = true;
   render(); $("opt0").focus();
 };
-$("againBtn").onclick = () => { G = null; $("game").hidden = true; $("setup").hidden = false; renderSetup(); };
+$("againBtn").onclick = () => { G = null; try { localStorage.removeItem(SAVE_KEY); } catch (e) {} $("game").hidden = true; $("setup").hidden = false; renderSetup(); };
+
+// ---------- persistence: a reload or an update of the page resumes the game ----------
+const SAVE_KEY = "snl-game";
+function persist() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify({ setup, G })); } catch (e) {}
+}
+function savedGame() {
+  try { return JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); } catch (e) { return null; }
+}
 
 // ---------- boot ----------
-function start(data) {
-  if (data && data.setup) setup = data.setup;
-  if (data && data.bank) bank = data.bank;
+async function start(data) {
+  const saved = data && data.G ? data : savedGame();
+  if (saved && saved.setup) setup = saved.setup;
   renderSetup();
-  if (data && data.G) {
-    G = data.G;
-    if (G.phase === "roll" || G.phase === "moving" || !G.q) { G.q = pickQuestion(); G.pick = null; G.phase = "question"; }
-    showGame();
-  }
+  if (!saved || !saved.G || saved.G.winner) return;
+  try { await loadLevels(saved.G.levels); } catch (e) { return; }
+  G = saved.G;
+  if (G.phase !== "question" && G.phase !== "done" || !G.q) { G.q = pickQuestion(); G.pick = null; G.phase = "question"; }
+  showGame();
 }
-window.claude?.hot?.snapshot?.(() => ({ setup, bank, G }));
+window.addEventListener("error", e => {
+  const box = $("crash");
+  box.textContent = "משהו השתבש במשחק. המצב נשמר, ורענון של הדף ימשיך מאותה נקודה. פרטים לתיקון: " + (e.message || e.error);
+  box.hidden = false;
+});
+window.claude?.hot?.snapshot?.(() => ({ setup, G }));
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 </script>
