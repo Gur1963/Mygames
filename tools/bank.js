@@ -62,6 +62,21 @@ if (cmd === "stats") {
     if (changed) save(d);
   }
   console.log("follow-ups rewritten:", done, "of", Object.keys(map).length);
+} else if (cmd === "cats") {
+  // merge stray category labels into the main ones, then print the topic table
+  const MERGE = { "חשבון": "מתמטיקה", "חגים": "יהדות", "שחמט": "ספורט", "תרבות": "כללי", "ארכאולוגיה": "היסטוריה" };
+  const table = {};
+  for (let l = 1; l <= 10; l++) {
+    const d = load(l);
+    let changed = false;
+    for (const q of d.questions) {
+      if (MERGE[q.cat]) { q.cat = MERGE[q.cat]; changed = true; }
+      if (!q.parent) ((table[q.cat] ||= Array(10).fill(0))[l - 1]++);
+    }
+    if (changed) save(d);
+  }
+  for (const [c, row] of Object.entries(table).sort((a, b) => b[1].reduce((x, y) => x + y) - a[1].reduce((x, y) => x + y)))
+    console.log(`${c}\t${row.reduce((x, y) => x + y)}\t${row.join(" ")}`);
 } else {
-  console.log("usage: node tools/bank.js stats | add <batch.json> | followups <map.json>");
+  console.log("usage: node tools/bank.js stats | add <batch.json> | followups <map.json> | cats");
 }
