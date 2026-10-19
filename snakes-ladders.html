@@ -128,6 +128,8 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
 .qhead { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
 .lvl { font-family: var(--display); font-weight: 700; color: var(--accent); }
 .qtext { font-weight: 700; font-size: 18px; margin: 0; }
+.from { margin: 0; font-size: 14px; color: var(--muted); border-inline-start: 3px solid var(--accent); padding-inline-start: 10px; }
+.from b { color: var(--accent); }
 .opts { display: grid; gap: 8px; }
 .opt {
   display: flex; gap: 10px; align-items: center; padding: 9px 12px; border-radius: 8px;
@@ -204,8 +206,10 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
 
       <div class="card" id="qCard" hidden>
         <div class="qhead"><span class="lvl" id="qLvl"></span><span id="qCat"></span></div>
+        <p class="from" id="qFrom" hidden></p>
         <p class="qtext" id="qText"></p>
         <div class="opts" id="qOpts"></div>
+        <div><button class="btn ghost" id="swapBtn" type="button" hidden>החלפת שאלה (פעם אחת על נחש)</button></div>
         <div class="feedback" id="fb" hidden></div>
         <p class="log" id="log" hidden></p>
         <details class="more" id="more" open hidden><summary>הרחבה: עוד על הנושא</summary><p id="moreText"></p></details>
@@ -315,7 +319,7 @@ function renderSetup() {
   }
   const [lo, hi] = levelRange(setup.level);
   $("range").textContent = (lo === hi ? `כל השאלות ברמה ${lo}.` : `השאלות יהיו ברמות ${lo}–${hi}.`) +
-    " תשובה נכונה מוסיפה נקודות כמספר הרמה של השאלה, ותשובה שגויה מורידה את אותו מספר.";
+    " תשובה נכונה מוסיפה נקודות כמספר הרמה של השאלה. תשובה שגויה מורידה 11 פחות הרמה, כלומר טעות בשאלה קשה עולה פחות.";
 }
 
 async function loadLevels(levels) {
@@ -347,13 +351,25 @@ $("startBtn").onclick = async () => {
 
 // ---------- game ----------
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+// wrong answers cost less the harder the question: level 1 costs 10, level 10 costs 1
+const penalty = level => 11 - level;
+const EXP_CHANCE = 0.4;   // chance of a question drawn from an expansion already read
+const EXP_DELAY = 3;      // a follow-up comes back only after this many turns, so it tests memory
+const turnsPlayed = () => G.players.reduce((n, p) => n + p.asked, 0);
+const any = a => a[Math.floor(Math.random() * a.length)];
 function pickQuestion() {
-  let pool = [];
-  for (const l of G.levels) for (const q of bank[l]) if (!G.used.includes(q.id)) pool.push({ ...q, level: l });
-  if (!pool.length) { G.used = []; return pickQuestion(); }
-  const q = pool[Math.floor(Math.random() * pool.length)];
+  const all = [];
+  for (const l of G.levels) for (const q of bank[l]) all.push({ ...q, level: l });
+  const readAt = G.readAt || {}, now = turnsPlayed();
+  // follow-ups unlock a few turns after their parent's expansion was shown to the table
+  const fus = all.filter(q => q.parent && readAt[q.parent] !== undefined && now - readAt[q.parent] >= EXP_DELAY && !G.used.includes(q.id));
+  let pool = all.filter(q => !q.parent && !G.used.includes(q.id));
+  if (!pool.length) { G.used = G.used.filter(id => all.some(q => q.id === id && q.parent)); pool = all.filter(q => !q.parent && !G.used.includes(q.id)); }
+  const q = fus.length && Math.random() < EXP_CHANCE ? any(fus) : any(pool);
   G.used.push(q.id);
-  return { id: q.id, level: q.level, cat: q.cat, q: q.q, options: q.options, answer: q.answer, explain: q.explain, expansion: q.expansion || "", order: shuffle([0, 1, 2, 3]) };
+  const parent = q.parent ? all.find(x => x.id === q.parent) : null;
+  return { id: q.id, level: q.level, cat: q.cat, q: q.q, options: q.options, answer: q.answer, explain: q.explain, expansion: q.expansion || "",
+           fromExp: parent ? parent.q : "", order: shuffle([0, 1, 2, 3]) };
 }
 
 function showGame() {
@@ -384,9 +400,13 @@ function render() {
   $("qCard").hidden = !G.q;
   if (G.q) {
     const q = G.q;
-    $("qLvl").textContent = `רמה ${q.level} · ${q.level} נק'`;
-    $("qCat").textContent = q.cat;
+    $("qLvl").textContent = `רמה ${q.level} · נכון +${q.level} · טעות −${penalty(q.level)}`;
+    $("qCat").textContent = q.fromExp ? "שאלה מתוך הרחבה" : q.cat;
+    const from = $("qFrom");
+    from.hidden = !q.fromExp;
+    if (q.fromExp) { from.innerHTML = "<b>מתוך ההרחבה לשאלה:</b> "; from.appendChild(document.createTextNode(q.fromExp)); }
     $("qText").textContent = q.q;
+    $("swapBtn").hidden = !(G.phase === "question" && SNAKES[cur.sq] && !G.swapped);
     const box = $("qOpts"); box.innerHTML = "";
     q.order.forEach((oi, k) => {
       const b = document.createElement("button"); b.type = "button"; b.className = "opt"; b.id = "opt" + k;
@@ -404,7 +424,7 @@ function render() {
     else {
       const ok = G.pick === q.answer;
       fb.hidden = false; fb.className = "feedback " + (ok ? "ok" : "no");
-      fb.textContent = ok ? `נכון! +${q.level} נקודות` : `לא נכון, −${q.level} נקודות. התשובה: ${q.options[q.answer]}`;
+      fb.textContent = ok ? `נכון! +${q.level} נקודות` : `לא נכון, −${penalty(q.level)} נקודות. התשובה: ${q.options[q.answer]}`;
       if (q.explain) { const s = document.createElement("span"); s.className = "ex"; s.textContent = q.explain; fb.appendChild(s); }
     }
     $("log").hidden = !G.msg; $("log").textContent = G.msg;
@@ -436,6 +456,7 @@ function answer(oi) {
   G.pick = oi; p.asked++;
   // expansions this player has read; groundwork for questions drawn from them later
   (p.seen = p.seen || []).push(q.id);
+  if (q.expansion) (G.readAt = G.readAt || {})[q.id] = turnsPlayed();
   let msg;
   if (ok) {
     p.pts += q.level; p.right++;
@@ -445,7 +466,7 @@ function answer(oi) {
       msg = (SNAKES[from] ? `ניצלת מהנחש! ` : "") + `${p.name} התקדם/ה למשבצת ${p.sq}.`;
     }
   } else {
-    p.pts -= q.level;
+    p.pts -= penalty(q.level);
     if (SNAKES[from]) { p.sq = SNAKES[from]; msg = `${p.name} החליק/ה בנחש ממשבצת ${from} למשבצת ${p.sq}.`; }
     else msg = `${p.name} נשאר/ת במשבצת ${from}.`;
   }
@@ -461,9 +482,13 @@ function answer(oi) {
 
 $("nextBtn").onclick = () => {
   G.turn = (G.turn + 1) % G.players.length;
-  G.q = pickQuestion(); G.pick = null; G.msg = ""; G.phase = "question";
+  G.q = pickQuestion(); G.pick = null; G.msg = ""; G.phase = "question"; G.swapped = false;
   render();
   $("turnCard").scrollIntoView({ block: "nearest" });
+};
+$("swapBtn").onclick = () => {
+  G.q = pickQuestion(); G.swapped = true;
+  render(); $("opt0").focus();
 };
 $("againBtn").onclick = () => { G = null; $("game").hidden = true; $("setup").hidden = false; renderSetup(); };
 
