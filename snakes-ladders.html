@@ -153,6 +153,11 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
 .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 18px; height: 4px; border-radius: 2px; display: inline-block; }
+.cell .trap { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(14px, 3.4vw, 26px); line-height: 1; }
+.exam-bar { display: flex; gap: 6px; }
+.exam-bar i { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
+.exam-bar i.ok { background: var(--good); }
+.exam-bar i.no { background: var(--bad); }
 .win { text-align: center; }
 .win .big { font: 800 28px var(--display); }
 </style>
@@ -192,6 +197,7 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
         <div class="legend">
           <span><i style="background: var(--ladder)"></i>סולם: עולים</span>
           <span><i style="background: var(--snake)"></i>נחש: יורדים</span>
+          <span>🎈 / 💣 מוסתרים בלוח עד שדורכים עליהם</span>
         </div>
         <div><button class="btn ghost" id="resetBtn" type="button">משחק חדש</button></div>
       </div>
@@ -208,6 +214,7 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
 
       <div class="card" id="qCard" hidden>
         <div class="qhead"><span class="lvl" id="qLvl"></span><span id="qCat"></span></div>
+        <div class="exam-bar" id="examBar" hidden></div>
         <p class="from" id="qFrom" hidden></p>
         <p class="qtext" id="qText"></p>
         <div class="opts" id="qOpts"></div>
@@ -231,6 +238,11 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
 <script>
 const LADDERS = { 4: 14, 9: 31, 21: 42, 28: 84, 51: 67, 72: 91, 80: 99 };
 const SNAKES  = { 17: 7, 54: 34, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 79 };
+// hidden squares: stepping on one reveals it and opens a 5-question exam; only a perfect exam counts
+const TRAPS = { balloon: { icon: "🎈", name: "כדור פורח", count: 3 }, mine: { icon: "💣", name: "מוקש", count: 3 } };
+const EXAM_LEN = 5, TRAP_JUMP = 10;
+// balloons ask easy questions (bottom of the range), mines ask one level above the chosen level
+const examLevel = (kind, L) => kind === "balloon" ? Math.max(1, L - 2) : Math.min(10, L + 1);
 const COLORS = ["var(--p1)", "var(--p2)", "var(--p3)", "var(--p4)"];
 const LETTERS = ["א", "ב", "ג", "ד"];
 const $ = id => document.getElementById(id);
@@ -251,7 +263,7 @@ function drawBoard() {
   for (let s = 1; s <= 100; s++) {
     const p = pos(s), c = document.createElement("div");
     c.className = "cell" + ((p.col + p.row) % 2 ? " alt" : "") + (s === 100 ? " end" : "");
-    c.style.gridColumn = p.col + 1; c.style.gridRow = p.row + 1;
+    c.dataset.s = s; c.style.gridColumn = p.col + 1; c.style.gridRow = p.row + 1;
     c.innerHTML = `<span class="n">${s}</span>` + (s === 1 ? `<span class="tag">התחלה</span>` : s === 100 ? `<span class="tag">סיום</span>` : "");
     b.appendChild(c);
   }
@@ -337,7 +349,7 @@ $("startBtn").onclick = async () => {
   const [lo, hi] = levelRange(setup.level), levels = [];
   for (let l = lo; l <= hi; l++) levels.push(l);
   $("loadErr").hidden = true;
-  try { await loadLevels(levels); }
+  try { await loadLevels([...levels, examLevel("mine", setup.level)]); }
   catch (e) {
     $("loadErr").textContent = "לא הצלחתי לטעון את קובצי השאלות מהתיקייה questions. אם פתחת את הקובץ ישירות מהמחשב, צריך להריץ אותו דרך שרת מקומי.";
     $("loadErr").hidden = false; return;
@@ -347,6 +359,7 @@ $("startBtn").onclick = async () => {
     players: Array.from({ length: setup.count }, (_, i) => ({ name: (setup.names[i] || "").trim() || `שחקן ${i + 1}`, sq: 1, pts: 0, right: 0, asked: 0 })),
     turn: 0, phase: "question", q: null, used: [], pick: null, msg: "", winner: null
   };
+  G.traps = placeTraps(); G.revealed = []; G.exam = null;
   G.q = pickQuestion();
   showGame();
 };
@@ -374,6 +387,40 @@ function pickQuestion() {
            fromExp: parent ? parent.q : "", order: shuffle([0, 1, 2, 3]) };
 }
 
+function placeTraps() {
+  const busy = new Set([...Object.keys(LADDERS), ...Object.values(LADDERS), ...Object.keys(SNAKES), ...Object.values(SNAKES)].map(Number));
+  const free = shuffle(Array.from({ length: 80 }, (_, i) => i + 11).filter(s => !busy.has(s)));
+  const kinds = Object.entries(TRAPS).flatMap(([k, t]) => Array(t.count).fill(k)), traps = {};
+  for (const s of free) {
+    if (!kinds.length) break;
+    // keep traps apart, and never exactly a jump away from each other, so a jump can't land on another trap
+    if (Object.keys(traps).some(t => Math.abs(t - s) < 3 || Math.abs(t - s) === TRAP_JUMP)) continue;
+    traps[s] = kinds.pop();
+  }
+  return traps;
+}
+function pickExamQuestion(level) {
+  let pool = bank[level].filter(q => !q.parent && !G.used.includes(q.id));
+  if (!pool.length) pool = bank[level].filter(q => !q.parent);
+  const q = any(pool);
+  G.used.push(q.id);
+  return { id: q.id, level, cat: q.cat, q: q.q, options: q.options, answer: q.answer, explain: q.explain, expansion: q.expansion || "",
+           fromExp: "", order: shuffle([0, 1, 2, 3]) };
+}
+function drawTraps() {
+  document.querySelectorAll(".cell .trap").forEach(e => e.remove());
+  for (const s of G.revealed) {
+    const c = document.querySelector(`.cell[data-s="${s}"]`), t = TRAPS[G.traps[s]];
+    if (c) c.insertAdjacentHTML("beforeend", `<span class="trap" title="${t.name}">${t.icon}</span>`);
+  }
+}
+// hint shown after moving onto a square
+function landingNote(sq) {
+  if (LADDERS[sq]) return ` נחתת על סולם: בתור הבא תשובה נכונה תעלה אותך למשבצת ${LADDERS[sq]}.`;
+  if (SNAKES[sq]) return ` זהירות, ראש נחש: בתור הבא תשובה שגויה תוריד אותך למשבצת ${SNAKES[sq]}.`;
+  return "";
+}
+
 function showGame() {
   $("setup").hidden = true; $("game").hidden = false;
   drawBoard(); render();
@@ -381,7 +428,8 @@ function showGame() {
 
 function render() {
   persist();
-  drawTokens();
+  drawTokens(); drawTraps();
+  const ex = G.exam && G.exam.started ? G.exam : null;
   const pl = $("players"); pl.innerHTML = "";
   G.players.forEach((p, i) => {
     const r = document.createElement("div"); r.className = "pl" + (i === G.turn && !G.winner ? " turn" : "");
@@ -395,6 +443,7 @@ function render() {
   const sub = $("sub");
   sub.className = "sub";
   if (G.winner) sub.textContent = "";
+  else if (ex) { const t = TRAPS[ex.kind]; sub.textContent = `${t.icon} מבחן ${t.name}: ${EXAM_LEN} נכונות ברצף ` + (ex.kind === "balloon" ? `יקפיצו אותך ${TRAP_JUMP} משבצות קדימה.` : `ימנעו נפילה של ${TRAP_JUMP} משבצות.`); }
   else if (G.phase !== "question") sub.textContent = "";
   else if (LADDERS[cur.sq]) { sub.className = "sub ladder"; sub.textContent = `אתה על סולם. תשובה נכונה תעלה אותך למשבצת ${LADDERS[cur.sq]}.`; }
   else if (SNAKES[cur.sq]) { sub.className = "sub snake"; sub.textContent = `אתה על ראש נחש. תשובה שגויה תוריד אותך למשבצת ${SNAKES[cur.sq]}.`; }
@@ -403,13 +452,16 @@ function render() {
   $("qCard").hidden = !G.q;
   if (G.q) {
     const q = G.q;
-    $("qLvl").textContent = `רמה ${q.level} · נכון +${q.level} · טעות −${penalty(q.level)}`;
+    const qNum = ex ? ex.n + (G.phase === "question" || ex.passed === false ? 1 : 0) : 0;
+    $("qLvl").textContent = (ex ? `${TRAPS[ex.kind].icon} שאלה ${qNum} מתוך ${EXAM_LEN} · ` : "") + `רמה ${q.level} · נכון +${q.level} · טעות −${penalty(q.level)}`;
+    const bar = $("examBar"); bar.hidden = !ex; bar.innerHTML = "";
+    if (ex) for (let i = 0; i < EXAM_LEN; i++) bar.insertAdjacentHTML("beforeend", `<i class="${i < ex.n ? "ok" : i === ex.n && ex.passed === false ? "no" : ""}"></i>`);
     $("qCat").textContent = q.fromExp ? "שאלה מתוך הרחבה" : q.cat;
     const from = $("qFrom");
     from.hidden = !q.fromExp;
     if (q.fromExp) { from.innerHTML = "<b>מתוך ההרחבה לשאלה:</b> "; from.appendChild(document.createTextNode(q.fromExp)); }
     $("qText").textContent = q.q;
-    $("swapBtn").hidden = !(G.phase === "question" && SNAKES[cur.sq] && !G.swapped);
+    $("swapBtn").hidden = !(G.phase === "question" && !ex && SNAKES[cur.sq] && !G.swapped);
     const box = $("qOpts"); box.innerHTML = "";
     q.order.forEach((oi, k) => {
       const b = document.createElement("button"); b.type = "button"; b.className = "opt"; b.id = "opt" + k;
@@ -434,6 +486,7 @@ function render() {
     $("more").hidden = G.phase === "question" || !q.expansion;
     $("moreText").textContent = q.expansion;
     $("nextBtn").hidden = G.phase !== "done" || !!G.winner;
+    $("nextBtn").textContent = G.exam && !G.exam.started ? "למבחן" : ex && ex.passed == null ? "לשאלה הבאה במבחן" : "התור הבא";
   }
 
   $("winCard").hidden = !G.winner;
@@ -455,6 +508,7 @@ function render() {
 }
 
 function answer(oi) {
+  if (G.exam && G.exam.started) return examAnswer(oi);
   const p = G.players[G.turn], q = G.q, ok = oi === q.answer, from = p.sq;
   G.pick = oi; p.asked++;
   // expansions this player has read; groundwork for questions drawn from them later
@@ -474,8 +528,41 @@ function answer(oi) {
     else msg = `${p.name} נשאר/ת במשבצת ${from}.`;
   }
   if (p.sq !== from) {
-    if (LADDERS[p.sq]) msg += ` נחתת על סולם: בתור הבא תשובה נכונה תעלה אותך למשבצת ${LADDERS[p.sq]}.`;
-    else if (SNAKES[p.sq]) msg += ` זהירות, ראש נחש: בתור הבא תשובה שגויה תוריד אותך למשבצת ${SNAKES[p.sq]}.`;
+    msg += landingNote(p.sq);
+    const kind = G.traps && G.traps[p.sq];
+    if (kind) {
+      const t = TRAPS[kind], first = !G.revealed.includes(p.sq);
+      if (first) G.revealed.push(p.sq);
+      G.exam = { kind, sq: p.sq, level: examLevel(kind, G.level), n: 0, started: false, passed: null };
+      msg += ` ${t.icon} ${first ? "נחשף" : "דרכת על"} ${t.name} במשבצת ${p.sq}! מבחן של ${EXAM_LEN} שאלות ברמה ${G.exam.level}: ` +
+        (kind === "balloon" ? `רק ${EXAM_LEN} מתוך ${EXAM_LEN} יקפיצו אותך ${TRAP_JUMP} משבצות קדימה.` : `רק ${EXAM_LEN} מתוך ${EXAM_LEN} ימנעו נפילה של ${TRAP_JUMP} משבצות אחורה.`);
+    }
+  }
+  if (p.sq === 100) G.winner = G.turn + 1;
+  G.msg = msg; G.phase = "done";
+  render();
+  if (!G.winner) $("nextBtn").focus();
+}
+
+// exam questions don't count as turns; the exam stops at the first mistake
+function examAnswer(oi) {
+  const p = G.players[G.turn], q = G.q, ex = G.exam, ok = oi === q.answer, from = p.sq, t = TRAPS[ex.kind];
+  G.pick = oi;
+  (p.seen = p.seen || []).push(q.id);
+  if (q.expansion) (G.readAt = G.readAt || {})[q.id] = turnsPlayed();
+  let msg;
+  if (ok) {
+    p.pts += q.level; p.right++; ex.n++;
+    if (ex.n < EXAM_LEN) msg = `${ex.n} מתוך ${EXAM_LEN} נכונות.`;
+    else {
+      ex.passed = true;
+      if (ex.kind === "balloon") { p.sq = Math.min(100, from + TRAP_JUMP); msg = `${t.icon} הכדור המריא! ${p.name} עף/ה ממשבצת ${from} למשבצת ${p.sq}.` + landingNote(p.sq); }
+      else msg = `${t.icon} המוקש נוטרל! ${p.name} נשאר/ת במשבצת ${from}.`;
+    }
+  } else {
+    p.pts -= penalty(q.level); ex.passed = false;
+    if (ex.kind === "mine") { p.sq = Math.max(1, from - TRAP_JUMP); msg = `${t.icon} בום! המוקש התפוצץ אחרי ${ex.n} נכונות. ${p.name} ירד/ה ממשבצת ${from} למשבצת ${p.sq}.` + landingNote(p.sq); }
+    else msg = `${t.icon} הכדור לא המריא (${ex.n} מתוך ${EXAM_LEN}). ${p.name} נשאר/ת במשבצת ${from}.`;
   }
   if (p.sq === 100) G.winner = G.turn + 1;
   G.msg = msg; G.phase = "done";
@@ -484,6 +571,13 @@ function answer(oi) {
 }
 
 $("nextBtn").onclick = () => {
+  if (G.exam && (!G.exam.started || G.exam.passed == null)) {
+    G.exam.started = true;
+    G.q = pickExamQuestion(G.exam.level); G.pick = null; G.msg = ""; G.phase = "question";
+    render(); $("opt0").focus();
+    return;
+  }
+  G.exam = null;
   G.turn = (G.turn + 1) % G.players.length;
   G.q = pickQuestion(); G.pick = null; G.msg = ""; G.phase = "question"; G.swapped = false;
   render();
@@ -519,8 +613,9 @@ async function start(data) {
   if (saved && saved.setup) setup = saved.setup;
   renderSetup();
   if (!saved || !saved.G || saved.G.winner) return;
-  try { await loadLevels(saved.G.levels); } catch (e) { return; }
+  try { await loadLevels([...saved.G.levels, examLevel("mine", saved.G.level)]); } catch (e) { return; }
   G = saved.G;
+  if (!G.traps) { G.traps = placeTraps(); G.revealed = []; G.exam = null; }
   if (G.phase !== "question" && G.phase !== "done" || !G.q) { G.q = pickQuestion(); G.pick = null; G.phase = "question"; }
   showGame();
 }
