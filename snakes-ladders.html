@@ -263,11 +263,11 @@ function tone(c, t0, freq, dur, { type = "sine", vol = .18, to } = {}) {
   g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur);
   o.connect(g).connect(c.destination); o.start(t0); o.stop(t0 + dur + .02);
 }
-function noise(c, t0, dur, vol, from, to) {
+function noise(c, t0, dur, vol, from, to, type = "lowpass") {
   const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate), d = buf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
-  s.buffer = buf; f.type = "lowpass";
+  s.buffer = buf; f.type = type;
   f.frequency.setValueAtTime(from, t0); f.frequency.exponentialRampToValueAtTime(to, t0 + dur);
   g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur);
   s.connect(f).connect(g).connect(c.destination); s.start(t0);
@@ -280,6 +280,14 @@ const SFX = {
   fly:     (c, t) => { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(c, t + i * .09, f, .3, { type: "triangle", vol: .16 })); },
   defuse:  (c, t) => { tone(c, t, 1800, .04, { type: "square", vol: .08 }); [784, 988, 1175].forEach((f, i) => tone(c, t + .12 + i * .1, f, .35, { vol: .15 })); },
   boom:    (c, t) => { noise(c, t, 1.2, .6, 1800, 60); tone(c, t, 110, .9, { to: 30, vol: .5 }); },
+  // climbing rungs: a quick run of steps up a major scale
+  ladder:  (c, t) => { [392, 440, 494, 523, 587, 659, 740, 784].forEach((f, i) => tone(c, t + i * .07, f, .12, { type: "triangle", vol: .14 })); },
+  // a hiss, then a long slide down
+  snake:   (c, t) => { noise(c, t, .6, .12, 4000, 6000, "highpass"); tone(c, t + .35, 520, .9, { type: "triangle", to: 90, vol: .16 }); },
+  win:     (c, t) => {
+    [[523, 0], [659, .15], [784, .3], [1047, .45], [784, .7], [1047, .85]].forEach(([f, d]) => tone(c, t + d, f, .3, { type: "triangle", vol: .18 }));
+    [523, 659, 784, 1047].forEach(f => tone(c, t + 1.05, f, 1.2, { vol: .08 }));
+  },
   deflate: (c, t) => { tone(c, t, 620, .8, { type: "sawtooth", to: 140, vol: .06 }); noise(c, t, .8, .08, 3000, 400); }
 };
 function sfx(name, delay = 0) {
@@ -558,7 +566,7 @@ function answer(oi) {
   if (G.exam && G.exam.started) return examAnswer(oi);
   const p = G.players[G.turn], q = G.q, ok = oi === q.answer, from = p.sq;
   G.pick = oi; p.asked++;
-  sfx(ok ? "right" : "wrong");
+  sfx(ok ? (LADDERS[from] ? "ladder" : "right") : (SNAKES[from] ? "snake" : "wrong"));
   // expansions this player has read; groundwork for questions drawn from them later
   (p.seen = p.seen || []).push(q.id);
   if (q.expansion) (G.readAt = G.readAt || {})[q.id] = turnsPlayed();
@@ -587,7 +595,7 @@ function answer(oi) {
         (kind === "balloon" ? `רק ${EXAM_LEN} מתוך ${EXAM_LEN} יקפיצו אותך ${TRAP_JUMP} משבצות קדימה.` : `רק ${EXAM_LEN} מתוך ${EXAM_LEN} ימנעו נפילה של ${TRAP_JUMP} משבצות אחורה.`);
     }
   }
-  if (p.sq === 100) G.winner = G.turn + 1;
+  if (p.sq === 100) { G.winner = G.turn + 1; sfx("win", .6); }
   G.msg = msg; G.phase = "done";
   render();
   if (!G.winner) $("nextBtn").focus();
@@ -613,7 +621,7 @@ function examAnswer(oi) {
     if (ex.kind === "mine") { p.sq = Math.max(1, from - TRAP_JUMP); msg = `${t.icon} בום! המוקש התפוצץ אחרי ${ex.n} נכונות. ${p.name} ירד/ה ממשבצת ${from} למשבצת ${p.sq}.` + landingNote(p.sq); }
     else msg = `${t.icon} הכדור לא המריא (${ex.n} מתוך ${EXAM_LEN}). ${p.name} נשאר/ת במשבצת ${from}.`;
   }
-  if (p.sq === 100) G.winner = G.turn + 1;
+  if (p.sq === 100) { G.winner = G.turn + 1; sfx("win", .6); }
   G.msg = msg; G.phase = "done";
   render();
   if (!G.winner) $("nextBtn").focus();
