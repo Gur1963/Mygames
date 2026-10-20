@@ -199,7 +199,7 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
           <span><i style="background: var(--snake)"></i>נחש: יורדים</span>
           <span>🎈 / 💣 מוסתרים בלוח עד שדורכים עליהם</span>
         </div>
-        <div><button class="btn ghost" id="resetBtn" type="button">משחק חדש</button></div>
+        <div class="turn-row"><button class="btn ghost" id="resetBtn" type="button">משחק חדש</button><button class="btn ghost" id="soundBtn" type="button"></button></div>
       </div>
 
       <div class="card" id="turnCard">
@@ -246,6 +246,53 @@ const examLevel = (kind, L) => kind === "balloon" ? Math.max(1, L - 2) : Math.mi
 const COLORS = ["var(--p1)", "var(--p2)", "var(--p3)", "var(--p4)"];
 const LETTERS = ["א", "ב", "ג", "ד"];
 const $ = id => document.getElementById(id);
+
+// ---------- sound: short effects synthesized with Web Audio, so there are no audio files ----------
+let audio = null, soundOn = true;
+try { soundOn = localStorage.getItem("snl-sound") !== "off"; } catch (e) {}
+function ac() {
+  if (!audio) { const A = window.AudioContext || window.webkitAudioContext; if (!A) return null; audio = new A(); }
+  if (audio.state === "suspended") audio.resume();
+  return audio;
+}
+// one oscillator note; `to` slides the pitch over the note
+function tone(c, t0, freq, dur, { type = "sine", vol = .18, to } = {}) {
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur);
+  o.connect(g).connect(c.destination); o.start(t0); o.stop(t0 + dur + .02);
+}
+function noise(c, t0, dur, vol, from, to) {
+  const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+  s.buffer = buf; f.type = "lowpass";
+  f.frequency.setValueAtTime(from, t0); f.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur);
+  s.connect(f).connect(g).connect(c.destination); s.start(t0);
+}
+const SFX = {
+  right:   (c, t) => { tone(c, t, 660, .12); tone(c, t + .1, 880, .2); },
+  wrong:   (c, t) => { tone(c, t, 220, .22, { type: "square", vol: .06 }); tone(c, t + .18, 165, .3, { type: "square", vol: .06 }); },
+  mine:    (c, t) => { for (let i = 0; i < 3; i++) { tone(c, t + i * .26, 880, .12, { type: "square", vol: .07 }); tone(c, t + i * .26 + .13, 660, .12, { type: "square", vol: .07 }); } },
+  balloon: (c, t) => { tone(c, t, 300, .7, { to: 900, vol: .14 }); tone(c, t + .05, 450, .7, { to: 1350, vol: .06 }); },
+  fly:     (c, t) => { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(c, t + i * .09, f, .3, { type: "triangle", vol: .16 })); },
+  defuse:  (c, t) => { tone(c, t, 1800, .04, { type: "square", vol: .08 }); [784, 988, 1175].forEach((f, i) => tone(c, t + .12 + i * .1, f, .35, { vol: .15 })); },
+  boom:    (c, t) => { noise(c, t, 1.2, .6, 1800, 60); tone(c, t, 110, .9, { to: 30, vol: .5 }); },
+  deflate: (c, t) => { tone(c, t, 620, .8, { type: "sawtooth", to: 140, vol: .06 }); noise(c, t, .8, .08, 3000, 400); }
+};
+function sfx(name, delay = 0) {
+  if (!soundOn) return;
+  try { const c = ac(); if (c) SFX[name](c, c.currentTime + delay); } catch (e) {}
+}
+function renderSound() { $("soundBtn").textContent = soundOn ? "🔊 קול" : "🔇 מושתק"; $("soundBtn").setAttribute("aria-pressed", soundOn); }
+$("soundBtn").onclick = () => {
+  soundOn = !soundOn; renderSound();
+  try { localStorage.setItem("snl-sound", soundOn ? "on" : "off"); } catch (e) {}
+  sfx("right");
+};
+renderSound();
 
 let setup = { count: 2, level: 5, names: ["שחקן 1", "שחקן 2", "שחקן 3", "שחקן 4"] };
 let bank = {};      // level -> questions[]
@@ -511,6 +558,7 @@ function answer(oi) {
   if (G.exam && G.exam.started) return examAnswer(oi);
   const p = G.players[G.turn], q = G.q, ok = oi === q.answer, from = p.sq;
   G.pick = oi; p.asked++;
+  sfx(ok ? "right" : "wrong");
   // expansions this player has read; groundwork for questions drawn from them later
   (p.seen = p.seen || []).push(q.id);
   if (q.expansion) (G.readAt = G.readAt || {})[q.id] = turnsPlayed();
@@ -533,6 +581,7 @@ function answer(oi) {
     if (kind) {
       const t = TRAPS[kind], first = !G.revealed.includes(p.sq);
       if (first) G.revealed.push(p.sq);
+      sfx(kind, .4);
       G.exam = { kind, sq: p.sq, level: examLevel(kind, G.level), n: 0, started: false, passed: null };
       msg += ` ${t.icon} ${first ? "נחשף" : "דרכת על"} ${t.name} במשבצת ${p.sq}! מבחן של ${EXAM_LEN} שאלות ברמה ${G.exam.level}: ` +
         (kind === "balloon" ? `רק ${EXAM_LEN} מתוך ${EXAM_LEN} יקפיצו אותך ${TRAP_JUMP} משבצות קדימה.` : `רק ${EXAM_LEN} מתוך ${EXAM_LEN} ימנעו נפילה של ${TRAP_JUMP} משבצות אחורה.`);
@@ -553,14 +602,14 @@ function examAnswer(oi) {
   let msg;
   if (ok) {
     p.pts += q.level; p.right++; ex.n++;
-    if (ex.n < EXAM_LEN) msg = `${ex.n} מתוך ${EXAM_LEN} נכונות.`;
+    if (ex.n < EXAM_LEN) { msg = `${ex.n} מתוך ${EXAM_LEN} נכונות.`; sfx("right"); }
     else {
-      ex.passed = true;
+      ex.passed = true; sfx(ex.kind === "balloon" ? "fly" : "defuse");
       if (ex.kind === "balloon") { p.sq = Math.min(100, from + TRAP_JUMP); msg = `${t.icon} הכדור המריא! ${p.name} עף/ה ממשבצת ${from} למשבצת ${p.sq}.` + landingNote(p.sq); }
       else msg = `${t.icon} המוקש נוטרל! ${p.name} נשאר/ת במשבצת ${from}.`;
     }
   } else {
-    p.pts -= penalty(q.level); ex.passed = false;
+    p.pts -= penalty(q.level); ex.passed = false; sfx(ex.kind === "mine" ? "boom" : "deflate");
     if (ex.kind === "mine") { p.sq = Math.max(1, from - TRAP_JUMP); msg = `${t.icon} בום! המוקש התפוצץ אחרי ${ex.n} נכונות. ${p.name} ירד/ה ממשבצת ${from} למשבצת ${p.sq}.` + landingNote(p.sq); }
     else msg = `${t.icon} הכדור לא המריא (${ex.n} מתוך ${EXAM_LEN}). ${p.name} נשאר/ת במשבצת ${from}.`;
   }
