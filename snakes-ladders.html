@@ -161,8 +161,19 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
 .exam-bar i { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
 .exam-bar i.ok { background: var(--good); }
 .exam-bar i.no { background: var(--bad); }
-.win { text-align: center; }
-.win .big { font: 800 28px var(--display); }
+.win { text-align: center; --pc: var(--accent); border: 3px solid var(--pc); background: linear-gradient(180deg, color-mix(in srgb, var(--pc) 22%, var(--panel)), var(--panel) 60%); }
+.win .trophy { font-size: 72px; line-height: 1; }
+.win .big { font: 800 30px/1.3 var(--display); color: var(--pc); }
+.win .rank .pl:first-child { box-shadow: 0 0 0 2px var(--pc) inset; }
+#fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
+@media (prefers-reduced-motion: no-preference) {
+  .win.pop { animation: winPop .7s cubic-bezier(.2, 1.6, .4, 1) both; }
+  .win.pop .trophy { animation: trophy 1.2s ease-in-out .5s infinite alternate; }
+  .win.pop .big { animation: shine 1.6s ease-in-out infinite alternate; }
+}
+@keyframes winPop { from { transform: scale(.4) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes trophy { from { transform: translateY(0) rotate(-8deg) scale(1); } to { transform: translateY(-8px) rotate(8deg) scale(1.12); } }
+@keyframes shine { from { text-shadow: 0 0 0 transparent; } to { text-shadow: 0 0 18px color-mix(in srgb, var(--pc) 60%, transparent); } }
 </style>
 
 <div class="wrap">
@@ -229,6 +240,7 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
       </div>
 
       <div class="card win" id="winCard" hidden>
+        <div class="trophy" aria-hidden="true">🏆</div>
         <div class="big" id="winText"></div>
         <div class="rank" id="rank"></div>
         <p class="log" id="winSub"></p>
@@ -237,6 +249,7 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
     </div>
   </section>
 </div>
+<canvas id="fx" aria-hidden="true"></canvas>
 
 <script>
 const LADDERS = { 4: 14, 9: 31, 21: 42, 28: 84, 51: 67, 72: 91, 80: 99 };
@@ -287,12 +300,57 @@ const SFX = {
   ladder:  (c, t) => { [392, 440, 494, 523, 587, 659, 740, 784].forEach((f, i) => tone(c, t + i * .07, f, .12, { type: "triangle", vol: .14 })); },
   // a hiss, then a long slide down
   snake:   (c, t) => { noise(c, t, .6, .12, 4000, 6000, "highpass"); tone(c, t + .35, 520, .9, { type: "triangle", to: 90, vol: .16 }); },
+  // drum roll, trumpet fanfare, a big held chord with a cymbal, then firework pops
   win:     (c, t) => {
-    [[523, 0], [659, .15], [784, .3], [1047, .45], [784, .7], [1047, .85]].forEach(([f, d]) => tone(c, t + d, f, .3, { type: "triangle", vol: .18 }));
-    [523, 659, 784, 1047].forEach(f => tone(c, t + 1.05, f, 1.2, { vol: .08 }));
+    for (let i = 0; i < 16; i++) noise(c, t + i * .05, .06, .05 + i * .012, 900, 200);
+    const f0 = t + .85;
+    [[523, 0, .16], [523, .17, .16], [523, .34, .16], [659, .51, .5], [587, 1.05, .16], [659, 1.22, .16], [784, 1.39, .9]]
+      .forEach(([f, d, len]) => { tone(c, f0 + d, f, len, { type: "sawtooth", vol: .07 }); tone(c, f0 + d, f * 2, len, { type: "triangle", vol: .07 }); });
+    const ch = f0 + 2.35;
+    noise(c, ch, 1.8, .22, 9000, 3000, "highpass");
+    noise(c, ch, .5, .5, 600, 60);
+    [262, 523, 659, 784, 1047, 1319].forEach(f => tone(c, ch, f, 2.4, { type: "triangle", vol: .07 }));
+    [1047, 1319, 1568, 2093].forEach((f, i) => tone(c, ch + .2 + i * .12, f, .4, { vol: .06 }));
+    for (let i = 0; i < 6; i++) { const d = ch + 1.2 + i * .35 + Math.random() * .15; tone(c, d, 1400 + Math.random() * 800, .5, { to: 300, vol: .05 }); noise(c, d + .45, .4, .3, 3000, 200); }
   },
   deflate: (c, t) => { tone(c, t, 620, .8, { type: "sawtooth", to: 140, vol: .06 }); noise(c, t, .8, .08, 3000, 400); }
 };
+// confetti + fireworks on a full-screen canvas for about 7 seconds
+function celebrate(color) {
+  const cv = $("fx"), x = cv.getContext("2d");
+  if (!x || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const W = cv.width = innerWidth, H = cv.height = innerHeight;
+  const pal = [color, "#ffd23f", "#ff5e7e", "#3ec1ff", "#7cf29a", "#c27bff", "#ffffff"];
+  const pick = () => pal[Math.random() * pal.length | 0];
+  const bits = [], sparks = [];
+  for (let i = 0; i < 220; i++) bits.push({ x: Math.random() * W, y: -Math.random() * H, vx: Math.random() * 2 - 1, vy: 2 + Math.random() * 3,
+    s: 6 + Math.random() * 8, r: Math.random() * 6, vr: Math.random() * .3 - .15, c: pick() });
+  const burst = () => { const bx = W * (.15 + Math.random() * .7), by = H * (.1 + Math.random() * .4), c = pick();
+    for (let i = 0; i < 70; i++) { const a = Math.random() * 7, v = 2 + Math.random() * 5; sparks.push({ x: bx, y: by, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, c }); } };
+  const start = performance.now(); let nextBurst = 0;
+  (function frame(now) {
+    const el = now - start;
+    x.clearRect(0, 0, W, H);
+    if (el > nextBurst && el < 5500) { burst(); nextBurst = el + 350 + Math.random() * 400; }
+    for (const b of bits) {
+      b.x += b.vx + Math.sin(el / 300 + b.r); b.y += b.vy; b.r += b.vr;
+      if (b.y > H + 20 && el < 4500) { b.y = -20; b.x = Math.random() * W; }
+      x.save(); x.translate(b.x, b.y); x.rotate(b.r); x.fillStyle = b.c; x.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2 * Math.abs(Math.cos(b.r * 2)) + 1); x.restore();
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i]; p.x += p.vx; p.y += p.vy; p.vy += .06; p.vx *= .985; p.life -= .012;
+      if (p.life <= 0) { sparks.splice(i, 1); continue; }
+      x.globalAlpha = p.life; x.fillStyle = p.c; x.beginPath(); x.arc(p.x, p.y, 2.6, 0, 7); x.fill(); x.globalAlpha = 1;
+    }
+    if (el < 7500) requestAnimationFrame(frame); else x.clearRect(0, 0, W, H);
+  })(start);
+}
+function win() {
+  G.winner = G.turn + 1; sfx("win", .3);
+  celebrate(getComputedStyle(document.documentElement).getPropertyValue(`--p${G.winner}`).trim() || "#ffd23f");
+  const card = $("winCard"); card.classList.remove("pop"); void card.offsetWidth; card.classList.add("pop");
+  setTimeout(() => card.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+}
 function sfx(name, delay = 0) {
   if (!soundOn) return;
   try { const c = ac(); if (c) SFX[name](c, c.currentTime + delay); } catch (e) {}
@@ -551,7 +609,8 @@ function render() {
   $("winCard").hidden = !G.winner;
   if (G.winner) {
     const w = G.players[G.winner - 1];
-    $("winText").textContent = `${w.name} הגיע/ה ראשון/ה למשבצת 100!`;
+    $("winCard").style.setProperty("--pc", COLORS[G.winner - 1]);
+    $("winText").textContent = `🎉 ${w.name} ניצח/ה! 🎉`;
     // ranking: whoever reached 100 first, then by square, then by points
     const order = G.players.map((p, i) => ({ p, i })).sort((a, b) =>
       (b.i === G.winner - 1) - (a.i === G.winner - 1) || b.p.sq - a.p.sq || b.p.pts - a.p.pts);
@@ -599,7 +658,7 @@ function answer(oi) {
         (kind === "balloon" ? `רק ${EXAM_LEN} מתוך ${EXAM_LEN} יקפיצו אותך ${TRAP_JUMP} משבצות קדימה.` : `רק ${EXAM_LEN} מתוך ${EXAM_LEN} ימנעו נפילה של ${TRAP_JUMP} משבצות אחורה.`);
     }
   }
-  if (p.sq === 100) { G.winner = G.turn + 1; sfx("win", .6); }
+  if (p.sq === 100) win();
   G.msg = msg; G.phase = "done";
   render();
   if (!G.winner) $("nextBtn").focus();
@@ -625,7 +684,7 @@ function examAnswer(oi) {
     if (ex.kind === "mine") { p.sq = Math.max(1, from - TRAP_JUMP); msg = `${t.icon} בום! המוקש התפוצץ אחרי ${ex.n} נכונות. ${p.name} ירד/ה ממשבצת ${from} למשבצת ${p.sq}.` + landingNote(p.sq); }
     else msg = `${t.icon} הכדור לא המריא (${ex.n} מתוך ${EXAM_LEN}). ${p.name} נשאר/ת במשבצת ${from}.`;
   }
-  if (p.sq === 100) { G.winner = G.turn + 1; sfx("win", .6); }
+  if (p.sq === 100) win();
   G.msg = msg; G.phase = "done";
   render();
   if (!G.winner) $("nextBtn").focus();
