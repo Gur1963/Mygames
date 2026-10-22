@@ -82,7 +82,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 /* game */
 .game { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 860px) { .game { grid-template-columns: 1fr; } }
+.board-col { display: grid; gap: 12px; justify-items: center; min-width: 0; }
 .board-wrap { position: relative; width: 100%; max-width: 680px; aspect-ratio: 1; justify-self: center; }
+.board-alert {
+  font: 800 clamp(22px, 4vw, 30px) var(--display); color: var(--panel); background: var(--snake);
+  padding: 8px 22px; border-radius: 10px; text-align: center;
+}
+.board-alert.ladder { background: var(--ladder); }
+@media (prefers-reduced-motion: no-preference) { .board-alert.blink { animation: alertBlink .5s steps(1) 3; } }
+@keyframes alertBlink { 50% { opacity: 0; } }
 .board {
   position: absolute; inset: 0; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(10, 1fr);
   border-radius: 10px; overflow: hidden; border: 2px solid var(--line); direction: ltr;
@@ -199,10 +207,13 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
   </section>
 
   <section class="game" id="game" hidden>
-    <div class="board-wrap" id="boardWrap">
-      <div class="board" id="board"></div>
-      <svg class="over" id="over" viewBox="0 0 100 100" aria-hidden="true"></svg>
-      <div class="tokens" id="tokens"></div>
+    <div class="board-col">
+      <div class="board-wrap" id="boardWrap">
+        <div class="board" id="board"></div>
+        <svg class="over" id="over" viewBox="0 0 100 100" aria-hidden="true"></svg>
+        <div class="tokens" id="tokens"></div>
+      </div>
+      <div class="board-alert" id="boardAlert" role="alert" hidden></div>
     </div>
 
     <div class="side">
@@ -232,7 +243,7 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
         <p class="from" id="qFrom" hidden></p>
         <p class="qtext" id="qText"></p>
         <div class="opts" id="qOpts"></div>
-        <div><button class="btn ghost" id="swapBtn" type="button" hidden>החלפת שאלה (פעם אחת על נחש)</button></div>
+        <div><button class="btn ghost" id="swapBtn" type="button" hidden>החלפת שאלה (פעם אחת על נחש או סולם)</button></div>
         <div class="feedback" id="fb" hidden></div>
         <p class="log" id="log" hidden></p>
         <details class="more" id="more" open hidden><summary>הרחבה: עוד על הנושא</summary><p id="moreText"></p></details>
@@ -313,6 +324,24 @@ const SFX = {
     [1047, 1319, 1568, 2093].forEach((f, i) => tone(c, ch + .2 + i * .12, f, .4, { vol: .06 }));
     for (let i = 0; i < 6; i++) { const d = ch + 1.2 + i * .35 + Math.random() * .15; tone(c, d, 1400 + Math.random() * 800, .5, { to: 300, vol: .05 }); noise(c, d + .45, .4, .3, 3000, 200); }
   },
+  // landing on a ladder foot: a bright rising sparkle
+  chance:  (c, t) => {
+    [784, 988, 1175, 1568].forEach((f, i) => tone(c, t + i * .08, f, .5, { vol: .13 }));
+    [2093, 2637, 3136].forEach((f, i) => tone(c, t + .4 + i * .06, f, .35, { type: "triangle", vol: .05 }));
+  },
+  // landing on a snake head: one "psssss" hiss
+  danger:  (c, t) => {
+    const len = 1.4, sr = c.sampleRate, buf = c.createBuffer(1, sr * len, sr), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) {
+      const x = i / d.length, p = i < sr * .03 ? 1.6 * Math.exp(-i / (sr * .008)) : 0;   // the "p" puff
+      d[i] = (Math.random() * 2 - 1) * (p + .6 * Math.min(1, x / .06) * Math.pow(1 - x, 1.5));
+    }
+    const s = c.createBufferSource(), hp = c.createBiquadFilter(), pk = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = buf; hp.type = "highpass"; hp.frequency.value = 2500;
+    pk.type = "peaking"; pk.frequency.value = 6500; pk.Q.value = .8; pk.gain.value = 8;
+    g.gain.value = .5;
+    s.connect(hp).connect(pk).connect(g).connect(c.destination); s.start(t);
+  },
   deflate: (c, t) => { tone(c, t, 620, .8, { type: "sawtooth", to: 140, vol: .06 }); noise(c, t, .8, .08, 3000, 400); }
 };
 // confetti + fireworks on a full-screen canvas for about 7 seconds
@@ -344,6 +373,17 @@ function celebrate(color) {
     }
     if (el < 7500) requestAnimationFrame(frame); else x.clearRect(0, 0, W, H);
   })(start);
+}
+// landing on a snake head or a ladder foot: a sound, and a note under the board that blinks three times
+const ALERTS = { snake: { sound: "danger", text: "🐍 זהירות, נחש! 🐍" }, ladder: { sound: "chance", text: "🪜 יש סולם! 🪜" } };
+function boardAlert(kind, delay) {
+  sfx(ALERTS[kind].sound, delay);
+  const w = $("boardAlert");
+  setTimeout(() => {
+    w.textContent = ALERTS[kind].text; w.className = "board-alert " + kind;
+    w.hidden = false; void w.offsetWidth; w.classList.add("blink");
+    clearTimeout(w.hideAt); w.hideAt = setTimeout(() => { w.hidden = true; }, 1600);
+  }, delay * 1000);
 }
 function win() {
   G.winner = G.turn + 1; sfx("win", .3);
@@ -532,7 +572,7 @@ function drawTraps() {
 }
 // hint shown after moving onto a square
 function landingNote(sq) {
-  if (LADDERS[sq]) return ` נחתת על סולם: בתור הבא תשובה נכונה תעלה אותך למשבצת ${LADDERS[sq]}.`;
+  if (LADDERS[sq]) return ` נחתת על סולם: בתור הבא תשובה נכונה תעלה אותך למשבצת ${LADDERS[sq]}, ושגויה תקדם רק משבצת אחת.`;
   if (SNAKES[sq]) return ` זהירות, ראש נחש: בתור הבא תשובה שגויה תוריד אותך למשבצת ${SNAKES[sq]}.`;
   return "";
 }
@@ -561,7 +601,7 @@ function render() {
   if (G.winner) sub.textContent = "";
   else if (ex) { const t = TRAPS[ex.kind]; sub.textContent = `${t.icon} מבחן ${t.name}: ${EXAM_LEN} נכונות ברצף ` + (ex.kind === "balloon" ? `יקפיצו אותך ${TRAP_JUMP} משבצות קדימה.` : `ימנעו נפילה של ${TRAP_JUMP} משבצות.`); }
   else if (G.phase !== "question") sub.textContent = "";
-  else if (LADDERS[cur.sq]) { sub.className = "sub ladder"; sub.textContent = `אתה על סולם. תשובה נכונה תעלה אותך למשבצת ${LADDERS[cur.sq]}.`; }
+  else if (LADDERS[cur.sq]) { sub.className = "sub ladder"; sub.textContent = `אתה על סולם. תשובה נכונה תעלה אותך למשבצת ${LADDERS[cur.sq]}. תשובה שגויה תקדם רק משבצת אחת, והסולם יוחמץ.`; }
   else if (SNAKES[cur.sq]) { sub.className = "sub snake"; sub.textContent = `אתה על ראש נחש. תשובה שגויה תוריד אותך למשבצת ${SNAKES[cur.sq]}.`; }
   else sub.textContent = "תשובה נכונה מקדמת אותך משבצת אחת.";
 
@@ -578,7 +618,7 @@ function render() {
     from.hidden = !q.fromExp;
     if (q.fromExp) { from.innerHTML = "<b>מתוך ההרחבה לשאלה:</b> "; from.appendChild(document.createTextNode(q.fromExp)); }
     $("qText").textContent = q.q;
-    $("swapBtn").hidden = !(G.phase === "question" && !ex && SNAKES[cur.sq] && !G.swapped);
+    $("swapBtn").hidden = !(G.phase === "question" && !ex && (SNAKES[cur.sq] || LADDERS[cur.sq]) && !G.swapped);
     const box = $("qOpts"); box.innerHTML = "";
     q.order.forEach((oi, k) => {
       const b = document.createElement("button"); b.type = "button"; b.className = "opt"; b.id = "opt" + k;
@@ -644,10 +684,14 @@ function answer(oi) {
   } else {
     p.pts -= penalty(q.level);
     if (SNAKES[from]) { p.sq = SNAKES[from]; msg = `${p.name} החליק/ה בנחש ממשבצת ${from} למשבצת ${p.sq}.`; }
+    // a wrong answer on a ladder foot still moves one square, past the ladder
+    else if (LADDERS[from]) { p.sq = from + 1; msg = `הסולם הוחמץ! ${p.name} התקדם/ה רק למשבצת ${p.sq}.`; }
     else msg = `${p.name} נשאר/ת במשבצת ${from}.`;
   }
   if (p.sq !== from) {
     msg += landingNote(p.sq);
+    if (SNAKES[p.sq]) boardAlert("snake", .5);
+    if (LADDERS[p.sq]) boardAlert("ladder", .5);
     const kind = G.traps && G.traps[p.sq];
     if (kind) {
       const t = TRAPS[kind], first = !G.revealed.includes(p.sq);
@@ -684,6 +728,8 @@ function examAnswer(oi) {
     if (ex.kind === "mine") { p.sq = Math.max(1, from - TRAP_JUMP); msg = `${t.icon} בום! המוקש התפוצץ אחרי ${ex.n} נכונות. ${p.name} ירד/ה ממשבצת ${from} למשבצת ${p.sq}.` + landingNote(p.sq); }
     else msg = `${t.icon} הכדור לא המריא (${ex.n} מתוך ${EXAM_LEN}). ${p.name} נשאר/ת במשבצת ${from}.`;
   }
+  if (p.sq !== from && SNAKES[p.sq]) boardAlert("snake", 1.3);
+  if (p.sq !== from && LADDERS[p.sq]) boardAlert("ladder", 1.3);
   if (p.sq === 100) win();
   G.msg = msg; G.phase = "done";
   render();
