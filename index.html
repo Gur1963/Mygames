@@ -2,9 +2,805 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="0; url=snakes-ladders.html">
-<title>סולמות ונחשים של ידע</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
-<body><a href="snakes-ladders.html">למשחק סולמות ונחשים של ידע</a></body>
+<body>
+<title>סולמות ונחשים של ידע</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Layout: board on one side, a control panel (players, die, question) on the other; stacks on phones */
+:root {
+  --bg: #eef3f2;
+  --panel: #fbfdfc;
+  --ink: #17282a;
+  --muted: #5a6e70;
+  --line: #cfdcda;
+  --cell-a: #e3eeec;
+  --cell-b: #cfe1dd;
+  --accent: #0e6a6a;
+  --accent-ink: #ffffff;
+  --ladder: #b77a1f;
+  --snake: #7b3fa3;
+  --snake-belly: #c9a3e0;
+  --good: #1d7a46;
+  --good-soft: #def2e5;
+  --bad: #b3261e;
+  --bad-soft: #f8e2df;
+  --p1: #d64545; --p2: #2f6fd6; --p3: #d89b00; --p4: #2e9a5a;
+  --display: "Rubik", "Segoe UI", Arial, sans-serif;
+  --body: "Assistant", "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101818; --panel: #172222; --ink: #e3eeec; --muted: #94a9a8; --line: #2b3b3a;
+    --cell-a: #1b2928; --cell-b: #223634; --accent: #4fc2bd; --accent-ink: #0d1a1a;
+    --ladder: #e0a64a; --snake: #b07ad6; --snake-belly: #5d3a78;
+    --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d;
+    --p1: #f07070; --p2: #6e9ef0; --p3: #f0c040; --p4: #5cc48a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101818; --panel: #172222; --ink: #e3eeec; --muted: #94a9a8; --line: #2b3b3a;
+  --cell-a: #1b2928; --cell-b: #223634; --accent: #4fc2bd; --accent-ink: #0d1a1a;
+  --ladder: #e0a64a; --snake: #b07ad6; --snake-belly: #5d3a78;
+  --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d;
+  --p1: #f07070; --p2: #6e9ef0; --p3: #f0c040; --p4: #5cc48a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5; direction: rtl; }
+.wrap {
+  max-width: 1180px; margin: 0 auto; padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(24px, 4.5vw, 34px); margin: 0 0 14px; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 18px; margin: 0; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn {
+  font: 700 16px var(--body); padding: 10px 20px; border-radius: 8px; cursor: pointer;
+  border: 2px solid var(--accent); background: var(--accent); color: var(--accent-ink);
+}
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: default; }
+
+/* setup */
+.setup { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px; display: grid; gap: 22px; max-width: 640px; }
+.field { display: grid; gap: 10px; }
+.field > label, .field > .lbl { font-weight: 700; }
+.hint { color: var(--muted); font-size: 14px; margin: 0; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button {
+  min-width: 44px; padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--line);
+  background: transparent; cursor: pointer; font-family: var(--display); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.names { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.names .nm { display: flex; align-items: center; gap: 8px; }
+.names input {
+  flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--line);
+  background: var(--bg); color: var(--ink); font: inherit;
+}
+.chip { width: 16px; height: 16px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--line); }
+.err { color: var(--bad); font-weight: 600; margin: 0; }
+
+/* game */
+.game { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .game { grid-template-columns: 1fr; } }
+.board-col { display: grid; gap: 12px; justify-items: center; min-width: 0; }
+.board-wrap { position: relative; width: 100%; max-width: 680px; aspect-ratio: 1; justify-self: center; }
+.board-alert {
+  font: 800 clamp(22px, 4vw, 30px) var(--display); color: var(--panel); background: var(--snake);
+  padding: 8px 22px; border-radius: 10px; text-align: center;
+}
+.board-alert.ladder { background: var(--ladder); }
+@media (prefers-reduced-motion: no-preference) { .board-alert.blink { animation: alertBlink .5s steps(1) 3; } }
+@keyframes alertBlink { 50% { opacity: 0; } }
+.board {
+  position: absolute; inset: 0; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(10, 1fr);
+  border-radius: 10px; overflow: hidden; border: 2px solid var(--line); direction: ltr;
+}
+.cell { position: relative; background: var(--cell-a); border: .5px solid var(--line); }
+.cell.alt { background: var(--cell-b); }
+.cell .n { position: absolute; top: 3px; right: 5px; font: 700 clamp(8px, 1.5vw, 12px) var(--display); color: var(--muted); font-variant-numeric: tabular-nums; }
+.cell.end { background: var(--accent); }
+.cell.end .n { color: var(--accent-ink); }
+.cell .tag { position: absolute; bottom: 3px; left: 0; right: 0; text-align: center; font: 700 clamp(7px, 1.2vw, 11px) var(--display); color: var(--muted); }
+.cell.end .tag { color: var(--accent-ink); }
+svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.tokens { position: absolute; inset: 0; pointer-events: none; }
+.token {
+  position: absolute; width: 4.6%; height: 4.6%; border-radius: 50%;
+  border: 2px solid var(--panel); box-shadow: 0 2px 4px rgb(0 0 0 / .35);
+  transform: translate(-50%, -50%);
+}
+@media (prefers-reduced-motion: no-preference) { .token { transition: left .16s ease, top .16s ease; } }
+
+.side { display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.players { display: grid; gap: 6px; }
+.pl { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 8px; border: 1.5px solid transparent; }
+.pl.turn { border-color: var(--accent); background: var(--bg); }
+.pl .name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl .sq, .pl .pts { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; white-space: nowrap; }
+.pl .pts b { color: var(--ink); font-family: var(--display); font-size: 16px; }
+.turn-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.die {
+  width: 58px; height: 58px; border-radius: 12px; border: 2px solid var(--ink); background: var(--panel);
+  display: grid; place-items: center; font: 800 24px var(--display); flex: none; font-variant-numeric: tabular-nums;
+}
+.turn-text .sub.ladder { color: var(--ladder); font-weight: 600; }
+.turn-text .sub.snake { color: var(--snake); font-weight: 600; }
+.rank { display: grid; gap: 6px; text-align: right; }
+.rank .pl { grid-template-columns: auto auto 1fr auto auto; }
+.rank .place { font: 800 16px var(--display); color: var(--muted); font-variant-numeric: tabular-nums; }
+.turn-text { flex: 1; min-width: 0; }
+.turn-text .who { font-family: var(--display); font-weight: 700; font-size: 18px; }
+.turn-text .sub { color: var(--muted); font-size: 14px; }
+
+.qhead { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+.lvl { font-family: var(--display); font-weight: 700; color: var(--accent); }
+.qtext { font-weight: 700; font-size: 18px; margin: 0; }
+.from { margin: 0; font-size: 14px; color: var(--muted); border-inline-start: 3px solid var(--accent); padding-inline-start: 10px; }
+.from b { color: var(--accent); }
+.opts { display: grid; gap: 8px; }
+.opt {
+  display: flex; gap: 10px; align-items: center; padding: 9px 12px; border-radius: 8px;
+  border: 1.5px solid var(--line); background: transparent; cursor: pointer; text-align: right;
+}
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt .k { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--muted); display: grid; place-items: center; font: 700 13px var(--display); flex: none; }
+.opt.right { border-color: var(--good); background: var(--good-soft); }
+.opt.right .k { background: var(--good); border-color: var(--good); color: var(--panel); }
+.opt.wrong { border-color: var(--bad); background: var(--bad-soft); }
+.opt.wrong .k { background: var(--bad); border-color: var(--bad); color: var(--panel); }
+/* the question card takes a light tint of the current player's color */
+#qCard { background: color-mix(in srgb, var(--pc, var(--panel)) 14%, var(--panel)); border-color: color-mix(in srgb, var(--pc, var(--line)) 55%, var(--line)); border-width: 2px; }
+.feedback { padding: 12px 14px; border-radius: 8px; font: 800 20px/1.4 var(--display); }
+#log { font: 700 19px/1.5 var(--display); color: var(--ink); background: var(--panel); border-radius: 8px; padding: 10px 14px; }
+.feedback.ok { background: var(--good-soft); color: var(--good); }
+.feedback.no { background: var(--bad-soft); color: var(--bad); }
+.feedback .ex { display: block; font: 400 16px/1.5 var(--body); color: var(--ink); margin-top: 6px; }
+.log { color: var(--muted); font-size: 14px; margin: 0; }
+.more { border-top: 1px dashed var(--line); padding-top: 10px; }
+.more summary { cursor: pointer; font-family: var(--display); font-weight: 700; color: var(--accent); }
+.more p { margin: 8px 0 0; font-size: 15px; line-height: 1.65; max-width: 62ch; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 18px; height: 4px; border-radius: 2px; display: inline-block; }
+.cell .trap { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(14px, 3.4vw, 26px); line-height: 1; }
+.exam-bar { display: flex; gap: 6px; }
+.exam-bar i { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
+.exam-bar i.ok { background: var(--good); }
+.exam-bar i.no { background: var(--bad); }
+.win { text-align: center; --pc: var(--accent); border: 3px solid var(--pc); background: linear-gradient(180deg, color-mix(in srgb, var(--pc) 22%, var(--panel)), var(--panel) 60%); }
+.win .trophy { font-size: 72px; line-height: 1; }
+.win .big { font: 800 30px/1.3 var(--display); color: var(--pc); }
+.win .rank .pl:first-child { box-shadow: 0 0 0 2px var(--pc) inset; }
+#fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
+@media (prefers-reduced-motion: no-preference) {
+  .win.pop { animation: winPop .7s cubic-bezier(.2, 1.6, .4, 1) both; }
+  .win.pop .trophy { animation: trophy 1.2s ease-in-out .5s infinite alternate; }
+  .win.pop .big { animation: shine 1.6s ease-in-out infinite alternate; }
+}
+@keyframes winPop { from { transform: scale(.4) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes trophy { from { transform: translateY(0) rotate(-8deg) scale(1); } to { transform: translateY(-8px) rotate(8deg) scale(1.12); } }
+@keyframes shine { from { text-shadow: 0 0 0 transparent; } to { text-shadow: 0 0 18px color-mix(in srgb, var(--pc) 60%, transparent); } }
+</style>
+
+<div class="wrap">
+  <h1>סולמות ונחשים של ידע</h1>
+  <p class="err" id="crash" hidden></p>
+
+  <section class="setup" id="setup">
+    <div class="field">
+      <span class="lbl">מספר שחקנים</span>
+      <div class="seg" id="count" role="group" aria-label="מספר שחקנים"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">שמות</span>
+      <div class="names" id="names"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">רמת קושי</span>
+      <div class="seg" id="levels" role="group" aria-label="רמת קושי"></div>
+      <p class="hint" id="range"></p>
+    </div>
+    <p class="err" id="loadErr" hidden></p>
+    <div><button class="btn" id="startBtn" type="button">התחלת משחק</button></div>
+  </section>
+
+  <section class="game" id="game" hidden>
+    <div class="board-col">
+      <div class="board-wrap" id="boardWrap">
+        <div class="board" id="board"></div>
+        <svg class="over" id="over" viewBox="0 0 100 100" aria-hidden="true"></svg>
+        <div class="tokens" id="tokens"></div>
+      </div>
+      <div class="board-alert" id="boardAlert" role="alert" hidden></div>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <div class="players" id="players"></div>
+        <div class="legend">
+          <span><i style="background: var(--ladder)"></i>סולם: עולים</span>
+          <span><i style="background: var(--snake)"></i>נחש: יורדים</span>
+          <span>🎈 / 💣 מוסתרים בלוח עד שדורכים עליהם</span>
+        </div>
+        <div class="turn-row"><button class="btn ghost" id="resetBtn" type="button">משחק חדש</button><button class="btn ghost" id="soundBtn" type="button"></button></div>
+      </div>
+
+      <div class="card" id="turnCard">
+        <div class="turn-row">
+          <div class="die" id="die" aria-label="המשבצת הנוכחית">1</div>
+          <div class="turn-text">
+            <div class="who" id="who"></div>
+            <div class="sub" id="sub"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="qCard" hidden>
+        <div class="qhead"><span class="lvl" id="qLvl"></span><span id="qCat"></span></div>
+        <div class="exam-bar" id="examBar" hidden></div>
+        <p class="from" id="qFrom" hidden></p>
+        <p class="qtext" id="qText"></p>
+        <div class="opts" id="qOpts"></div>
+        <div><button class="btn ghost" id="swapBtn" type="button" hidden>החלפת שאלה (פעם אחת על נחש או סולם)</button></div>
+        <div class="feedback" id="fb" hidden></div>
+        <p class="log" id="log" hidden></p>
+        <details class="more" id="more" open hidden><summary>הרחבה: עוד על הנושא</summary><p id="moreText"></p></details>
+        <div><button class="btn" id="nextBtn" type="button" hidden>התור הבא</button></div>
+      </div>
+
+      <div class="card win" id="winCard" hidden>
+        <div class="trophy" aria-hidden="true">🏆</div>
+        <div class="big" id="winText"></div>
+        <div class="rank" id="rank"></div>
+        <p class="log" id="winSub"></p>
+        <div><button class="btn" id="againBtn" type="button">משחק חדש</button></div>
+      </div>
+    </div>
+  </section>
+</div>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<script>
+const LADDERS = { 4: 14, 9: 31, 21: 42, 28: 84, 51: 67, 72: 91, 80: 99 };
+const SNAKES  = { 17: 7, 54: 34, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 79 };
+// hidden squares: stepping on one reveals it and opens a 5-question exam; only a perfect exam counts
+const TRAPS = { balloon: { icon: "🎈", name: "כדור פורח", count: 3 }, mine: { icon: "💣", name: "מוקש", count: 3 } };
+const EXAM_LEN = 5, TRAP_JUMP = 10;
+// balloons ask easy questions (bottom of the range), mines ask one level above the chosen level
+const examLevel = (kind, L) => kind === "balloon" ? Math.max(1, L - 2) : Math.min(10, L + 1);
+const COLORS = ["var(--p1)", "var(--p2)", "var(--p3)", "var(--p4)"];
+const LETTERS = ["א", "ב", "ג", "ד"];
+const $ = id => document.getElementById(id);
+
+// ---------- sound: short effects synthesized with Web Audio, so there are no audio files ----------
+let audio = null, soundOn = true;
+try { soundOn = localStorage.getItem("snl-sound") !== "off"; } catch (e) {}
+function ac() {
+  if (!audio) { const A = window.AudioContext || window.webkitAudioContext; if (!A) return null; audio = new A(); }
+  if (audio.state === "suspended") audio.resume();
+  return audio;
+}
+// one oscillator note; `to` slides the pitch over the note
+function tone(c, t0, freq, dur, { type = "sine", vol = .18, to } = {}) {
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur);
+  o.connect(g).connect(c.destination); o.start(t0); o.stop(t0 + dur + .02);
+}
+function noise(c, t0, dur, vol, from, to, type = "lowpass") {
+  const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+  s.buffer = buf; f.type = type;
+  f.frequency.setValueAtTime(from, t0); f.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur);
+  s.connect(f).connect(g).connect(c.destination); s.start(t0);
+}
+const SFX = {
+  right:   (c, t) => { tone(c, t, 660, .12); tone(c, t + .1, 880, .2); },
+  wrong:   (c, t) => { tone(c, t, 220, .22, { type: "square", vol: .06 }); tone(c, t + .18, 165, .3, { type: "square", vol: .06 }); },
+  mine:    (c, t) => { for (let i = 0; i < 3; i++) { tone(c, t + i * .26, 880, .12, { type: "square", vol: .07 }); tone(c, t + i * .26 + .13, 660, .12, { type: "square", vol: .07 }); } },
+  balloon: (c, t) => { tone(c, t, 300, .7, { to: 900, vol: .14 }); tone(c, t + .05, 450, .7, { to: 1350, vol: .06 }); },
+  fly:     (c, t) => { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(c, t + i * .09, f, .3, { type: "triangle", vol: .16 })); },
+  defuse:  (c, t) => { tone(c, t, 1800, .04, { type: "square", vol: .08 }); [784, 988, 1175].forEach((f, i) => tone(c, t + .12 + i * .1, f, .35, { vol: .15 })); },
+  boom:    (c, t) => { noise(c, t, 1.2, .6, 1800, 60); tone(c, t, 110, .9, { to: 30, vol: .5 }); },
+  // climbing rungs: a quick run of steps up a major scale
+  ladder:  (c, t) => { [392, 440, 494, 523, 587, 659, 740, 784].forEach((f, i) => tone(c, t + i * .07, f, .12, { type: "triangle", vol: .14 })); },
+  // a hiss, then a long slide down
+  snake:   (c, t) => { noise(c, t, .6, .12, 4000, 6000, "highpass"); tone(c, t + .35, 520, .9, { type: "triangle", to: 90, vol: .16 }); },
+  // drum roll, trumpet fanfare, a big held chord with a cymbal, then firework pops
+  win:     (c, t) => {
+    for (let i = 0; i < 16; i++) noise(c, t + i * .05, .06, .05 + i * .012, 900, 200);
+    const f0 = t + .85;
+    [[523, 0, .16], [523, .17, .16], [523, .34, .16], [659, .51, .5], [587, 1.05, .16], [659, 1.22, .16], [784, 1.39, .9]]
+      .forEach(([f, d, len]) => { tone(c, f0 + d, f, len, { type: "sawtooth", vol: .07 }); tone(c, f0 + d, f * 2, len, { type: "triangle", vol: .07 }); });
+    const ch = f0 + 2.35;
+    noise(c, ch, 1.8, .22, 9000, 3000, "highpass");
+    noise(c, ch, .5, .5, 600, 60);
+    [262, 523, 659, 784, 1047, 1319].forEach(f => tone(c, ch, f, 2.4, { type: "triangle", vol: .07 }));
+    [1047, 1319, 1568, 2093].forEach((f, i) => tone(c, ch + .2 + i * .12, f, .4, { vol: .06 }));
+    for (let i = 0; i < 6; i++) { const d = ch + 1.2 + i * .35 + Math.random() * .15; tone(c, d, 1400 + Math.random() * 800, .5, { to: 300, vol: .05 }); noise(c, d + .45, .4, .3, 3000, 200); }
+  },
+  // landing on a ladder foot: a bright rising sparkle
+  chance:  (c, t) => {
+    [784, 988, 1175, 1568].forEach((f, i) => tone(c, t + i * .08, f, .5, { vol: .13 }));
+    [2093, 2637, 3136].forEach((f, i) => tone(c, t + .4 + i * .06, f, .35, { type: "triangle", vol: .05 }));
+  },
+  // landing on a snake head: one "psssss" hiss
+  danger:  (c, t) => {
+    const len = 1.4, sr = c.sampleRate, buf = c.createBuffer(1, sr * len, sr), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) {
+      const x = i / d.length, p = i < sr * .03 ? 1.6 * Math.exp(-i / (sr * .008)) : 0;   // the "p" puff
+      d[i] = (Math.random() * 2 - 1) * (p + .6 * Math.min(1, x / .06) * Math.pow(1 - x, 1.5));
+    }
+    const s = c.createBufferSource(), hp = c.createBiquadFilter(), pk = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = buf; hp.type = "highpass"; hp.frequency.value = 2500;
+    pk.type = "peaking"; pk.frequency.value = 6500; pk.Q.value = .8; pk.gain.value = 8;
+    g.gain.value = .5;
+    s.connect(hp).connect(pk).connect(g).connect(c.destination); s.start(t);
+  },
+  deflate: (c, t) => { tone(c, t, 620, .8, { type: "sawtooth", to: 140, vol: .06 }); noise(c, t, .8, .08, 3000, 400); }
+};
+// confetti + fireworks on a full-screen canvas for about 7 seconds
+function celebrate(color) {
+  const cv = $("fx"), x = cv.getContext("2d");
+  if (!x || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const W = cv.width = innerWidth, H = cv.height = innerHeight;
+  const pal = [color, "#ffd23f", "#ff5e7e", "#3ec1ff", "#7cf29a", "#c27bff", "#ffffff"];
+  const pick = () => pal[Math.random() * pal.length | 0];
+  const bits = [], sparks = [];
+  for (let i = 0; i < 220; i++) bits.push({ x: Math.random() * W, y: -Math.random() * H, vx: Math.random() * 2 - 1, vy: 2 + Math.random() * 3,
+    s: 6 + Math.random() * 8, r: Math.random() * 6, vr: Math.random() * .3 - .15, c: pick() });
+  const burst = () => { const bx = W * (.15 + Math.random() * .7), by = H * (.1 + Math.random() * .4), c = pick();
+    for (let i = 0; i < 70; i++) { const a = Math.random() * 7, v = 2 + Math.random() * 5; sparks.push({ x: bx, y: by, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, c }); } };
+  const start = performance.now(); let nextBurst = 0;
+  (function frame(now) {
+    const el = now - start;
+    x.clearRect(0, 0, W, H);
+    if (el > nextBurst && el < 5500) { burst(); nextBurst = el + 350 + Math.random() * 400; }
+    for (const b of bits) {
+      b.x += b.vx + Math.sin(el / 300 + b.r); b.y += b.vy; b.r += b.vr;
+      if (b.y > H + 20 && el < 4500) { b.y = -20; b.x = Math.random() * W; }
+      x.save(); x.translate(b.x, b.y); x.rotate(b.r); x.fillStyle = b.c; x.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2 * Math.abs(Math.cos(b.r * 2)) + 1); x.restore();
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i]; p.x += p.vx; p.y += p.vy; p.vy += .06; p.vx *= .985; p.life -= .012;
+      if (p.life <= 0) { sparks.splice(i, 1); continue; }
+      x.globalAlpha = p.life; x.fillStyle = p.c; x.beginPath(); x.arc(p.x, p.y, 2.6, 0, 7); x.fill(); x.globalAlpha = 1;
+    }
+    if (el < 7500) requestAnimationFrame(frame); else x.clearRect(0, 0, W, H);
+  })(start);
+}
+// landing on a snake head or a ladder foot: a sound, and a note under the board that blinks three times
+const ALERTS = { snake: { sound: "danger", text: "🐍 זהירות, נחש! 🐍" }, ladder: { sound: "chance", text: "🪜 יש סולם! 🪜" } };
+function boardAlert(kind, delay) {
+  sfx(ALERTS[kind].sound, delay);
+  const w = $("boardAlert");
+  setTimeout(() => {
+    w.textContent = ALERTS[kind].text; w.className = "board-alert " + kind;
+    w.hidden = false; void w.offsetWidth; w.classList.add("blink");
+    clearTimeout(w.hideAt); w.hideAt = setTimeout(() => { w.hidden = true; }, 1600);
+  }, delay * 1000);
+}
+function win() {
+  G.winner = G.turn + 1; sfx("win", .3);
+  celebrate(getComputedStyle(document.documentElement).getPropertyValue(`--p${G.winner}`).trim() || "#ffd23f");
+  const card = $("winCard"); card.classList.remove("pop"); void card.offsetWidth; card.classList.add("pop");
+  setTimeout(() => card.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+}
+function sfx(name, delay = 0) {
+  if (!soundOn) return;
+  try { const c = ac(); if (c) SFX[name](c, c.currentTime + delay); } catch (e) {}
+}
+function renderSound() { $("soundBtn").textContent = soundOn ? "🔊 קול" : "🔇 מושתק"; $("soundBtn").setAttribute("aria-pressed", soundOn); }
+$("soundBtn").onclick = () => {
+  soundOn = !soundOn; renderSound();
+  try { localStorage.setItem("snl-sound", soundOn ? "on" : "off"); } catch (e) {}
+  sfx("right");
+};
+renderSound();
+
+let setup = { count: 2, level: 5, names: ["שחקן 1", "שחקן 2", "שחקן 3", "שחקן 4"] };
+let bank = {};      // level -> questions[]
+let G = null;       // game state
+
+// ---------- board geometry (square 1 bottom-right, rows snake upward) ----------
+function pos(s) {
+  const i = s - 1, row = Math.floor(i / 10), k = i % 10;
+  const col = row % 2 === 0 ? 9 - k : k;   // col 0 = left edge
+  return { col, row: 9 - row, x: col * 10 + 5, y: (9 - row) * 10 + 5 };
+}
+
+function drawBoard() {
+  const b = $("board"); b.innerHTML = "";
+  for (let s = 1; s <= 100; s++) {
+    const p = pos(s), c = document.createElement("div");
+    c.className = "cell" + ((p.col + p.row) % 2 ? " alt" : "") + (s === 100 ? " end" : "");
+    c.dataset.s = s; c.style.gridColumn = p.col + 1; c.style.gridRow = p.row + 1;
+    c.innerHTML = `<span class="n">${s}</span>` + (s === 1 ? `<span class="tag">התחלה</span>` : s === 100 ? `<span class="tag">סיום</span>` : "");
+    b.appendChild(c);
+  }
+  const NS = "http://www.w3.org/2000/svg", svg = $("over"); svg.innerHTML = "";
+  const el = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); svg.appendChild(e); return e; };
+  for (const [a, b2] of Object.entries(LADDERS)) {
+    const p = pos(+a), q = pos(b2);
+    const dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy), nx = -dy / len * 1.7, ny = dx / len * 1.7;
+    const style = "stroke: var(--ladder); stroke-linecap: round; fill: none";
+    el("line", { x1: p.x + nx, y1: p.y + ny, x2: q.x + nx, y2: q.y + ny, style: style + "; stroke-width: .9" });
+    el("line", { x1: p.x - nx, y1: p.y - ny, x2: q.x - nx, y2: q.y - ny, style: style + "; stroke-width: .9" });
+    const steps = Math.floor(len / 3.2);
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps, cx = p.x + dx * t, cy = p.y + dy * t;
+      el("line", { x1: cx + nx, y1: cy + ny, x2: cx - nx, y2: cy - ny, style: style + "; stroke-width: .6" });
+    }
+  }
+  for (const [a, b2] of Object.entries(SNAKES)) {
+    const h = pos(+a), t = pos(b2);
+    const dx = t.x - h.x, dy = t.y - h.y, len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len, w = Math.min(6, len / 4);
+    const c1 = { x: h.x + dx * .33 + nx * w, y: h.y + dy * .33 + ny * w };
+    const c2 = { x: h.x + dx * .66 - nx * w, y: h.y + dy * .66 - ny * w };
+    const d = `M${h.x},${h.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${t.x},${t.y}`;
+    el("path", { d, style: "stroke: var(--snake); stroke-width: 2.4; stroke-linecap: round; fill: none; opacity: .9" });
+    el("path", { d, style: "stroke: var(--snake-belly); stroke-width: .7; stroke-linecap: round; fill: none; stroke-dasharray: 1.2 1.6" });
+    el("circle", { cx: h.x, cy: h.y, r: 2.1, style: "fill: var(--snake)" });
+    el("circle", { cx: h.x - .7, cy: h.y - .5, r: .45, style: "fill: var(--panel)" });
+    el("circle", { cx: h.x + .7, cy: h.y - .5, r: .45, style: "fill: var(--panel)" });
+  }
+}
+
+function drawTokens() {
+  const box = $("tokens"); box.innerHTML = "";
+  const offs = [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]];
+  G.players.forEach((p, i) => {
+    const q = pos(p.sq), t = document.createElement("div");
+    t.className = "token"; t.style.background = COLORS[i];
+    t.style.left = (q.x + offs[i][0]) + "%"; t.style.top = (q.y + offs[i][1]) + "%";
+    t.title = p.name; box.appendChild(t);
+  });
+}
+
+// ---------- setup ----------
+function levelRange(L) { return [Math.max(1, L - 2), L]; }
+function renderSetup() {
+  const cnt = $("count"); cnt.innerHTML = "";
+  for (let n = 1; n <= 4; n++) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = n;
+    b.setAttribute("aria-pressed", n === setup.count);
+    b.onclick = () => { setup.count = n; renderSetup(); };
+    cnt.appendChild(b);
+  }
+  const nm = $("names"); nm.innerHTML = "";
+  for (let i = 0; i < setup.count; i++) {
+    const row = document.createElement("div"); row.className = "nm";
+    row.innerHTML = `<span class="chip" style="background:${COLORS[i]}"></span><input id="name${i}" maxlength="16" aria-label="שם שחקן ${i + 1}">`;
+    const inp = row.querySelector("input"); inp.value = setup.names[i];
+    inp.oninput = () => { setup.names[i] = inp.value; };
+    nm.appendChild(row);
+  }
+  const lv = $("levels"); lv.innerHTML = "";
+  for (let L = 1; L <= 10; L++) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = L;
+    b.setAttribute("aria-pressed", L === setup.level);
+    b.onclick = () => { setup.level = L; renderSetup(); };
+    lv.appendChild(b);
+  }
+  const [lo, hi] = levelRange(setup.level);
+  $("range").textContent = (lo === hi ? `כל השאלות ברמה ${lo}.` : `השאלות יהיו ברמות ${lo}–${hi}.`) +
+    " תשובה נכונה מוסיפה נקודות כמספר הרמה של השאלה. תשובה שגויה מורידה 11 פחות הרמה, כלומר טעות בשאלה קשה עולה פחות.";
+}
+
+async function loadLevels(levels) {
+  const need = levels.filter(l => !bank[l]);
+  await Promise.all(need.map(async l => {
+    const r = await fetch(`questions/level-${String(l).padStart(2, "0")}.json`);
+    if (!r.ok) throw new Error(l);
+    bank[l] = (await r.json()).questions;
+  }));
+}
+
+$("startBtn").onclick = async () => {
+  const [lo, hi] = levelRange(setup.level), levels = [];
+  for (let l = lo; l <= hi; l++) levels.push(l);
+  $("loadErr").hidden = true;
+  try { await loadLevels([...levels, examLevel("mine", setup.level)]); }
+  catch (e) {
+    $("loadErr").textContent = "לא הצלחתי לטעון את קובצי השאלות מהתיקייה questions. אם פתחת את הקובץ ישירות מהמחשב, צריך להריץ אותו דרך שרת מקומי.";
+    $("loadErr").hidden = false; return;
+  }
+  G = {
+    level: setup.level, levels,
+    players: Array.from({ length: setup.count }, (_, i) => ({ name: (setup.names[i] || "").trim() || `שחקן ${i + 1}`, sq: 1, pts: 0, right: 0, asked: 0 })),
+    turn: 0, phase: "question", q: null, used: [], pick: null, msg: "", winner: null
+  };
+  G.traps = placeTraps(); G.revealed = []; G.exam = null;
+  G.q = pickQuestion();
+  showGame();
+};
+
+// ---------- game ----------
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+// wrong answers cost less the harder the question: level 1 costs 10, level 10 costs 1
+const penalty = level => 11 - level;
+const EXP_CHANCE = 0.4;   // chance of a question drawn from an expansion already read
+const EXP_DELAY = 10;     // a follow-up comes back only after this many turns, so it tests memory
+const turnsPlayed = () => G.players.reduce((n, p) => n + p.asked, 0);
+const any = a => a[Math.floor(Math.random() * a.length)];
+function pickQuestion() {
+  const all = [];
+  for (const l of G.levels) for (const q of bank[l]) all.push({ ...q, level: l });
+  const readAt = G.readAt || {}, now = turnsPlayed();
+  // follow-ups unlock a few turns after their parent's expansion was shown to the table
+  const fus = all.filter(q => q.parent && readAt[q.parent] !== undefined && now - readAt[q.parent] >= EXP_DELAY && !G.used.includes(q.id));
+  let pool = all.filter(q => !q.parent && !G.used.includes(q.id));
+  if (!pool.length) { G.used = G.used.filter(id => all.some(q => q.id === id && q.parent)); pool = all.filter(q => !q.parent && !G.used.includes(q.id)); }
+  const q = fus.length && Math.random() < EXP_CHANCE ? any(fus) : any(pool);
+  G.used.push(q.id);
+  const parent = q.parent ? all.find(x => x.id === q.parent) : null;
+  return { id: q.id, level: q.level, cat: q.cat, q: q.q, options: q.options, answer: q.answer, explain: q.explain, expansion: q.expansion || "",
+           fromExp: parent ? parent.q : "", order: shuffle([0, 1, 2, 3]) };
+}
+
+function placeTraps() {
+  const busy = new Set([...Object.keys(LADDERS), ...Object.values(LADDERS), ...Object.keys(SNAKES), ...Object.values(SNAKES)].map(Number));
+  const free = shuffle(Array.from({ length: 80 }, (_, i) => i + 11).filter(s => !busy.has(s)));
+  const kinds = Object.entries(TRAPS).flatMap(([k, t]) => Array(t.count).fill(k)), traps = {};
+  for (const s of free) {
+    if (!kinds.length) break;
+    // keep traps apart, and never exactly a jump away from each other, so a jump can't land on another trap
+    if (Object.keys(traps).some(t => Math.abs(t - s) < 3 || Math.abs(t - s) === TRAP_JUMP)) continue;
+    traps[s] = kinds.pop();
+  }
+  return traps;
+}
+function pickExamQuestion(level) {
+  let pool = bank[level].filter(q => !q.parent && !G.used.includes(q.id));
+  if (!pool.length) pool = bank[level].filter(q => !q.parent);
+  const q = any(pool);
+  G.used.push(q.id);
+  return { id: q.id, level, cat: q.cat, q: q.q, options: q.options, answer: q.answer, explain: q.explain, expansion: q.expansion || "",
+           fromExp: "", order: shuffle([0, 1, 2, 3]) };
+}
+function drawTraps() {
+  document.querySelectorAll(".cell .trap").forEach(e => e.remove());
+  for (const s of G.revealed) {
+    const c = document.querySelector(`.cell[data-s="${s}"]`), t = TRAPS[G.traps[s]];
+    if (c) c.insertAdjacentHTML("beforeend", `<span class="trap" title="${t.name}">${t.icon}</span>`);
+  }
+}
+// hint shown after moving onto a square
+function landingNote(sq) {
+  if (LADDERS[sq]) return ` נחתת על סולם: בתור הבא תשובה נכונה תעלה אותך למשבצת ${LADDERS[sq]}, ושגויה תקדם רק משבצת אחת.`;
+  if (SNAKES[sq]) return ` זהירות, ראש נחש: בתור הבא תשובה שגויה תוריד אותך למשבצת ${SNAKES[sq]}.`;
+  return "";
+}
+
+function showGame() {
+  $("setup").hidden = true; $("game").hidden = false;
+  drawBoard(); render();
+}
+
+function render() {
+  persist();
+  drawTokens(); drawTraps();
+  const ex = G.exam && G.exam.started ? G.exam : null;
+  const pl = $("players"); pl.innerHTML = "";
+  G.players.forEach((p, i) => {
+    const r = document.createElement("div"); r.className = "pl" + (i === G.turn && !G.winner ? " turn" : "");
+    r.innerHTML = `<span class="chip" style="background:${COLORS[i]}"></span><span class="name"></span><span class="sq">משבצת ${p.sq} · ${p.asked} תורות</span><span class="pts"><b>${p.pts}</b> נק'</span>`;
+    r.querySelector(".name").textContent = p.name;
+    pl.appendChild(r);
+  });
+  const cur = G.players[G.turn];
+  $("die").textContent = cur.sq;
+  $("who").textContent = G.winner ? "המשחק הסתיים" : `התור של ${cur.name}`;
+  const sub = $("sub");
+  sub.className = "sub";
+  if (G.winner) sub.textContent = "";
+  else if (ex) { const t = TRAPS[ex.kind]; sub.textContent = `${t.icon} מבחן ${t.name}: ${EXAM_LEN} נכונות ברצף ` + (ex.kind === "balloon" ? `יקפיצו אותך ${TRAP_JUMP} משבצות קדימה.` : `ימנעו נפילה של ${TRAP_JUMP} משבצות.`); }
+  else if (G.phase !== "question") sub.textContent = "";
+  else if (LADDERS[cur.sq]) { sub.className = "sub ladder"; sub.textContent = `אתה על סולם. תשובה נכונה תעלה אותך למשבצת ${LADDERS[cur.sq]}. תשובה שגויה תקדם רק משבצת אחת, והסולם יוחמץ.`; }
+  else if (SNAKES[cur.sq]) { sub.className = "sub snake"; sub.textContent = `אתה על ראש נחש. תשובה שגויה תוריד אותך למשבצת ${SNAKES[cur.sq]}.`; }
+  else sub.textContent = "תשובה נכונה מקדמת אותך משבצת אחת.";
+
+  $("qCard").hidden = !G.q;
+  $("qCard").style.setProperty("--pc", COLORS[G.turn]);
+  if (G.q) {
+    const q = G.q;
+    const qNum = ex ? ex.n + (G.phase === "question" || ex.passed === false ? 1 : 0) : 0;
+    $("qLvl").textContent = (ex ? `${TRAPS[ex.kind].icon} שאלה ${qNum} מתוך ${EXAM_LEN} · ` : "") + `רמה ${q.level} · נכון +${q.level} · טעות −${penalty(q.level)}`;
+    const bar = $("examBar"); bar.hidden = !ex; bar.innerHTML = "";
+    if (ex) for (let i = 0; i < EXAM_LEN; i++) bar.insertAdjacentHTML("beforeend", `<i class="${i < ex.n ? "ok" : i === ex.n && ex.passed === false ? "no" : ""}"></i>`);
+    $("qCat").textContent = q.fromExp ? "שאלה מתוך הרחבה" : q.cat;
+    const from = $("qFrom");
+    from.hidden = !q.fromExp;
+    if (q.fromExp) { from.innerHTML = "<b>מתוך ההרחבה לשאלה:</b> "; from.appendChild(document.createTextNode(q.fromExp)); }
+    $("qText").textContent = q.q;
+    $("swapBtn").hidden = !(G.phase === "question" && !ex && (SNAKES[cur.sq] || LADDERS[cur.sq]) && !G.swapped);
+    const box = $("qOpts"); box.innerHTML = "";
+    q.order.forEach((oi, k) => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "opt"; b.id = "opt" + k;
+      b.innerHTML = `<span class="k">${LETTERS[k]}</span><span></span>`;
+      b.lastChild.textContent = q.options[oi];
+      if (G.phase !== "question") {
+        b.disabled = true;
+        if (oi === q.answer) b.classList.add("right");
+        else if (oi === G.pick) b.classList.add("wrong");
+      } else b.onclick = () => answer(oi);
+      box.appendChild(b);
+    });
+    const fb = $("fb");
+    if (G.phase === "question") fb.hidden = true;
+    else {
+      const ok = G.pick === q.answer;
+      fb.hidden = false; fb.className = "feedback " + (ok ? "ok" : "no");
+      fb.textContent = ok ? `נכון! +${q.level} נקודות` : `לא נכון, −${penalty(q.level)} נקודות. התשובה: ${q.options[q.answer]}`;
+      if (q.explain) { const s = document.createElement("span"); s.className = "ex"; s.textContent = q.explain; fb.appendChild(s); }
+    }
+    $("log").hidden = !G.msg; $("log").textContent = G.msg;
+    $("more").hidden = G.phase === "question" || !q.expansion;
+    $("moreText").textContent = q.expansion;
+    $("nextBtn").hidden = G.phase !== "done" || !!G.winner;
+    $("nextBtn").textContent = G.exam && !G.exam.started ? "למבחן" : ex && ex.passed == null ? "לשאלה הבאה במבחן" : "התור הבא";
+  }
+
+  $("winCard").hidden = !G.winner;
+  if (G.winner) {
+    const w = G.players[G.winner - 1];
+    $("winCard").style.setProperty("--pc", COLORS[G.winner - 1]);
+    $("winText").textContent = `🎉 ${w.name} ניצח/ה! 🎉`;
+    // ranking: whoever reached 100 first, then by square, then by points
+    const order = G.players.map((p, i) => ({ p, i })).sort((a, b) =>
+      (b.i === G.winner - 1) - (a.i === G.winner - 1) || b.p.sq - a.p.sq || b.p.pts - a.p.pts);
+    const rk = $("rank"); rk.innerHTML = "";
+    order.forEach(({ p, i }, n) => {
+      const r = document.createElement("div"); r.className = "pl";
+      r.innerHTML = `<span class="place">${n + 1}</span><span class="chip" style="background:${COLORS[i]}"></span><span class="name"></span><span class="sq">משבצת ${p.sq} · ${p.asked} תורות · ${p.right} נכונות</span><span class="pts"><b>${p.pts}</b> נק'</span>`;
+      r.querySelector(".name").textContent = p.name;
+      rk.appendChild(r);
+    });
+    $("winSub").textContent = `${w.name} הגיע/ה ל-100 אחרי ${w.asked} תורות.`;
+  }
+}
+
+function answer(oi) {
+  if (G.exam && G.exam.started) return examAnswer(oi);
+  const p = G.players[G.turn], q = G.q, ok = oi === q.answer, from = p.sq;
+  G.pick = oi; p.asked++;
+  sfx(ok ? (LADDERS[from] ? "ladder" : "right") : (SNAKES[from] ? "snake" : "wrong"));
+  // expansions this player has read; groundwork for questions drawn from them later
+  (p.seen = p.seen || []).push(q.id);
+  if (q.expansion) (G.readAt = G.readAt || {})[q.id] = turnsPlayed();
+  let msg;
+  if (ok) {
+    p.pts += q.level; p.right++;
+    if (LADDERS[from]) { p.sq = LADDERS[from]; msg = `טיפוס בסולם! ${p.name} עלה/תה ממשבצת ${from} למשבצת ${p.sq}.`; }
+    else {
+      p.sq = from + 1;
+      msg = (SNAKES[from] ? `ניצלת מהנחש! ` : "") + `${p.name} התקדם/ה למשבצת ${p.sq}.`;
+    }
+  } else {
+    p.pts -= penalty(q.level);
+    if (SNAKES[from]) { p.sq = SNAKES[from]; msg = `${p.name} החליק/ה בנחש ממשבצת ${from} למשבצת ${p.sq}.`; }
+    // a wrong answer on a ladder foot still moves one square, past the ladder
+    else if (LADDERS[from]) { p.sq = from + 1; msg = `הסולם הוחמץ! ${p.name} התקדם/ה רק למשבצת ${p.sq}.`; }
+    else msg = `${p.name} נשאר/ת במשבצת ${from}.`;
+  }
+  if (p.sq !== from) {
+    msg += landingNote(p.sq);
+    if (SNAKES[p.sq]) boardAlert("snake", .5);
+    if (LADDERS[p.sq]) boardAlert("ladder", .5);
+    const kind = G.traps && G.traps[p.sq];
+    if (kind) {
+      const t = TRAPS[kind], first = !G.revealed.includes(p.sq);
+      if (first) G.revealed.push(p.sq);
+      sfx(kind, .4);
+      G.exam = { kind, sq: p.sq, level: examLevel(kind, G.level), n: 0, started: false, passed: null };
+      msg += ` ${t.icon} ${first ? "נחשף" : "דרכת על"} ${t.name} במשבצת ${p.sq}! מבחן של ${EXAM_LEN} שאלות ברמה ${G.exam.level}: ` +
+        (kind === "balloon" ? `רק ${EXAM_LEN} מתוך ${EXAM_LEN} יקפיצו אותך ${TRAP_JUMP} משבצות קדימה.` : `רק ${EXAM_LEN} מתוך ${EXAM_LEN} ימנעו נפילה של ${TRAP_JUMP} משבצות אחורה.`);
+    }
+  }
+  if (p.sq === 100) win();
+  G.msg = msg; G.phase = "done";
+  render();
+  if (!G.winner) $("nextBtn").focus();
+}
+
+// exam questions don't count as turns; the exam stops at the first mistake
+function examAnswer(oi) {
+  const p = G.players[G.turn], q = G.q, ex = G.exam, ok = oi === q.answer, from = p.sq, t = TRAPS[ex.kind];
+  G.pick = oi;
+  (p.seen = p.seen || []).push(q.id);
+  if (q.expansion) (G.readAt = G.readAt || {})[q.id] = turnsPlayed();
+  let msg;
+  if (ok) {
+    p.pts += q.level; p.right++; ex.n++;
+    if (ex.n < EXAM_LEN) { msg = `${ex.n} מתוך ${EXAM_LEN} נכונות.`; sfx("right"); }
+    else {
+      ex.passed = true; sfx(ex.kind === "balloon" ? "fly" : "defuse");
+      if (ex.kind === "balloon") { p.sq = Math.min(100, from + TRAP_JUMP); msg = `${t.icon} הכדור המריא! ${p.name} עף/ה ממשבצת ${from} למשבצת ${p.sq}.` + landingNote(p.sq); }
+      else msg = `${t.icon} המוקש נוטרל! ${p.name} נשאר/ת במשבצת ${from}.`;
+    }
+  } else {
+    p.pts -= penalty(q.level); ex.passed = false; sfx(ex.kind === "mine" ? "boom" : "deflate");
+    if (ex.kind === "mine") { p.sq = Math.max(1, from - TRAP_JUMP); msg = `${t.icon} בום! המוקש התפוצץ אחרי ${ex.n} נכונות. ${p.name} ירד/ה ממשבצת ${from} למשבצת ${p.sq}.` + landingNote(p.sq); }
+    else msg = `${t.icon} הכדור לא המריא (${ex.n} מתוך ${EXAM_LEN}). ${p.name} נשאר/ת במשבצת ${from}.`;
+  }
+  if (p.sq !== from && SNAKES[p.sq]) boardAlert("snake", 1.3);
+  if (p.sq !== from && LADDERS[p.sq]) boardAlert("ladder", 1.3);
+  if (p.sq === 100) win();
+  G.msg = msg; G.phase = "done";
+  render();
+  if (!G.winner) $("nextBtn").focus();
+}
+
+$("nextBtn").onclick = () => {
+  if (G.exam && (!G.exam.started || G.exam.passed == null)) {
+    G.exam.started = true;
+    G.q = pickExamQuestion(G.exam.level); G.pick = null; G.msg = ""; G.phase = "question";
+    render(); $("opt0").focus();
+    return;
+  }
+  G.exam = null;
+  G.turn = (G.turn + 1) % G.players.length;
+  G.q = pickQuestion(); G.pick = null; G.msg = ""; G.phase = "question"; G.swapped = false;
+  render();
+  $("turnCard").scrollIntoView({ block: "nearest" });
+};
+$("swapBtn").onclick = () => {
+  G.q = pickQuestion(); G.swapped = true;
+  render(); $("opt0").focus();
+};
+function newGame() { G = null; try { localStorage.removeItem(SAVE_KEY); } catch (e) {} $("game").hidden = true; $("setup").hidden = false; renderSetup(); }
+$("againBtn").onclick = newGame;
+// mid-game reset asks for a second click, since the current game is lost
+let resetArmed = null;
+$("resetBtn").onclick = () => {
+  const b = $("resetBtn");
+  if (resetArmed) { clearTimeout(resetArmed); resetArmed = null; b.textContent = "משחק חדש"; newGame(); return; }
+  b.textContent = "המשחק הנוכחי יימחק. ללחוץ שוב לאישור";
+  resetArmed = setTimeout(() => { resetArmed = null; b.textContent = "משחק חדש"; }, 4000);
+};
+
+// ---------- persistence: a reload or an update of the page resumes the game ----------
+const SAVE_KEY = "snl-game";
+function persist() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify({ setup, G })); } catch (e) {}
+}
+function savedGame() {
+  try { return JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); } catch (e) { return null; }
+}
+
+// ---------- boot ----------
+async function start(data) {
+  const saved = data && data.G ? data : savedGame();
+  if (saved && saved.setup) setup = saved.setup;
+  renderSetup();
+  if (!saved || !saved.G || saved.G.winner) return;
+  try { await loadLevels([...saved.G.levels, examLevel("mine", saved.G.level)]); } catch (e) { return; }
+  G = saved.G;
+  if (!G.traps) { G.traps = placeTraps(); G.revealed = []; G.exam = null; }
+  if (G.phase !== "question" && G.phase !== "done" || !G.q) { G.q = pickQuestion(); G.pick = null; G.phase = "question"; }
+  showGame();
+}
+window.addEventListener("error", e => {
+  const box = $("crash");
+  box.textContent = "משהו השתבש במשחק. המצב נשמר, ורענון של הדף ימשיך מאותה נקודה. פרטים לתיקון: " + (e.message || e.error);
+  box.hidden = false;
+});
+window.claude?.hot?.snapshot?.(() => ({ setup, G }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
+
+</body>
 </html>
