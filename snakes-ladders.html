@@ -138,8 +138,6 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
 .qhead { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
 .lvl { font-family: var(--display); font-weight: 700; color: var(--accent); }
 .qtext { font-weight: 700; font-size: 18px; margin: 0; }
-.from { margin: 0; font-size: 14px; color: var(--muted); border-inline-start: 3px solid var(--accent); padding-inline-start: 10px; }
-.from b { color: var(--accent); }
 .opts { display: grid; gap: 8px; }
 .opt {
   display: flex; gap: 10px; align-items: center; padding: 9px 12px; border-radius: 8px;
@@ -242,7 +240,6 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
       <div class="card" id="qCard" hidden>
         <div class="qhead"><span class="lvl" id="qLvl"></span><span id="qCat"></span></div>
         <div class="exam-bar" id="examBar" hidden></div>
-        <p class="from" id="qFrom" hidden></p>
         <p class="qtext" id="qText"></p>
         <div class="opts" id="qOpts"></div>
         <div><button class="btn ghost" id="swapBtn" type="button" hidden>החלפת שאלה (פעם אחת על נחש או סולם)</button></div>
@@ -540,9 +537,8 @@ function pickQuestion() {
   if (!pool.length) { G.used = G.used.filter(id => all.some(q => q.id === id && q.parent)); pool = all.filter(q => !q.parent && !G.used.includes(q.id)); }
   const q = fus.length && Math.random() < EXP_CHANCE ? any(fus) : any(pool);
   G.used.push(q.id);
-  const parent = q.parent ? all.find(x => x.id === q.parent) : null;
   return { id: q.id, level: q.level, cat: q.cat, q: q.q, options: q.options, answer: q.answer, explain: q.explain, expansion: q.expansion || "",
-           fromExp: parent ? parent.q : "", order: shuffle([0, 1, 2, 3]) };
+           order: shuffle([0, 1, 2, 3]) };
 }
 
 function placeTraps() {
@@ -563,7 +559,7 @@ function pickExamQuestion(level) {
   const q = any(pool);
   G.used.push(q.id);
   return { id: q.id, level, cat: q.cat, q: q.q, options: q.options, answer: q.answer, explain: q.explain, expansion: q.expansion || "",
-           fromExp: "", order: shuffle([0, 1, 2, 3]) };
+           order: shuffle([0, 1, 2, 3]) };
 }
 function drawTraps() {
   document.querySelectorAll(".cell .trap").forEach(e => e.remove());
@@ -615,10 +611,8 @@ function render() {
     $("qLvl").textContent = (ex ? `${TRAPS[ex.kind].icon} שאלה ${qNum} מתוך ${EXAM_LEN} · ` : "") + `רמה ${q.level} · נכון +${q.level} · טעות −${penalty(q.level)}`;
     const bar = $("examBar"); bar.hidden = !ex; bar.innerHTML = "";
     if (ex) for (let i = 0; i < EXAM_LEN; i++) bar.insertAdjacentHTML("beforeend", `<i class="${i < ex.n ? "ok" : i === ex.n && ex.passed === false ? "no" : ""}"></i>`);
-    $("qCat").textContent = q.fromExp ? "שאלה מתוך הרחבה" : q.cat;
-    const from = $("qFrom");
-    from.hidden = !q.fromExp;
-    if (q.fromExp) { from.innerHTML = "<b>מתוך ההרחבה לשאלה:</b> "; from.appendChild(document.createTextNode(q.fromExp)); }
+    // a follow-up looks like any other question; it quietly tests what an earlier expansion taught
+    $("qCat").textContent = q.cat;
     $("qText").textContent = q.q;
     $("swapBtn").hidden = !(G.phase === "question" && !ex && (SNAKES[cur.sq] || LADDERS[cur.sq]) && !G.swapped);
     const box = $("qOpts"); box.innerHTML = "";
