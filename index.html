@@ -50,6 +50,8 @@
   --p1: #f07070; --p2: #6e9ef0; --p3: #f0c040; --p4: #5cc48a; color-scheme: dark;
 }
 * { box-sizing: border-box; }
+/* the Claude host adds this rule; repeated here so the page also works on a plain web host */
+[hidden] { display: none !important; }
 body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5; direction: rtl; }
 .wrap {
   max-width: 1180px; margin: 0 auto; padding-block: 20px 48px;
