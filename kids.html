@@ -58,6 +58,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 }
 .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .names { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+select { max-width: 100%; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+.fb .say { float: inline-end; width: 40px; height: 40px; font-size: 18px; margin-inline-start: 8px; }
 .names input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
 .hint { color: var(--muted); font-size: 15px; margin: 0; }
 .err { color: var(--bad); font-weight: 700; margin: 0; }
@@ -141,6 +143,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       <span class="lbl">נושא</span>
       <div class="seg" id="topic" role="group" aria-label="נושא"></div>
       <p class="hint">בכל סבב 10 שאלות לכל ילד. על כל תשובה נכונה מקבלים כוכב ⭐, ועל טעות לא מפסידים כלום.</p>
+    </div>
+    <div class="field" id="voiceField" hidden>
+      <label class="lbl" for="voice">קול ההקראה</label>
+      <select id="voice"></select>
+      <p class="hint">כדאי לנסות כמה קולות. הקולות שמסומנים Natural נשמעים בדרך כלל הכי טבעי.</p>
     </div>
     <p class="err" id="loadErr" hidden></p>
     <div><button class="btn" id="startBtn" type="button">יוצאים לדרך!</button></div>
@@ -261,9 +268,12 @@ function render() {
   else {
     const ok = S.pick === q.answer;
     fb.hidden = false; fb.className = "fb pop " + (ok ? "ok" : "no");
-    fb.innerHTML = `<b></b><span></span>`;
-    fb.firstChild.textContent = ok ? any(["כל הכבוד! ⭐", "נכון מאוד! ⭐", "מצוין! ⭐", "יופי! ⭐"]) : `כמעט! התשובה הנכונה: ${q.options[q.answer]}`;
-    fb.lastChild.textContent = q.explain;
+    fb.innerHTML = `<button class="say" type="button" aria-label="הקראת ההסבר" title="הקראת ההסבר">🔊</button><b></b><span></span>`;
+    const head = ok ? any(["כל הכבוד! ⭐", "נכון מאוד! ⭐", "מצוין! ⭐", "יופי! ⭐"]) : `כמעט! התשובה הנכונה: ${q.options[q.answer]}`;
+    fb.children[1].textContent = head;
+    fb.children[2].textContent = q.explain;
+    fb.children[0].hidden = !window.speechSynthesis;
+    fb.children[0].onclick = () => say(strip(head) + ". " + q.explain);
   }
   const last = S.i === S.qs.length - 1;
   $("nextBtn").hidden = S.pick == null;
@@ -304,20 +314,35 @@ function finish() {
 $("againBtn").onclick = startRound;
 $("setupBtn").onclick = () => { $("end").hidden = true; $("setup").hidden = false; renderSetup(); };
 
-// read the question and the answers aloud, when the browser has a Hebrew voice
+// read aloud with the browser's own Hebrew voices; their quality differs a lot between devices,
+// so the neural ("Natural"/"Online") and Google voices are preferred and the player can pick another
 const strip = s => s.replace(/\p{Extended_Pictographic}|️/gu, "").trim();
-$("sayBtn").onclick = () => {
+const rankVoice = v => /natural|online|neural/i.test(v.name) ? 0 : /google/i.test(v.name) ? 1 : v.localService ? 3 : 2;
+const heVoices = () => (window.speechSynthesis ? speechSynthesis.getVoices() : [])
+  .filter(v => /^(he|iw)/i.test(v.lang)).sort((a, b) => rankVoice(a) - rankVoice(b));
+function renderVoices() {
+  const vs = heVoices(), sel = $("voice");
+  $("voiceField").hidden = vs.length < 2;
+  sel.innerHTML = "";
+  for (const v of vs) { const o = document.createElement("option"); o.value = v.name; o.textContent = v.name.replace(/^Microsoft\s+/, "").replace(/\s*-\s*Hebrew.*$/i, ""); sel.appendChild(o); }
+  if (vs.some(v => v.name === setup.voice)) sel.value = setup.voice;
+}
+function say(text) {
   if (!window.speechSynthesis) return;
-  const q = S.qs[S.i];
   speechSynthesis.cancel();
-  const text = strip(q.q) + ". " + q.order.map((oi, k) => strip(q.options[oi])).filter(Boolean).join(". או: ") + ".";
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "he-IL"; u.rate = .9;
-  const v = speechSynthesis.getVoices().find(v => /^(he|iw)/i.test(v.lang));
+  const vs = heVoices(), v = vs.find(v => v.name === setup.voice) || vs[0];
   if (v) u.voice = v;
   speechSynthesis.speak(u);
+}
+$("sayBtn").onclick = () => {
+  const q = S.qs[S.i];
+  say(strip(q.q) + ". " + q.order.map(oi => strip(q.options[oi])).filter(Boolean).join(". או: ") + ".");
 };
-if (!window.speechSynthesis) $("sayBtn").hidden = true;
+$("voice").onchange = () => { setup.voice = $("voice").value; store.set("setup", setup); say("שלום! ככה אני נשמע."); };
+if (window.speechSynthesis) { renderVoices(); speechSynthesis.addEventListener?.("voiceschanged", renderVoices); }
+else $("sayBtn").hidden = true;
 
 // short sounds made with Web Audio, so there are no audio files
 let audio = null;
