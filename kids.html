@@ -67,6 +67,7 @@ select { max-width: 100%; padding: 10px 12px; border-radius: 12px; border: 2px s
 .top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .who { font: 800 20px var(--display); color: var(--pc, var(--accent)); }
 .cat { color: var(--muted); font-size: 15px; margin-inline-start: auto; }
+.quit { padding: 5px 12px; border-radius: 10px; border: 2px solid var(--line); background: transparent; cursor: pointer; font: 700 15px var(--display); color: var(--muted); }
 .progress { display: flex; gap: 5px; }
 .progress i { flex: 1; height: 10px; border-radius: 5px; background: var(--line); }
 .progress i.ok { background: var(--good); }
@@ -154,7 +155,7 @@ select { max-width: 100%; padding: 10px 12px; border-radius: 12px; border: 2px s
   </section>
 
   <section class="card" id="play" hidden>
-    <div class="top"><span class="who" id="who"></span><span class="cat" id="cat"></span></div>
+    <div class="top"><span class="who" id="who"></span><span class="cat" id="cat"></span><button class="quit" id="quitBtn" type="button">⚙️ הגדרות</button></div>
     <div class="progress" id="progress"></div>
     <div class="qrow">
       <p class="qtext" id="qText"></p>
@@ -312,6 +313,12 @@ function finish() {
   sfx("win");
 }
 $("againBtn").onclick = startRound;
+// leave a round in the middle; asks first, so a stray tap by a child doesn't end the game
+$("quitBtn").onclick = () => {
+  if (!confirm("לצאת מהסבב ולחזור להגדרות? הסבב הנוכחי לא יישמר.")) return;
+  window.speechSynthesis?.cancel();
+  $("play").hidden = true; $("setup").hidden = false; renderSetup();
+};
 $("setupBtn").onclick = () => { $("end").hidden = true; $("setup").hidden = false; renderSetup(); };
 
 // read aloud with the browser's own Hebrew voices; their quality differs a lot between devices,
