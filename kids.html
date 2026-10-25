@@ -350,7 +350,13 @@ fetch("questions/say.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : {
   const words = Object.keys(d).sort((a, b) => b.length - a.length);
   if (words.length) lexRe = new RegExp(`(^|[^\\u05D0-\\u05EA])([והבלמשכ]{0,3})(${words.join("|")})(?![\\u05D0-\\u05EA])`, "g");
 }).catch(() => {});
-const pronounce = text => lexRe ? text.replace(lexRe, (m, pre, px, w) => pre + px + lexicon[w]) : text;
+// a Latin-letter entry (a name such as "Pooh") gets its Hebrew prefix letters in Latin too, "הדוב" → "haDov",
+// so the voice doesn't read half a word in each language
+const PREFIX = { "ו": "ve", "ה": "ha", "ב": "ba", "ל": "la", "מ": "mi", "ש": "she", "כ": "ka" };
+const pronounce = text => lexRe ? text.replace(lexRe, (m, pre, px, w) => {
+  const to = lexicon[w], latin = /^[A-Za-z]/.test(to);
+  return pre + (latin ? [...px].map(c => PREFIX[c]).join("") : px) + to;
+}) : text;
 function say(text) {
   if (!window.speechSynthesis) return;
   speechSynthesis.cancel();
