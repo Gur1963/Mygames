@@ -3,6 +3,7 @@
 //   node tools/bank.js add <batch.json>        batch: [{ level, cat, q, options[4], explain, expansion, followup: { q, options[4], explain } }]
 //   node tools/bank.js followups <map.json>    map: { "<parent id>": { q, options[4], explain } } rewrites "<parent>-F1"
 //   node tools/bank.js replace <map.json>      map: { "<id>": { cat, q, options[4], explain, expansion, followup } } swaps a question and its follow-up, keeping the ids
+//   node tools/bank.js expansions <map.json>   map: { "<id>": "<expansion>" } rewrites a main question's expansion
 // The correct answer is always options[0]; the game shuffles.
 const fs = require("fs"), path = require("path");
 const DIR = path.join(__dirname, "..", "questions");
@@ -79,6 +80,20 @@ if (cmd === "stats") {
     if (changed) save(d);
   }
   console.log("questions replaced:", done, "of", Object.keys(map).length);
+} else if (cmd === "expansions") {
+  const map = JSON.parse(fs.readFileSync(arg, "utf8"));
+  let done = 0;
+  for (let l = 1; l <= 10; l++) {
+    const d = load(l);
+    let changed = false;
+    for (const q of d.questions) {
+      if (q.parent || !map[q.id]) continue;
+      q.expansion = map[q.id].trim();
+      changed = true; done++;
+    }
+    if (changed) save(d);
+  }
+  console.log("expansions rewritten:", done, "of", Object.keys(map).length);
 } else if (cmd === "cats") {
   // merge stray category labels into the main ones, then print the topic table
   const MERGE = { "חשבון": "מתמטיקה", "חגים": "יהדות", "שחמט": "ספורט", "תרבות": "כללי", "ארכאולוגיה": "היסטוריה" };
@@ -95,5 +110,5 @@ if (cmd === "stats") {
   for (const [c, row] of Object.entries(table).sort((a, b) => b[1].reduce((x, y) => x + y) - a[1].reduce((x, y) => x + y)))
     console.log(`${c}\t${row.reduce((x, y) => x + y)}\t${row.join(" ")}`);
 } else {
-  console.log("usage: node tools/bank.js stats | add <batch.json> | followups <map.json> | replace <map.json> | cats");
+  console.log("usage: node tools/bank.js stats | add <batch.json> | followups <map.json> | replace <map.json> | expansions <map.json> | cats");
 }
