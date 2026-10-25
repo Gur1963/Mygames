@@ -574,7 +574,7 @@ function pickExamQuestion(level) {
 // analog clock for "what time is it" questions; time is "h:mm", face is "numbers" (default), "roman" or "bare"
 const ROMAN = ["XII", "I", "II", "III", "IIII", "V", "VI", "VII", "VIII", "IX", "X", "XI"];
 function drawClock(svg, time, face) {
-  svg.hidden = !time;
+  svg.toggleAttribute("hidden", !time);   // svg elements have no .hidden property, so set the attribute itself
   if (!time) { svg.innerHTML = ""; return; }
   const [h, m] = time.split(":").map(Number);
   const at = (deg, r) => { const a = (deg - 90) * Math.PI / 180; return [(100 + r * Math.cos(a)).toFixed(1), (100 + r * Math.sin(a)).toFixed(1)]; };
