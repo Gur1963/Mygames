@@ -5,9 +5,10 @@
 //   node tools/bank.js replace <map.json>      map: { "<id>": { cat, q, options[4], explain, expansion, followup } } swaps a question and its follow-up, keeping the ids
 //   node tools/bank.js expansions <map.json>   map: { "<id>": "<expansion>" } rewrites a main question's expansion
 // The correct answer is always options[0]; the game shuffles.
+// A question (or follow-up) may carry clock: "h:mm" and face: "roman" | "bare" to show an analog clock.
 const fs = require("fs"), path = require("path");
 const DIR = path.join(__dirname, "..", "questions");
-const KEYS = ["id", "parent", "cat", "q", "options", "answer", "explain", "expansion"];
+const KEYS = ["id", "parent", "cat", "q", "clock", "face", "options", "answer", "explain", "expansion"];
 const file = l => path.join(DIR, `level-${String(l).padStart(2, "0")}.json`);
 const load = l => JSON.parse(fs.readFileSync(file(l), "utf8"));
 
@@ -37,13 +38,16 @@ if (cmd === "stats") {
   const batch = JSON.parse(fs.readFileSync(arg, "utf8")), byLevel = {};
   batch.forEach((b, i) => { check(b, `#${i}`); check(b.followup, `#${i} follow-up`); (byLevel[b.level] ||= []).push(b); });
   for (const [l, items] of Object.entries(byLevel)) {
-    const d = load(+l), known = new Set(d.questions.map(q => q.q));
+    // clock questions share their wording, so the clock time is part of what makes one unique
+    const key = q => q.q + (q.clock ? " @" + q.clock : "");
+    const d = load(+l), known = new Set(d.questions.map(key));
     let n = Math.max(0, ...d.questions.filter(q => !q.parent).map(q => +q.id.slice(4)));
     for (const b of items) {
-      if (known.has(b.q)) { console.warn("skip duplicate:", b.q); continue; }
+      if (known.has(key(b))) { console.warn("skip duplicate:", key(b)); continue; }
       const id = `L${String(l).padStart(2, "0")}-${String(++n).padStart(3, "0")}`;
-      d.questions.push({ id, cat: b.cat, q: b.q, options: b.options, answer: 0, explain: b.explain || "", expansion: b.expansion });
-      d.questions.push({ id: id + "-F1", parent: id, cat: b.cat, q: b.followup.q, options: b.followup.options, answer: 0, explain: b.followup.explain || "" });
+      d.questions.push({ id, cat: b.cat, q: b.q, clock: b.clock, face: b.face, options: b.options, answer: 0, explain: b.explain || "", expansion: b.expansion });
+      d.questions.push({ id: id + "-F1", parent: id, cat: b.cat, q: b.followup.q, clock: b.followup.clock, face: b.followup.face,
+                         options: b.followup.options, answer: 0, explain: b.followup.explain || "" });
     }
     save(d);
     console.log(`level ${l}: +${items.length}`);

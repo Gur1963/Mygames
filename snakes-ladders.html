@@ -138,6 +138,15 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
 .qhead { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
 .lvl { font-family: var(--display); font-weight: 700; color: var(--accent); }
 .qtext { font-weight: 700; font-size: 18px; margin: 0; }
+.clock { display: block; width: min(210px, 62vw); margin: 4px auto; }
+.clock .face { fill: var(--panel); stroke: var(--ink); stroke-width: 4; }
+.clock .tick { stroke: var(--muted); stroke-width: 1.5; }
+.clock .tick.big { stroke: var(--ink); stroke-width: 3.5; }
+.clock text { fill: var(--ink); font-family: var(--display); font-weight: 700; font-size: 17px; text-anchor: middle; dominant-baseline: central;
+  paint-order: stroke; stroke: var(--panel); stroke-width: 5px; }
+.clock .hh { stroke: var(--ink); stroke-width: 7; stroke-linecap: round; }
+.clock .mh { stroke: var(--accent); stroke-width: 4; stroke-linecap: round; }
+.clock .pin { fill: var(--ink); }
 .opts { display: grid; gap: 8px; }
 .opt {
   display: flex; gap: 10px; align-items: center; padding: 9px 12px; border-radius: 8px;
@@ -241,6 +250,7 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
         <div class="qhead"><span class="lvl" id="qLvl"></span><span id="qCat"></span></div>
         <div class="exam-bar" id="examBar" hidden></div>
         <p class="qtext" id="qText"></p>
+        <svg class="clock" id="qClock" viewBox="0 0 200 200" role="img" aria-label="שעון מחוגים" hidden></svg>
         <div class="opts" id="qOpts"></div>
         <div><button class="btn ghost" id="swapBtn" type="button" hidden>החלפת שאלה (פעם אחת על נחש או סולם)</button></div>
         <div class="feedback" id="fb" hidden></div>
@@ -538,7 +548,7 @@ function pickQuestion() {
   const q = fus.length && Math.random() < EXP_CHANCE ? any(fus) : any(pool);
   G.used.push(q.id);
   return { id: q.id, level: q.level, cat: q.cat, q: q.q, options: q.options, answer: q.answer, explain: q.explain, expansion: q.expansion || "",
-           order: shuffle([0, 1, 2, 3]) };
+           clock: q.clock, face: q.face, order: shuffle([0, 1, 2, 3]) };
 }
 
 function placeTraps() {
@@ -559,7 +569,29 @@ function pickExamQuestion(level) {
   const q = any(pool);
   G.used.push(q.id);
   return { id: q.id, level, cat: q.cat, q: q.q, options: q.options, answer: q.answer, explain: q.explain, expansion: q.expansion || "",
-           order: shuffle([0, 1, 2, 3]) };
+           clock: q.clock, face: q.face, order: shuffle([0, 1, 2, 3]) };
+}
+// analog clock for "what time is it" questions; time is "h:mm", face is "numbers" (default), "roman" or "bare"
+const ROMAN = ["XII", "I", "II", "III", "IIII", "V", "VI", "VII", "VIII", "IX", "X", "XI"];
+function drawClock(svg, time, face) {
+  svg.hidden = !time;
+  if (!time) { svg.innerHTML = ""; return; }
+  const [h, m] = time.split(":").map(Number);
+  const at = (deg, r) => { const a = (deg - 90) * Math.PI / 180; return [(100 + r * Math.cos(a)).toFixed(1), (100 + r * Math.sin(a)).toFixed(1)]; };
+  let s = `<circle class="face" cx="100" cy="100" r="94"/>`;
+  for (let i = 0; i < 60; i++) {
+    const big = i % 5 === 0, [x1, y1] = at(i * 6, big ? 78 : 84), [x2, y2] = at(i * 6, 89);
+    s += `<line class="tick${big ? " big" : ""}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+  }
+  // the minute hand reaches the tick ring; the numbers are drawn over it with a halo so they stay readable
+  const [hx, hy] = at((h % 12 + m / 60) * 30, 46), [mx, my] = at(m * 6, 82);
+  s += `<line class="mh" x1="100" y1="100" x2="${mx}" y2="${my}"/>`;
+  if (face !== "bare") for (let i = 0; i < 12; i++) {
+    const [x, y] = at(i * 30, 65);
+    s += `<text x="${x}" y="${y}"${face === "roman" ? ' style="font-size:13px"' : ""}>${face === "roman" ? ROMAN[i] : i || 12}</text>`;
+  }
+  s += `<line class="hh" x1="100" y1="100" x2="${hx}" y2="${hy}"/><circle class="pin" cx="100" cy="100" r="5"/>`;
+  svg.innerHTML = s;
 }
 function drawTraps() {
   document.querySelectorAll(".cell .trap").forEach(e => e.remove());
@@ -614,6 +646,7 @@ function render() {
     // a follow-up looks like any other question; it quietly tests what an earlier expansion taught
     $("qCat").textContent = q.cat;
     $("qText").textContent = q.q;
+    drawClock($("qClock"), q.clock, q.face);
     $("swapBtn").hidden = !(G.phase === "question" && !ex && (SNAKES[cur.sq] || LADDERS[cur.sq]) && !G.swapped);
     const box = $("qOpts"); box.innerHTML = "";
     q.order.forEach((oi, k) => {
