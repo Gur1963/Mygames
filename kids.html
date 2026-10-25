@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>שאלות לילדים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Kids mode: a short question-and-answer round, no board, no penalties */
+:root {
+  --bg: #fdf6ec; --panel: #ffffff; --ink: #2a2233; --muted: #6b6475; --line: #eadfce;
+  --accent: #6c4bd8; --accent-ink: #ffffff; --sun: #f5b400;
+  --good: #1d7a46; --good-soft: #def2e5; --bad: #b3261e; --bad-soft: #f8e2df;
+  --p1: #e0592f; --p2: #2f6fd6; --p3: #2e9a5a;
+  --display: "Rubik", "Segoe UI", Arial, sans-serif;
+  --body: "Assistant", "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17131f; --panel: #221c2c; --ink: #f1ecf7; --muted: #aca3b8; --line: #3a3147;
+    --accent: #a98cff; --accent-ink: #17131f; --sun: #ffcf40;
+    --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d;
+    --p1: #f58a64; --p2: #6e9ef0; --p3: #5cc48a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17131f; --panel: #221c2c; --ink: #f1ecf7; --muted: #aca3b8; --line: #3a3147;
+  --accent: #a98cff; --accent-ink: #17131f; --sun: #ffcf40;
+  --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d;
+  --p1: #f58a64; --p2: #6e9ef0; --p3: #5cc48a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 18px; line-height: 1.5; }
+.wrap {
+  max-width: 720px; margin: 0 auto; padding-block: 18px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 16px;
+}
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(26px, 6vw, 36px); margin: 0; }
+a.back { color: var(--accent); font-weight: 700; text-decoration: none; font-size: 16px; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.btn {
+  font: 700 19px var(--display); padding: 12px 26px; border-radius: 14px; cursor: pointer;
+  border: 2px solid var(--accent); background: var(--accent); color: var(--accent-ink);
+}
+.btn.ghost { background: transparent; color: var(--accent); }
+.field { display: grid; gap: 10px; }
+.lbl { font-weight: 700; font-family: var(--display); }
+.seg { display: flex; flex-wrap: wrap; gap: 8px; }
+.seg button {
+  padding: 9px 16px; border-radius: 12px; border: 2px solid var(--line); background: transparent; cursor: pointer;
+  font-family: var(--display); font-weight: 700;
+}
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.names { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.names input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+.hint { color: var(--muted); font-size: 15px; margin: 0; }
+.err { color: var(--bad); font-weight: 700; margin: 0; }
+
+.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.who { font: 800 20px var(--display); color: var(--pc, var(--accent)); }
+.cat { color: var(--muted); font-size: 15px; margin-inline-start: auto; }
+.progress { display: flex; gap: 5px; }
+.progress i { flex: 1; height: 10px; border-radius: 5px; background: var(--line); }
+.progress i.ok { background: var(--good); }
+.progress i.no { background: var(--bad); }
+.progress i.now { background: var(--sun); }
+.qrow { display: flex; gap: 10px; align-items: flex-start; }
+.qtext { font: 700 clamp(21px, 5vw, 26px)/1.4 var(--display); margin: 0; flex: 1; }
+.say { flex: none; width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--line); background: transparent; cursor: pointer; font-size: 22px; }
+/* a picture row reads right to left like the text, and shrinks to stay on one line */
+.pic { display: flex; justify-content: center; gap: 2px; min-width: 0; font-size: min(48px, calc(58vw / var(--n, 6)), calc(440px / var(--n, 6))); line-height: 1.2; }
+.pic span.num { font: 800 1em var(--display); padding: 0 .2em; }
+.opt.emo { font-size: 36px; line-height: 1; }
+.clock { display: block; width: min(230px, 66vw); margin: 0 auto; }
+.clock .face { fill: var(--panel); stroke: var(--ink); stroke-width: 4; }
+.clock .tick { stroke: var(--muted); stroke-width: 1.5; }
+.clock .tick.big { stroke: var(--ink); stroke-width: 3.5; }
+.clock text { fill: var(--ink); font-family: var(--display); font-weight: 700; font-size: 17px; text-anchor: middle; dominant-baseline: central;
+  paint-order: stroke; stroke: var(--panel); stroke-width: 5px; }
+.clock .hh { stroke: var(--ink); stroke-width: 7; stroke-linecap: round; }
+.clock .mh { stroke: var(--accent); stroke-width: 4; stroke-linecap: round; }
+.clock .pin { fill: var(--ink); }
+.opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 480px) { .opts { grid-template-columns: 1fr; } }
+.opt {
+  min-height: 60px; padding: 10px 14px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg);
+  cursor: pointer; font: 700 clamp(19px, 4.6vw, 22px) var(--display); text-align: center;
+}
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--good); background: var(--good-soft); }
+.opt.wrong { border-color: var(--bad); background: var(--bad-soft); }
+.fb { border-radius: 14px; padding: 12px 16px; font-size: 18px; }
+.fb b { font-family: var(--display); font-size: 21px; display: block; }
+.fb.ok { background: var(--good-soft); }
+.fb.ok b { color: var(--good); }
+.fb.no { background: var(--bad-soft); }
+.fb.no b { color: var(--bad); }
+.end { text-align: center; }
+.end .big { font: 800 clamp(26px, 7vw, 34px) var(--display); }
+.scores { display: grid; gap: 10px; }
+.score { display: grid; gap: 2px; padding: 12px; border-radius: 14px; border: 2px solid var(--pc); }
+.score .nm { font: 800 21px var(--display); color: var(--pc); }
+.score .stars { font-size: 26px; letter-spacing: 2px; }
+.score .tot { color: var(--muted); font-size: 15px; }
+.row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+@media (prefers-reduced-motion: no-preference) {
+  .pop { animation: pop .45s cubic-bezier(.2, 1.6, .4, 1) both; }
+  .score .stars { animation: pop .6s cubic-bezier(.2, 1.6, .4, 1) .2s both; }
+}
+@keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🧸 שאלות לילדים</h1>
+    <a class="back" href="index.html">לסולמות ונחשים ←</a>
+  </header>
+
+  <section class="card" id="setup">
+    <div class="field">
+      <span class="lbl">כמה ילדים משחקים?</span>
+      <div class="seg" id="count" role="group" aria-label="מספר ילדים"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">שמות</span>
+      <div class="names" id="names"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">גיל</span>
+      <div class="seg" id="group" role="group" aria-label="גיל"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">נושא</span>
+      <div class="seg" id="topic" role="group" aria-label="נושא"></div>
+      <p class="hint">בכל סבב 10 שאלות לכל ילד. על כל תשובה נכונה מקבלים כוכב ⭐, ועל טעות לא מפסידים כלום.</p>
+    </div>
+    <p class="err" id="loadErr" hidden></p>
+    <div><button class="btn" id="startBtn" type="button">יוצאים לדרך!</button></div>
+  </section>
+
+  <section class="card" id="play" hidden>
+    <div class="top"><span class="who" id="who"></span><span class="cat" id="cat"></span></div>
+    <div class="progress" id="progress"></div>
+    <div class="qrow">
+      <p class="qtext" id="qText"></p>
+      <button class="say" id="sayBtn" type="button" aria-label="הקראת השאלה" title="הקראת השאלה">🔊</button>
+    </div>
+    <div class="pic" id="pic" hidden></div>
+    <svg class="clock" id="clock" viewBox="0 0 200 200" role="img" aria-label="שעון מחוגים" hidden></svg>
+    <div class="opts" id="opts"></div>
+    <div class="fb" id="fb" hidden></div>
+    <div class="row"><button class="btn" id="nextBtn" type="button" hidden></button></div>
+  </section>
+
+  <section class="card end" id="end" hidden>
+    <div class="big pop" id="endTitle"></div>
+    <div class="scores" id="scores"></div>
+    <div class="row">
+      <button class="btn" id="againBtn" type="button">עוד סבב!</button>
+      <button class="btn ghost" id="setupBtn" type="button">הגדרות</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const ROUND = 10;
+const COLORS = ["var(--p1)", "var(--p2)", "var(--p3)"];
+const GROUPS = { small: "קטנים (6–7)", big: "גדולים (8–9)" };
+const TOPICS = ["הכול", "חשבון", "מילים", "טבע", "היגיון", "העולם שלנו", "סיפורים", "ציורים", "שעון"];
+const LETTERS = ["א", "ב", "ג", "ד"];
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("kids-" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("kids-" + k, JSON.stringify(v)); } catch (e) {} }
+};
+let bank = null, S = null;
+const setup = store.get("setup", { count: 1, names: ["", "", ""], group: "small", topic: "הכול" });
+
+function seg(el, items, cur, pick) {
+  el.innerHTML = "";
+  for (const [val, text] of items) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = text;
+    b.setAttribute("aria-pressed", val === cur);
+    b.onclick = () => { pick(val); renderSetup(); };
+    el.appendChild(b);
+  }
+}
+function renderSetup() {
+  store.set("setup", setup);
+  seg($("count"), [[1, "1"], [2, "2"], [3, "3"]], setup.count, v => setup.count = v);
+  seg($("group"), Object.entries(GROUPS), setup.group, v => setup.group = v);
+  seg($("topic"), TOPICS.map(t => [t, t]), setup.topic, v => setup.topic = v);
+  const nm = $("names"); nm.innerHTML = "";
+  for (let i = 0; i < setup.count; i++) {
+    const inp = document.createElement("input");
+    inp.value = setup.names[i] || ""; inp.placeholder = `ילד ${i + 1}`; inp.maxLength = 14;
+    inp.style.borderColor = COLORS[i];
+    inp.oninput = () => { setup.names[i] = inp.value; store.set("setup", setup); };
+    nm.appendChild(inp);
+  }
+}
+
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// questions already seen are skipped until the pool runs out, so the next round brings new ones
+function draw(n) {
+  const pool = bank.filter(q => q.group === setup.group && (setup.topic === "הכול" || q.cat === setup.topic));
+  const seenKey = `seen-${setup.group}`;
+  let seen = store.get(seenKey, []);
+  let fresh = pool.filter(q => !seen.includes(q.id));
+  if (fresh.length < n) { seen = seen.filter(id => !pool.some(q => q.id === id)); fresh = pool; }
+  const out = shuffle(fresh).slice(0, n);
+  // a short pool repeats rather than ending the round early
+  while (out.length < n && pool.length) out.push(pool[out.length % pool.length]);
+  store.set(seenKey, [...seen, ...out.map(q => q.id)]);
+  return out.map(q => ({ ...q, order: shuffle([0, 1, 2, 3]) }));
+}
+
+$("startBtn").onclick = async () => {
+  $("loadErr").hidden = true;
+  try { if (!bank) { const r = await fetch("questions/kids.json"); if (!r.ok) throw 0; bank = (await r.json()).questions; } }
+  catch (e) { $("loadErr").textContent = "לא הצלחתי לטעון את השאלות. אם פתחת את הקובץ ישירות מהמחשב, צריך להריץ אותו דרך שרת."; $("loadErr").hidden = false; return; }
+  startRound();
+};
+function startRound() {
+  const players = Array.from({ length: setup.count }, (_, i) => ({ name: (setup.names[i] || "").trim() || `ילד ${i + 1}`, marks: [] }));
+  S = { players, qs: draw(ROUND * players.length), i: 0, pick: null };
+  $("setup").hidden = true; $("end").hidden = true; $("play").hidden = false;
+  render();
+}
+
+function render() {
+  const q = S.qs[S.i], pi = S.i % S.players.length, p = S.players[pi], k = Math.floor(S.i / S.players.length);
+  $("play").style.setProperty("--pc", COLORS[pi]);
+  $("who").textContent = S.players.length > 1 ? `התור של ${p.name}` : p.name;
+  $("cat").textContent = `${q.cat} · שאלה ${k + 1} מתוך ${ROUND}`;
+  const pr = $("progress"); pr.innerHTML = "";
+  for (let j = 0; j < ROUND; j++) pr.insertAdjacentHTML("beforeend", `<i class="${p.marks[j] === true ? "ok" : p.marks[j] === false ? "no" : j === k ? "now" : ""}"></i>`);
+  $("qText").textContent = q.q;
+  const pic = $("pic"); pic.hidden = !q.pic; pic.innerHTML = "";
+  if (q.pic) pic.style.setProperty("--n", q.pic.length);
+  if (q.pic) for (const s of q.pic) { const e = document.createElement("span"); e.textContent = s; if (/^\d+$/.test(s)) e.className = "num"; pic.appendChild(e); }
+  drawClock($("clock"), q.clock);
+  const box = $("opts"); box.innerHTML = "";
+  q.order.forEach(oi => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = q.options[oi];
+    b.className = strip(q.options[oi]) ? "opt" : "opt emo";
+    if (S.pick != null) { b.disabled = true; if (oi === q.answer) b.classList.add("right"); else if (oi === S.pick) b.classList.add("wrong"); }
+    else b.onclick = () => answer(oi);
+    box.appendChild(b);
+  });
+  const fb = $("fb");
+  if (S.pick == null) fb.hidden = true;
+  else {
+    const ok = S.pick === q.answer;
+    fb.hidden = false; fb.className = "fb pop " + (ok ? "ok" : "no");
+    fb.innerHTML = `<b></b><span></span>`;
+    fb.firstChild.textContent = ok ? any(["כל הכבוד! ⭐", "נכון מאוד! ⭐", "מצוין! ⭐", "יופי! ⭐"]) : `כמעט! התשובה הנכונה: ${q.options[q.answer]}`;
+    fb.lastChild.textContent = q.explain;
+  }
+  const last = S.i === S.qs.length - 1;
+  $("nextBtn").hidden = S.pick == null;
+  $("nextBtn").textContent = last ? "לתוצאות 🏆" : S.players.length > 1 ? `לתור של ${S.players[(pi + 1) % S.players.length].name}` : "לשאלה הבאה";
+}
+const any = a => a[Math.floor(Math.random() * a.length)];
+function answer(oi) {
+  const q = S.qs[S.i], p = S.players[S.i % S.players.length], ok = oi === q.answer;
+  S.pick = oi; p.marks.push(ok);
+  sfx(ok); render();
+  $("nextBtn").focus({ preventScroll: true });
+}
+$("nextBtn").onclick = () => {
+  window.speechSynthesis?.cancel();
+  if (S.i === S.qs.length - 1) return finish();
+  S.i++; S.pick = null; render();
+  $("play").scrollIntoView({ block: "start", behavior: "smooth" });
+};
+function finish() {
+  const stars = store.get("stars", {});
+  $("play").hidden = true; $("end").hidden = false;
+  const best = Math.max(...S.players.map(p => p.marks.filter(Boolean).length));
+  $("endTitle").textContent = best >= 8 ? "🏆 איזה אלופים! 🏆" : best >= 5 ? "🎉 יופי של משחק! 🎉" : "👏 כל הכבוד על המאמץ! 👏";
+  const sc = $("scores"); sc.innerHTML = "";
+  S.players.forEach((p, i) => {
+    const n = p.marks.filter(Boolean).length;
+    stars[p.name] = (stars[p.name] || 0) + n;
+    const d = document.createElement("div"); d.className = "score"; d.style.setProperty("--pc", COLORS[i]);
+    d.innerHTML = `<span class="nm"></span><span class="stars"></span><span class="tot"></span>`;
+    d.children[0].textContent = `${p.name}: ${n} מתוך ${ROUND}`;
+    d.children[1].textContent = "⭐".repeat(n) || "🌱";
+    d.children[2].textContent = `סך הכול אספת ${stars[p.name]} כוכבים`;
+    sc.appendChild(d);
+  });
+  store.set("stars", stars);
+  sfx("win");
+}
+$("againBtn").onclick = startRound;
+$("setupBtn").onclick = () => { $("end").hidden = true; $("setup").hidden = false; renderSetup(); };
+
+// read the question and the answers aloud, when the browser has a Hebrew voice
+const strip = s => s.replace(/\p{Extended_Pictographic}|️/gu, "").trim();
+$("sayBtn").onclick = () => {
+  if (!window.speechSynthesis) return;
+  const q = S.qs[S.i];
+  speechSynthesis.cancel();
+  const text = strip(q.q) + ". " + q.order.map((oi, k) => strip(q.options[oi])).filter(Boolean).join(". או: ") + ".";
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "he-IL"; u.rate = .9;
+  const v = speechSynthesis.getVoices().find(v => /^(he|iw)/i.test(v.lang));
+  if (v) u.voice = v;
+  speechSynthesis.speak(u);
+};
+if (!window.speechSynthesis) $("sayBtn").hidden = true;
+
+// short sounds made with Web Audio, so there are no audio files
+let audio = null;
+function tone(f, t, d, type = "sine", vol = .15) {
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(vol, audio.currentTime + t); g.gain.exponentialRampToValueAtTime(.001, audio.currentTime + t + d);
+  o.connect(g).connect(audio.destination); o.start(audio.currentTime + t); o.stop(audio.currentTime + t + d);
+}
+function sfx(kind) {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (kind === "win") [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .12, .3));
+    else if (kind) { tone(660, 0, .15); tone(880, .1, .25); }
+    else tone(220, 0, .3, "triangle", .12);
+  } catch (e) {}
+}
+
+// analog clock, the same drawing as in the main game; time is "h:mm"
+function drawClock(svg, time) {
+  svg.toggleAttribute("hidden", !time);
+  if (!time) { svg.innerHTML = ""; return; }
+  const [h, m] = time.split(":").map(Number);
+  const at = (deg, r) => { const a = (deg - 90) * Math.PI / 180; return [(100 + r * Math.cos(a)).toFixed(1), (100 + r * Math.sin(a)).toFixed(1)]; };
+  let s = `<circle class="face" cx="100" cy="100" r="94"/>`;
+  for (let i = 0; i < 60; i++) {
+    const big = i % 5 === 0, [x1, y1] = at(i * 6, big ? 78 : 84), [x2, y2] = at(i * 6, 89);
+    s += `<line class="tick${big ? " big" : ""}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+  }
+  const [hx, hy] = at((h % 12 + m / 60) * 30, 46), [mx, my] = at(m * 6, 82);
+  s += `<line class="mh" x1="100" y1="100" x2="${mx}" y2="${my}"/>`;
+  for (let i = 0; i < 12; i++) { const [x, y] = at(i * 30, 65); s += `<text x="${x}" y="${y}">${i || 12}</text>`; }
+  s += `<line class="hh" x1="100" y1="100" x2="${hx}" y2="${hy}"/><circle class="pin" cx="100" cy="100" r="5"/>`;
+  svg.innerHTML = s;
+}
+
+renderSetup();
+</script>
+</body>
+</html>
