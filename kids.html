@@ -155,6 +155,7 @@ select { max-width: 100%; padding: 10px 12px; border-radius: 12px; border: 2px s
     <div class="field" id="tryField">
       <label class="lbl" for="tryText">בדיקת הגייה</label>
       <div class="try"><input id="tryText" placeholder="כתבו מילה או משפט"><button class="btn ghost" id="tryBtn" type="button">🔊 השמע</button></div>
+      <p class="hint" id="trySent" hidden></p>
       <p class="hint">מילה שנשמעת לא נכון אפשר לתקן בקובץ questions/say.json.</p>
     </div>
     <p class="err" id="loadErr" hidden></p>
@@ -240,7 +241,7 @@ function draw(n) {
 
 $("startBtn").onclick = async () => {
   $("loadErr").hidden = true;
-  try { if (!bank) { const r = await fetch("questions/kids.json"); if (!r.ok) throw 0; bank = (await r.json()).questions; } }
+  try { if (!bank) { const r = await fetch("questions/kids.json", { cache: "no-cache" }); if (!r.ok) throw 0; bank = (await r.json()).questions; } }
   catch (e) { $("loadErr").textContent = "לא הצלחתי לטעון את השאלות. אם פתחת את הקובץ ישירות מהמחשב, צריך להריץ אותו דרך שרת."; $("loadErr").hidden = false; return; }
   startRound();
 };
@@ -344,7 +345,7 @@ function renderVoices() {
 // pronunciation dictionary (questions/say.json): words the voice gets wrong, with niqqud or a phonetic spelling.
 // A word also matches after up to three prefix letters, e.g. "הסייח" or "וכשהאווז".
 let lexicon = null, lexRe = null;
-fetch("questions/say.json").then(r => r.ok ? r.json() : {}).then(d => {
+fetch("questions/say.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : {}).then(d => {
   lexicon = d;
   const words = Object.keys(d).sort((a, b) => b.length - a.length);
   if (words.length) lexRe = new RegExp(`(^|[^\\u05D0-\\u05EA])([והבלמשכ]{0,3})(${words.join("|")})(?![\\u05D0-\\u05EA])`, "g");
@@ -364,7 +365,13 @@ $("sayBtn").onclick = () => {
   say(strip(q.q) + ". " + q.order.map(oi => strip(q.options[oi])).filter(Boolean).join(". או: ") + ".");
 };
 $("voice").onchange = () => { setup.voice = $("voice").value; store.set("setup", setup); say("שלום! ככה אני נשמע."); };
-$("tryBtn").onclick = () => say($("tryText").value || "שלום");
+$("tryBtn").onclick = () => {
+  const text = $("tryText").value || "שלום";
+  // show what the voice actually gets, so a missing dictionary swap is visible
+  $("trySent").hidden = false;
+  $("trySent").textContent = `נשלח לקול: ${pronounce(text)}` + (lexicon ? "" : " (המילון עוד לא נטען)");
+  say(text);
+};
 $("tryText").onkeydown = e => { if (e.key === "Enter") $("tryBtn").click(); };
 if (window.speechSynthesis) { renderVoices(); speechSynthesis.addEventListener?.("voiceschanged", renderVoices); }
 else { $("sayBtn").hidden = true; $("tryField").hidden = true; }
