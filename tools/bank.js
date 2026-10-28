@@ -8,6 +8,7 @@
 // A question (or follow-up) may carry clock: "h:mm" and face: "roman" | "bare" to show an analog clock.
 const fs = require("fs"), path = require("path");
 const DIR = path.join(__dirname, "..", "questions");
+const LEVELS = 11;
 const KEYS = ["id", "parent", "cat", "q", "clock", "face", "options", "answer", "explain", "expansion"];
 const file = l => path.join(DIR, `level-${String(l).padStart(2, "0")}.json`);
 const load = l => JSON.parse(fs.readFileSync(file(l), "utf8"));
@@ -28,7 +29,7 @@ function check(q, where) {
 const [cmd, arg] = process.argv.slice(2);
 if (cmd === "stats") {
   let total = 0;
-  for (let l = 1; l <= 10; l++) {
+  for (let l = 1; l <= LEVELS; l++) {
     const qs = load(l).questions, main = qs.filter(q => !q.parent).length;
     total += qs.length;
     console.log(`level ${String(l).padStart(2)}: ${String(main).padStart(3)} main + ${qs.length - main} follow-ups`);
@@ -55,7 +56,7 @@ if (cmd === "stats") {
 } else if (cmd === "followups") {
   const map = JSON.parse(fs.readFileSync(arg, "utf8"));
   let done = 0;
-  for (let l = 1; l <= 10; l++) {
+  for (let l = 1; l <= LEVELS; l++) {
     const d = load(l);
     let changed = false;
     for (const q of d.questions) {
@@ -71,7 +72,7 @@ if (cmd === "stats") {
 } else if (cmd === "replace") {
   const map = JSON.parse(fs.readFileSync(arg, "utf8"));
   let done = 0;
-  for (let l = 1; l <= 10; l++) {
+  for (let l = 1; l <= LEVELS; l++) {
     const d = load(l);
     let changed = false;
     for (const q of d.questions) {
@@ -87,7 +88,7 @@ if (cmd === "stats") {
 } else if (cmd === "expansions") {
   const map = JSON.parse(fs.readFileSync(arg, "utf8"));
   let done = 0;
-  for (let l = 1; l <= 10; l++) {
+  for (let l = 1; l <= LEVELS; l++) {
     const d = load(l);
     let changed = false;
     for (const q of d.questions) {
@@ -102,7 +103,7 @@ if (cmd === "stats") {
   // merge stray category labels into the main ones, then print the topic table
   const MERGE = { "חשבון": "מתמטיקה", "חגים": "יהדות", "שחמט": "ספורט", "תרבות": "כללי", "ארכאולוגיה": "היסטוריה" };
   const table = {};
-  for (let l = 1; l <= 10; l++) {
+  for (let l = 1; l <= LEVELS; l++) {
     const d = load(l);
     let changed = false;
     for (const q of d.questions) {

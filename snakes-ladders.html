@@ -278,9 +278,9 @@ const LADDERS = { 4: 14, 9: 31, 21: 42, 28: 84, 51: 67, 72: 91, 80: 99 };
 const SNAKES  = { 17: 7, 54: 34, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 79 };
 // hidden squares: stepping on one reveals it and opens a 5-question exam; only a perfect exam counts
 const TRAPS = { balloon: { icon: "🎈", name: "כדור פורח", count: 3 }, mine: { icon: "💣", name: "מוקש", count: 3 } };
-const EXAM_LEN = 5, TRAP_JUMP = 10;
+const EXAM_LEN = 5, TRAP_JUMP = 10, MAX_LEVEL = 11;
 // balloons ask easy questions (bottom of the range), mines ask one level above the chosen level
-const examLevel = (kind, L) => kind === "balloon" ? Math.max(1, L - 2) : Math.min(10, L + 1);
+const examLevel = (kind, L) => kind === "balloon" ? Math.max(1, L - 2) : Math.min(MAX_LEVEL, L + 1);
 const COLORS = ["var(--p1)", "var(--p2)", "var(--p3)", "var(--p4)"];
 const LETTERS = ["א", "ב", "ג", "ד"];
 const $ = id => document.getElementById(id);
@@ -492,7 +492,7 @@ function renderSetup() {
     nm.appendChild(row);
   }
   const lv = $("levels"); lv.innerHTML = "";
-  for (let L = 1; L <= 10; L++) {
+  for (let L = 1; L <= MAX_LEVEL; L++) {
     const b = document.createElement("button"); b.type = "button"; b.textContent = L;
     b.setAttribute("aria-pressed", L === setup.level);
     b.onclick = () => { setup.level = L; renderSetup(); };
@@ -500,7 +500,7 @@ function renderSetup() {
   }
   const [lo, hi] = levelRange(setup.level);
   $("range").textContent = (lo === hi ? `כל השאלות ברמה ${lo}.` : `השאלות יהיו ברמות ${lo}–${hi}.`) +
-    " תשובה נכונה מוסיפה נקודות כמספר הרמה של השאלה. תשובה שגויה מורידה 11 פחות הרמה, כלומר טעות בשאלה קשה עולה פחות.";
+    " תשובה נכונה מוסיפה נקודות כמספר הרמה של השאלה. תשובה שגויה מורידה 11 פחות הרמה (ולפחות נקודה אחת), כלומר טעות בשאלה קשה עולה פחות.";
 }
 
 async function loadLevels(levels) {
@@ -533,8 +533,8 @@ $("startBtn").onclick = async () => {
 
 // ---------- game ----------
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-// wrong answers cost less the harder the question: level 1 costs 10, level 10 costs 1
-const penalty = level => 11 - level;
+// wrong answers cost less the harder the question: level 1 costs 10, level 10 and up cost 1
+const penalty = level => Math.max(1, 11 - level);
 const EXP_CHANCE = 0.4;   // chance of a question drawn from an expansion already read
 const EXP_DELAY = 10;     // a follow-up comes back only after this many turns, so it tests memory
 const turnsPlayed = () => G.players.reduce((n, p) => n + p.asked, 0);
