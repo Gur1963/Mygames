@@ -278,11 +278,13 @@ function render() {
     const ok = S.pick === q.answer;
     fb.hidden = false; fb.className = "fb pop " + (ok ? "ok" : "no");
     fb.innerHTML = `<button class="say" type="button" aria-label="הקראת ההסבר" title="הקראת ההסבר">🔊</button><b></b><span></span>`;
-    const head = ok ? any(["כל הכבוד! ⭐", "נכון מאוד! ⭐", "מצוין! ⭐", "יופי! ⭐"]) : `כמעט! התשובה הנכונה: ${q.options[q.answer]}`;
+    const praise = any(["כל הכבוד! ⭐", "נכון מאוד! ⭐", "מצוין! ⭐", "יופי! ⭐"]);
+    const head = ok ? praise : `כמעט! התשובה הנכונה: ${q.options[q.answer]}`;
     fb.children[1].textContent = head;
     fb.children[2].textContent = q.explain;
     fb.children[0].hidden = !window.speechSynthesis;
-    fb.children[0].onclick = () => say(strip(head) + ". " + q.explain);
+    const sp = spoken(q);
+    fb.children[0].onclick = () => say(strip(ok ? praise : `כמעט! התשובה הנכונה: ${sp.options[q.answer]}`) + ". " + sp.explain);
   }
   const last = S.i === S.qs.length - 1;
   $("nextBtn").hidden = S.pick == null;
@@ -342,7 +344,8 @@ function renderVoices() {
   for (const v of vs) { const o = document.createElement("option"); o.value = v.name; o.textContent = v.name.replace(/^Microsoft\s+/, "").replace(/\s*-\s*Hebrew.*$/i, ""); sel.appendChild(o); }
   if (vs.some(v => v.name === setup.voice)) sel.value = setup.voice;
 }
-// pronunciation dictionary (questions/say.json): words the voice gets wrong, with niqqud or a phonetic spelling.
+// pronunciation dictionary (questions/say.json): words the voice gets wrong anywhere, with niqqud or a phonetic spelling.
+// A word that only goes wrong in one sentence belongs in that question's "say" field instead.
 // A word also matches after up to three prefix letters, e.g. "הסייח" or "וכשהאווז".
 let lexicon = null, lexRe = null;
 fetch("questions/say.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : {}).then(d => {
@@ -350,12 +353,19 @@ fetch("questions/say.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : {
   const words = Object.keys(d).sort((a, b) => b.length - a.length);
   if (words.length) lexRe = new RegExp(`(^|[^\\u05D0-\\u05EA])([והבלמשכ]{0,3})(${words.join("|")})(?![\\u05D0-\\u05EA])`, "g");
 }).catch(() => {});
-// a Latin-letter entry (a name such as "Pooh") gets its Hebrew prefix letters in Latin too, "הדוב" → "haDov",
+// a Latin-letter entry (a name such as "Pooh") gets its Hebrew prefix letters in Latin too, "הPooh" → "haPooh",
 // so the voice doesn't read half a word in each language
 const PREFIX = { "ו": "ve", "ה": "ha", "ב": "ba", "ל": "la", "מ": "mi", "ש": "she", "כ": "ka" };
+// before an entry with niqqud the prefix gets niqqud too ("ושמש" → "וְשֶׁמֶשׁ"), since a bare letter glued to
+// a vocalized word confused the voice. ב/ל/כ stay bare: "לַשֶּׁלֶג" or "לְשֶׁלֶג" depends on the sentence.
+const vav = to => /^[בומפ]/.test(to) || /^.[ּׁׂ]*ְ/.test(to) ? "וּ" : "וְ";
+const PREFIX_NQ = { "ה": "הַ", "ש": "שֶׁ" };
 const pronounce = text => lexRe ? text.replace(lexRe, (m, pre, px, w) => {
-  const to = lexicon[w], latin = /^[A-Za-z]/.test(to);
-  return pre + (latin ? [...px].map(c => PREFIX[c]).join("") : px) + to;
+  const to = lexicon[w], latin = /^[A-Za-z]/.test(to), nq = /[ְ-ׇ]/.test(to);
+  const head = latin ? [...px].map(c => PREFIX[c]).join("")
+    : nq ? [...px].map((c, i) => c === "ו" ? (i === px.length - 1 ? vav(to) : "וְ") : PREFIX_NQ[c] || c).join("")
+    : px;
+  return pre + head + to;
 }) : text;
 function say(text) {
   if (!window.speechSynthesis) return;
@@ -366,9 +376,17 @@ function say(text) {
   if (v) u.voice = v;
   speechSynthesis.speak(u);
 }
+// a question may carry a "say" field with the text to read instead of what is shown:
+// numbers in words with the right gender, names for emoji-only options, niqqud for one sentence
+const spoken = q => ({ q: q.say?.q ?? q.q, options: q.say?.options ?? q.options, explain: q.say?.explain ?? q.explain });
+// "A. B. C. אוֹ D." reads like a sentence; an "או:" before every option sounded broken
+const asked = (q, opts) => {
+  const t = strip(q), os = opts.map(strip).filter(Boolean);
+  return t + (/[?!.]$/.test(t) ? " " : ". ") + os.slice(0, -1).join(". ") + (os.length > 1 ? ". אוֹ " : "") + os.at(-1) + ".";
+};
 $("sayBtn").onclick = () => {
-  const q = S.qs[S.i];
-  say(strip(q.q) + ". " + q.order.map(oi => strip(q.options[oi])).filter(Boolean).join(". או: ") + ".");
+  const q = S.qs[S.i], sp = spoken(q);
+  say(asked(sp.q, q.order.map(oi => sp.options[oi])));
 };
 $("voice").onchange = () => { setup.voice = $("voice").value; store.set("setup", setup); say("שלום! ככה אני נשמע."); };
 $("tryBtn").onclick = () => {

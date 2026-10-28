@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>בדיקת הקראה</title>
+<style>
+  :root { --bg:#f6f4ef; --card:#fff; --ink:#222; --mute:#777; --line:#e3dfd6; --acc:#2f6fdd; --bad:#c2410c; --badbg:#fff1e8; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16181c; --card:#20232a; --ink:#eee; --mute:#9a9a9a; --line:#33363e; --acc:#6aa0ff; --bad:#fb923c; --badbg:#3a2418; } }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui, "Segoe UI", sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:20px 16px 120px; }
+  h1 { font-size:1.4rem; margin:0 0 4px; }
+  .mute { color:var(--mute); font-size:.92rem; }
+  .bar { position:sticky; top:0; background:var(--bg); padding:10px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center; border-bottom:1px solid var(--line); z-index:1; }
+  .q { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:12px 0; }
+  .q.bad { border-color:var(--bad); background:var(--badbg); }
+  .head { display:flex; gap:8px; align-items:baseline; color:var(--mute); font-size:.85rem; margin-bottom:6px; }
+  .line { display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:start; padding:6px 0; }
+  .line + .line { border-top:1px dashed var(--line); }
+  .sent { font-size:.8rem; color:var(--mute); margin-top:2px; }
+  button { font:inherit; border:0; border-radius:8px; padding:6px 12px; cursor:pointer; color:#fff; background:var(--acc); white-space:nowrap; }
+  button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); }
+  button.mark.on { background:var(--bad); color:#fff; border-color:var(--bad); }
+  input.note { font:inherit; width:100%; box-sizing:border-box; margin-top:8px; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); }
+  .foot { display:flex; gap:8px; margin-top:8px; }
+  label { display:flex; gap:6px; align-items:center; }
+  .try { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; margin-top:10px; }
+  .try .note { margin:0; }
+  .try .sent { grid-column:1 / -1; }
+</style>
+</head>
+<body>
+<main>
+  <h1>בדיקת הקראה, שאלות הילדים</h1>
+  <p class="mute">כל משפט מוקרא בדיוק כמו במשחק, עם המילון הנוכחי. משהו נשמע לא טוב? לחץ "לא נשמע טוב" וכתוב איזו מילה. בסוף לחץ "העתק רשימה" והדבק לי.</p>
+  <div class="bar">
+    <span id="voiceName" class="mute"></span>
+    <label class="mute">מהירות <input type="range" id="rate" min="0.6" max="1.2" step="0.05" value="0.9"></label>
+    <label class="mute"><input type="checkbox" id="onlyBad"> רק מסומנים</label>
+    <span id="count" class="mute"></span>
+    <button id="copy">העתק רשימה</button>
+  </div>
+  <div class="try">
+    <input class="note" id="tryText" placeholder="נסה כתיב: כתוב מילה או משפט ולחץ Enter">
+    <button id="tryBtn">▶ נסה</button>
+    <div class="sent" id="trySent"></div>
+  </div>
+  <div id="list"></div>
+</main>
+<script>
+/*DATA*/
+// same reading as kids.html: emoji stripped, dictionary swap with up to three prefix letters,
+// Hebrew prefixes spelled in Latin before a Latin-letter entry
+const strip = s => s.replace(/\p{Extended_Pictographic}|️/gu, "").trim();
+const words = Object.keys(LEX).sort((a, b) => b.length - a.length);
+const lexRe = words.length ? new RegExp(`(^|[^\u05D0-\u05EA])([והבלמשכ]{0,3})(${words.join("|")})(?![\u05D0-\u05EA])`, "g") : null;
+const PREFIX = { "ו": "ve", "ה": "ha", "ב": "ba", "ל": "la", "מ": "mi", "ש": "she", "כ": "ka" };
+const vav = to => /^[בומפ]/.test(to) || /^.[ּׁׂ]*ְ/.test(to) ? "וּ" : "וְ";
+const PREFIX_NQ = { "ה": "הַ", "ש": "שֶׁ" };
+const pronounce = text => lexRe ? text.replace(lexRe, (m, pre, px, w) => {
+  const to = LEX[w], latin = /^[A-Za-z]/.test(to), nq = /[ְ-ׇ]/.test(to);
+  const head = latin ? [...px].map(c => PREFIX[c]).join("")
+    : nq ? [...px].map((c, i) => c === "ו" ? (i === px.length - 1 ? vav(to) : "וְ") : PREFIX_NQ[c] || c).join("")
+    : px;
+  return pre + head + to;
+}) : text;
+
+let voice = null;
+function pickVoice() {
+  const vs = speechSynthesis.getVoices().filter(v => /^(he|iw)/i.test(v.lang));
+  voice = vs.find(v => /natural|online/i.test(v.name) && /הילה|hila/i.test(v.name)) || vs.find(v => /natural|online/i.test(v.name)) || vs[0] || null;
+  document.getElementById("voiceName").textContent = voice ? "קול: " + voice.name.replace(/^Microsoft\s+/, "").replace(/\s*-\s*Hebrew.*$/i, "") : "לא נמצא קול עברי, פתח ב־Edge";
+}
+function say(text) {
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(pronounce(text));
+  u.lang = "he-IL"; if (voice) u.voice = voice; u.rate = +document.getElementById("rate").value;
+  speechSynthesis.speak(u);
+}
+
+// marks are a per-browser convenience; the copied list is what gets reported back
+let marks = {};
+try { marks = JSON.parse(localStorage.getItem("listen-marks") || "{}"); } catch {}
+const save = () => { try { localStorage.setItem("listen-marks", JSON.stringify(marks)); } catch {} };
+
+const spoken = q => ({ q: q.say?.q ?? q.q, options: q.say?.options ?? q.options, explain: q.say?.explain ?? q.explain });
+const asked = (q, opts) => {
+  const t = strip(q), os = opts.map(strip).filter(Boolean);
+  return t + (/[?!.]$/.test(t) ? " " : ". ") + os.slice(0, -1).join(". ") + (os.length > 1 ? ". אוֹ " : "") + os.at(-1) + ".";
+};
+const questionText = q => { const s = spoken(q); return asked(s.q, s.options); };
+function render() {
+  const only = document.getElementById("onlyBad").checked, list = document.getElementById("list");
+  list.innerHTML = "";
+  for (const q of QS) {
+    const m = marks[q.id];
+    if (only && !m) continue;
+    const el = document.createElement("div");
+    el.className = "q" + (m ? " bad" : "");
+    el.innerHTML = `<div class="head"><b></b><span></span></div>`;
+    el.querySelector("b").textContent = q.id;
+    el.querySelector(".head span").textContent = (q.cat || "") + (q.say ? " · נוסח הקראה מתוקן" : "");
+    for (const text of [questionText(q), spoken(q).explain]) {
+      if (!text) continue;
+      const line = document.createElement("div");
+      line.className = "line";
+      line.innerHTML = `<button>▶</button><div><div class="txt"></div><div class="sent"></div></div>`;
+      line.querySelector("button").onclick = () => say(text);
+      line.querySelector(".txt").textContent = text;
+      const sent = pronounce(text);
+      if (sent !== text) line.querySelector(".sent").textContent = "נשלח לקול: " + sent;
+      el.appendChild(line);
+    }
+    const foot = document.createElement("div");
+    foot.className = "foot";
+    foot.innerHTML = `<button class="ghost mark${m ? " on" : ""}">${m ? "✗ מסומן" : "לא נשמע טוב"}</button>`;
+    foot.querySelector("button").onclick = () => {
+      if (marks[q.id]) delete marks[q.id]; else marks[q.id] = { note: "" };
+      save(); render();
+    };
+    el.appendChild(foot);
+    if (m) {
+      const inp = document.createElement("input");
+      inp.className = "note"; inp.placeholder = "איזו מילה, ואיך היא נשמעה?"; inp.value = m.note;
+      inp.oninput = () => { m.note = inp.value; save(); };
+      el.appendChild(inp);
+    }
+    list.appendChild(el);
+  }
+  document.getElementById("count").textContent = `${Object.keys(marks).length} מסומנים מתוך ${QS.length}`;
+}
+document.getElementById("onlyBad").onchange = render;
+document.getElementById("copy").onclick = async e => {
+  const txt = QS.filter(q => marks[q.id]).map(q => `${q.id}: ${strip(q.q)} | ${marks[q.id].note || "(בלי הערה)"}`).join("\n") || "(אין מסומנים)";
+  try { await navigator.clipboard.writeText(txt); e.target.textContent = "הועתק ✓"; }
+  catch { prompt("העתק מכאן:", txt); }
+  setTimeout(() => e.target.textContent = "העתק רשימה", 1500);
+};
+// try a spelling before it goes into the data; shows what the dictionary turns it into
+document.getElementById("tryBtn").onclick = () => {
+  const text = document.getElementById("tryText").value || "שלום";
+  document.getElementById("trySent").textContent = "נשלח לקול: " + pronounce(text);
+  say(text);
+};
+document.getElementById("tryText").onkeydown = e => { if (e.key === "Enter") document.getElementById("tryBtn").click(); };
+pickVoice();
+speechSynthesis.addEventListener("voiceschanged", pickVoice);
+render();
+</script>
+</body>
+</html>
