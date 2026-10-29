@@ -93,6 +93,8 @@ a.btn { display: inline-block; text-decoration: none; }
   padding: 8px 22px; border-radius: 10px; text-align: center;
 }
 .board-alert.ladder { background: var(--ladder); }
+.board-alert.balloon { background: var(--good); }
+.board-alert.mine { background: var(--bad); }
 @media (prefers-reduced-motion: no-preference) { .board-alert.blink { animation: alertBlink .5s steps(1) 3; } }
 @keyframes alertBlink { 50% { opacity: 0; } }
 .board {
@@ -176,6 +178,12 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 18px; height: 4px; border-radius: 2px; display: inline-block; }
 .cell .trap { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(14px, 3.4vw, 26px); line-height: 1; }
+/* an exam is announced loudly: a colored strip at the top of the card that blinks when it appears */
+.exam-banner { font: 800 22px/1.3 var(--display); color: var(--panel); text-align: center; padding: 8px 12px; border-radius: 8px; background: var(--good); }
+.exam-banner.mine { background: var(--bad); }
+.exam-banner.ladder { background: var(--ladder); }
+.exam-banner.snake { background: var(--snake); }
+@media (prefers-reduced-motion: no-preference) { .exam-banner.blink { animation: alertBlink .5s steps(1) 4; } }
 .exam-bar { display: flex; gap: 6px; }
 .exam-bar i { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
 .exam-bar i.ok { background: var(--good); }
@@ -250,6 +258,7 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
 
       <div class="card" id="qCard" hidden>
         <div class="qhead"><span class="lvl" id="qLvl"></span><span id="qCat"></span></div>
+        <div class="exam-banner" id="examBanner" hidden></div>
         <div class="exam-bar" id="examBar" hidden></div>
         <p class="qtext" id="qText"></p>
         <svg class="clock" id="qClock" viewBox="0 0 200 200" role="img" aria-label="שעון מחוגים" hidden></svg>
@@ -280,7 +289,7 @@ const SNAKES  = { 17: 7, 54: 34, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 79 
 const TRAPS = { balloon: { icon: "🎈", name: "כדור פורח", count: 3 }, mine: { icon: "💣", name: "מוקש", count: 3 } };
 const EXAM_LEN = 5, TRAP_JUMP = 10, MAX_LEVEL = 11;
 // balloons ask easy questions (bottom of the range), mines ask one level above the chosen level
-const examLevel = (kind, L) => kind === "balloon" ? Math.max(1, L - 2) : Math.min(MAX_LEVEL, L + 1);
+const examLevel = (kind, L) => kind === "balloon" ? levelRange(L)[0] : Math.min(MAX_LEVEL, L + 1);
 const COLORS = ["var(--p1)", "var(--p2)", "var(--p3)", "var(--p4)"];
 const LETTERS = ["א", "ב", "ג", "ד"];
 const $ = id => document.getElementById(id);
@@ -386,7 +395,8 @@ function celebrate(color) {
   })(start);
 }
 // landing on a snake head or a ladder foot: a sound, and a note under the board that blinks three times
-const ALERTS = { snake: { sound: "danger", text: "🐍 זהירות, נחש! 🐍" }, ladder: { sound: "chance", text: "🪜 יש סולם! 🪜" } };
+const ALERTS = { snake: { sound: "danger", text: "🐍 זהירות, נחש! 🐍" }, ladder: { sound: "chance", text: "🪜 יש סולם! 🪜" },
+  balloon: { sound: "balloon", text: "🎈 כדור פורח! מבחן! 🎈" }, mine: { sound: "mine", text: "💣 מוקש! מבחן! 💣" } };
 function boardAlert(kind, delay) {
   sfx(ALERTS[kind].sound, delay);
   const w = $("boardAlert");
@@ -474,7 +484,9 @@ function drawTokens() {
 }
 
 // ---------- setup ----------
-function levelRange(L) { return [Math.max(1, L - 2), L]; }
+// level 11 is for experts: its games use level 11 questions only
+const EXPERT_LEVEL = 11;
+function levelRange(L) { return L >= EXPERT_LEVEL ? [L, L] : [Math.max(1, L - 2), L]; }
 function renderSetup() {
   const cnt = $("count"); cnt.innerHTML = "";
   for (let n = 1; n <= 4; n++) {
@@ -500,7 +512,7 @@ function renderSetup() {
   }
   const [lo, hi] = levelRange(setup.level);
   $("range").textContent = (lo === hi ? `כל השאלות ברמה ${lo}.` : `השאלות יהיו ברמות ${lo}–${hi}.`) +
-    " " + Array.from({ length: hi - lo + 1 }, (_, i) => `ברמה ${lo + i}: נכונה +${i + 1}, טעות −${hi - lo + 1 - i}.`).join(" ") +
+    " " + Array.from({ length: hi - lo + 1 }, (_, i) => `ברמה ${lo + i}: נכונה +${reward(lo + i, setup.level)}, טעות −${penalty(lo + i, setup.level)}.`).join(" ") +
     (lo === hi ? "" : " שאלה קשה שווה יותר, וטעות בה עולה פחות.");
 }
 
@@ -536,8 +548,9 @@ $("startBtn").onclick = async () => {
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 // scoring follows the question's place in the game's range: the easiest level gives +1 and costs 3,
 // the hardest gives +3 and costs 1. A mine question one level above the range gives +4 and costs 1.
-const reward = level => level - levelRange(G.level)[0] + 1;
-const penalty = level => Math.max(1, levelRange(G.level)[1] - level + 1);
+// Every expert question counts as the hardest.
+const reward = (level, L = G.level) => L >= EXPERT_LEVEL ? 3 : level - levelRange(L)[0] + 1;
+const penalty = (level, L = G.level) => L >= EXPERT_LEVEL ? 1 : Math.max(1, levelRange(L)[1] - level + 1);
 const EXP_CHANCE = 0.4;   // chance of a question drawn from an expansion already read
 const EXP_DELAY = 10;     // a follow-up comes back only after this many turns, so it tests memory
 const turnsPlayed = () => G.players.reduce((n, p) => n + p.asked, 0);
@@ -646,6 +659,18 @@ function render() {
     const q = G.q;
     const qNum = ex ? ex.n + (G.phase === "question" || ex.passed === false ? 1 : 0) : 0;
     $("qLvl").textContent = (ex ? `${TRAPS[ex.kind].icon} שאלה ${qNum} מתוך ${EXAM_LEN} · ` : "") + `רמה ${q.level} · נכון +${reward(q.level)} · טעות −${penalty(q.level)}`;
+    // the banner shows from the moment a trap is hit until the exam ends, and while a ladder or snake question is open;
+    // it blinks whenever its text changes
+    const banner = $("examBanner"), pending = G.exam && (!G.exam.started || G.exam.passed == null) ? G.exam : null;
+    let kind = null, text = "";
+    if (pending) {
+      const t = TRAPS[pending.kind]; kind = pending.kind;
+      text = pending.started ? `${t.icon} מבחן ${t.name}: שאלה ${qNum} מתוך ${EXAM_LEN}` : `${t.icon} מבחן ${t.name} מחכה לך! ${t.icon}`;
+    } else if (G.phase === "question" && LADDERS[cur.sq]) { kind = "ladder"; text = "🪜 שאלת סולם! 🪜"; }
+    else if (G.phase === "question" && SNAKES[cur.sq]) { kind = "snake"; text = "🐍 שאלת נחש! 🐍"; }
+    banner.hidden = !kind;
+    if (kind && banner.textContent !== text) { banner.textContent = text; banner.className = "exam-banner " + kind; void banner.offsetWidth; banner.classList.add("blink"); }
+    if (!kind) banner.textContent = "";
     const bar = $("examBar"); bar.hidden = !ex; bar.innerHTML = "";
     if (ex) for (let i = 0; i < EXAM_LEN; i++) bar.insertAdjacentHTML("beforeend", `<i class="${i < ex.n ? "ok" : i === ex.n && ex.passed === false ? "no" : ""}"></i>`);
     // a follow-up looks like any other question; it quietly tests what an earlier expansion taught
@@ -730,7 +755,7 @@ function answer(oi) {
     if (kind) {
       const t = TRAPS[kind], first = !G.revealed.includes(p.sq);
       if (first) G.revealed.push(p.sq);
-      sfx(kind, .4);
+      boardAlert(kind, .4);
       G.exam = { kind, sq: p.sq, level: examLevel(kind, G.level), n: 0, started: false, passed: null };
       msg += ` ${t.icon} ${first ? "נחשף" : "דרכת על"} ${t.name} במשבצת ${p.sq}! מבחן של ${EXAM_LEN} שאלות ברמה ${G.exam.level}: ` +
         (kind === "balloon" ? `רק ${EXAM_LEN} מתוך ${EXAM_LEN} יקפיצו אותך ${TRAP_JUMP} משבצות קדימה.` : `רק ${EXAM_LEN} מתוך ${EXAM_LEN} ימנעו נפילה של ${TRAP_JUMP} משבצות אחורה.`);
