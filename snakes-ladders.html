@@ -500,7 +500,8 @@ function renderSetup() {
   }
   const [lo, hi] = levelRange(setup.level);
   $("range").textContent = (lo === hi ? `כל השאלות ברמה ${lo}.` : `השאלות יהיו ברמות ${lo}–${hi}.`) +
-    " תשובה נכונה מוסיפה נקודות כמספר הרמה של השאלה. תשובה שגויה מורידה 11 פחות הרמה (ולפחות נקודה אחת), כלומר טעות בשאלה קשה עולה פחות.";
+    " " + Array.from({ length: hi - lo + 1 }, (_, i) => `ברמה ${lo + i}: נכונה +${i + 1}, טעות −${hi - lo + 1 - i}.`).join(" ") +
+    (lo === hi ? "" : " שאלה קשה שווה יותר, וטעות בה עולה פחות.");
 }
 
 async function loadLevels(levels) {
@@ -533,8 +534,10 @@ $("startBtn").onclick = async () => {
 
 // ---------- game ----------
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-// wrong answers cost less the harder the question: level 1 costs 10, level 10 and up cost 1
-const penalty = level => Math.max(1, 11 - level);
+// scoring follows the question's place in the game's range: the easiest level gives +1 and costs 3,
+// the hardest gives +3 and costs 1. A mine question one level above the range gives +4 and costs 1.
+const reward = level => level - levelRange(G.level)[0] + 1;
+const penalty = level => Math.max(1, levelRange(G.level)[1] - level + 1);
 const EXP_CHANCE = 0.4;   // chance of a question drawn from an expansion already read
 const EXP_DELAY = 10;     // a follow-up comes back only after this many turns, so it tests memory
 const turnsPlayed = () => G.players.reduce((n, p) => n + p.asked, 0);
@@ -642,7 +645,7 @@ function render() {
   if (G.q) {
     const q = G.q;
     const qNum = ex ? ex.n + (G.phase === "question" || ex.passed === false ? 1 : 0) : 0;
-    $("qLvl").textContent = (ex ? `${TRAPS[ex.kind].icon} שאלה ${qNum} מתוך ${EXAM_LEN} · ` : "") + `רמה ${q.level} · נכון +${q.level} · טעות −${penalty(q.level)}`;
+    $("qLvl").textContent = (ex ? `${TRAPS[ex.kind].icon} שאלה ${qNum} מתוך ${EXAM_LEN} · ` : "") + `רמה ${q.level} · נכון +${reward(q.level)} · טעות −${penalty(q.level)}`;
     const bar = $("examBar"); bar.hidden = !ex; bar.innerHTML = "";
     if (ex) for (let i = 0; i < EXAM_LEN; i++) bar.insertAdjacentHTML("beforeend", `<i class="${i < ex.n ? "ok" : i === ex.n && ex.passed === false ? "no" : ""}"></i>`);
     // a follow-up looks like any other question; it quietly tests what an earlier expansion taught
@@ -667,7 +670,7 @@ function render() {
     else {
       const ok = G.pick === q.answer;
       fb.hidden = false; fb.className = "feedback " + (ok ? "ok" : "no");
-      fb.textContent = ok ? `נכון! +${q.level} נקודות` : `לא נכון, −${penalty(q.level)} נקודות. התשובה: ${q.options[q.answer]}`;
+      fb.textContent = ok ? `נכון! +${reward(q.level)} נקודות` : `לא נכון, −${penalty(q.level)} נקודות. התשובה: ${q.options[q.answer]}`;
       if (q.explain) { const s = document.createElement("span"); s.className = "ex"; s.textContent = q.explain; fb.appendChild(s); }
     }
     $("log").hidden = !G.msg; $("log").textContent = G.msg;
@@ -706,7 +709,7 @@ function answer(oi) {
   if (q.expansion) (G.readAt = G.readAt || {})[q.id] = turnsPlayed();
   let msg;
   if (ok) {
-    p.pts += q.level; p.right++;
+    p.pts += reward(q.level); p.right++;
     if (LADDERS[from]) { p.sq = LADDERS[from]; msg = `טיפוס בסולם! ${p.name} עלה/תה ממשבצת ${from} למשבצת ${p.sq}.`; }
     else {
       p.sq = from + 1;
@@ -747,7 +750,7 @@ function examAnswer(oi) {
   if (q.expansion) (G.readAt = G.readAt || {})[q.id] = turnsPlayed();
   let msg;
   if (ok) {
-    p.pts += q.level; p.right++; ex.n++;
+    p.pts += reward(q.level); p.right++; ex.n++;
     if (ex.n < EXAM_LEN) { msg = `${ex.n} מתוך ${EXAM_LEN} נכונות.`; sfx("right"); }
     else {
       ex.passed = true; sfx(ex.kind === "balloon" ? "fly" : "defuse");
