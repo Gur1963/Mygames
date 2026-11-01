@@ -61,6 +61,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 select { max-width: 100%; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
 .fb .say { float: inline-end; width: 40px; height: 40px; font-size: 18px; margin-inline-start: 8px; }
 .try { display: flex; gap: 8px; }
+/* the try-a-word row must not stretch the whole card past a phone's width */
+.card, .field { grid-template-columns: minmax(0, 1fr); }
 .try input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
 .names input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
 .hint { color: var(--muted); font-size: 15px; margin: 0; }
@@ -126,7 +128,7 @@ select { max-width: 100%; padding: 10px 12px; border-radius: 12px; border: 2px s
 <div class="wrap">
   <header>
     <h1>🧸 שאלות לילדים</h1>
-    <a class="back" href="index.html">לסולמות ונחשים ←</a>
+    <a class="back" href="index.html#board">לסולמות ונחשים ←</a>
   </header>
 
   <section class="card" id="setup">

@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>חידון אישי</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Build a quiz, then project it: home with two doors, an editor, game setup, and a full-screen stage */
+:root {
+  --bg: #eef3f2; --panel: #fbfdfc; --ink: #17282a; --muted: #5a6e70; --line: #cfdcda;
+  --accent: #0e6a6a; --accent-ink: #ffffff; --good: #1d7a46; --bad: #b3261e; --bad-soft: #f8e2df;
+  --display: "Rubik", "Segoe UI", Arial, sans-serif;
+  --body: "Assistant", "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101818; --panel: #172222; --ink: #e3eeec; --muted: #94a9a8; --line: #2b3b3a;
+    --accent: #4fc2bd; --accent-ink: #0d1a1a; --good: #5cc48a; --bad: #f08a80; --bad-soft: #3a1f1d; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5; direction: rtl; }
+.wrap {
+  max-width: 820px; margin: 0 auto; padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(26px, 5vw, 38px); margin: 0 0 6px; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 19px; margin: 0 0 10px; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn {
+  display: inline-block; font: 700 16px var(--body); padding: 10px 20px; border-radius: 8px; cursor: pointer; text-decoration: none;
+  border: 2px solid var(--accent); background: var(--accent); color: var(--accent-ink);
+}
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.small { font-size: 14px; padding: 5px 12px; }
+.btn.danger { border-color: var(--bad); color: var(--bad); background: transparent; }
+.btn:disabled { opacity: .45; cursor: default; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.spread { justify-content: space-between; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-block: 14px; }
+.muted { color: var(--muted); }
+.err { color: var(--bad); background: var(--bad-soft); border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
+.back { color: var(--accent); font-weight: 700; text-decoration: none; }
+label.f { display: block; margin-block: 10px; font-weight: 600; }
+label.f small { font-weight: 400; color: var(--muted); }
+input[type=text], input[type=url], textarea, select {
+  display: block; width: 100%; font: 400 16px var(--body); padding: 8px 10px; margin-top: 4px; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+}
+textarea { resize: vertical; min-height: 44px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+@media (max-width: 560px) { .two { grid-template-columns: 1fr; } }
+
+/* home */
+.doors { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 22px; }
+@media (max-width: 560px) { .doors { grid-template-columns: 1fr; } }
+.door {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 34px 16px; cursor: pointer; text-align: center;
+  background: var(--panel); border: 2px solid var(--line); border-radius: 16px;
+}
+.door:hover { border-color: var(--accent); }
+.door b { font: 800 26px var(--display); }
+.door i { font-style: normal; font-size: 52px; line-height: 1.1; }
+
+/* computer screens: home fills the page, the working screens get more width */
+@media (min-width: 861px) {
+  .wrap { max-width: 1180px; }
+  #home h1, #home > p { text-align: center; }
+  #home h1 { font-size: clamp(34px, 3.4vw, 54px); }
+  #home > p { font-size: 20px; }
+  .doors { gap: 28px; }
+  .door { min-height: 56vh; justify-content: center; gap: 14px; border-radius: 22px; }
+  .door i { font-size: clamp(90px, 9vw, 150px); }
+  .door b { font-size: clamp(32px, 3vw, 48px); }
+  .door span { font-size: clamp(18px, 1.5vw, 24px); }
+}
+
+/* editor */
+.qcard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-block: 10px; }
+.qcard summary { padding: 12px 14px; cursor: pointer; font-weight: 700; overflow-wrap: anywhere; }
+.qcard .warn { color: var(--bad); font-weight: 400; font-size: 14px; }
+.qbody { padding: 0 14px 14px; }
+.opt { display: flex; align-items: center; gap: 8px; margin-block: 6px; }
+.opt input[type=radio] { width: 20px; height: 20px; flex: none; accent-color: var(--good); }
+.opt input[type=text] { margin: 0; }
+.qlist { display: flex; flex-direction: column; gap: 8px; }
+.qitem { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; overflow-wrap: anywhere; }
+.qitem.on { border: 2px solid var(--accent); }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { min-width: 44px; padding: 7px 12px; font-weight: 700; cursor: pointer; background: transparent; border: 2px solid var(--line); border-radius: 8px; }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* stage: always dark, whatever the room's color scheme, because it is projected */
+#show {
+  position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; color: #f4f7f6; overflow: auto;
+  background: radial-gradient(circle at 50% 0, color-mix(in srgb, var(--ev) 32%, #0d1416), #0d1416 70%);
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font: 700 clamp(15px, 1.8vw, 24px) var(--display); }
+.bar button, .act {
+  font: 700 clamp(14px, 1.5vw, 20px) var(--body); padding: 6px 14px; border-radius: 8px; cursor: pointer; color: #f4f7f6;
+  background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.28);
+}
+.act.main { background: var(--ev); border-color: var(--ev); color: #10181a; padding: 10px 30px; font-size: clamp(17px, 2vw, 26px); }
+.clockn { font-size: 1.5em; min-width: 2ch; text-align: center; }
+.clockn.low { color: #ff8a7a; }
+.mid { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: clamp(12px, 2.4vh, 30px); width: min(1500px, 100%); margin: 0 auto; padding-block: 14px; }
+.big { font: 800 clamp(26px, 4.4vw, 68px)/1.2 var(--display); text-align: center; margin: 0; text-wrap: balance; overflow-wrap: anywhere; }
+.huge { font-size: clamp(34px, 7vw, 110px); }
+.icon { font-size: clamp(60px, 11vw, 170px); line-height: 1; text-align: center; }
+.sub { font-size: clamp(18px, 2.6vw, 38px); text-align: center; margin: 0; text-wrap: balance; overflow-wrap: anywhere; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(8px, 1.4vw, 20px); }
+@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+.ans {
+  display: flex; align-items: center; gap: .5em; padding: .55em .8em; border-radius: 12px; overflow-wrap: anywhere;
+  font: 700 clamp(19px, 2.9vw, 44px)/1.2 var(--body); background: rgba(255,255,255,.09); border: 3px solid rgba(255,255,255,.2); min-width: 0;
+}
+.ans > b { flex: none; font-family: var(--display); color: var(--ev); }
+.ans > span { min-width: 0; }
+.ans.yes { background: #1d7a46; border-color: #7be3a6; animation: pop .45s ease; }
+.ans.yes > b { color: #fff; }
+.ans.no { opacity: .35; }
+@keyframes pop { 40% { transform: scale(1.04); } }
+.note { text-align: center; font-size: clamp(18px, 2.4vw, 34px); margin: 0; overflow-wrap: anywhere; }
+a.lk { color: #8fe0ff; font-weight: 700; overflow-wrap: anywhere; }
+.foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.teams { display: flex; flex-wrap: wrap; gap: 8px; }
+.team {
+  font: 700 clamp(14px, 1.7vw, 24px) var(--body); padding: 6px 14px; border-radius: 999px; color: #f4f7f6; cursor: default;
+  background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.28);
+}
+.team:enabled { cursor: pointer; }
+.team[aria-pressed="true"] { background: #1d7a46; border-color: #7be3a6; }
+.rank { display: flex; flex-direction: column; gap: 8px; width: min(760px, 100%); margin: 0 auto; }
+.rank div { display: flex; justify-content: space-between; gap: 12px; padding: .35em .8em; border-radius: 10px; background: rgba(255,255,255,.08); font: 700 clamp(18px, 2.6vw, 38px) var(--body); overflow-wrap: anywhere; }
+.rank div.first { background: var(--ev); color: #10181a; }
+.keys { width: 100%; font-size: 14px; opacity: .55; text-align: center; }
+/* the controls stay on screen even when a long question makes the stage scroll */
+.foot { position: sticky; bottom: 0; z-index: 1; padding-block: 8px 2px; background: linear-gradient(transparent, #0d1416 10px); }
+button, a, label { touch-action: manipulation; }
+.back, a.lk { display: inline-block; padding-block: 6px; }
+@media (max-width: 800px), (max-height: 500px) {
+  .keys { display: none; }
+  .teams { flex: 1 1 100%; min-width: 0; flex-wrap: nowrap; overflow-x: auto; }
+  .team { flex: none; white-space: nowrap; }
+  .foot .row { margin-inline-start: auto; }
+}
+/* phone on its side: little height, so everything shrinks and the controls share one row */
+@media (max-height: 500px) {
+  .bar { font-size: 14px; }
+  .mid { gap: 8px; padding-block: 6px; }
+  .big { font-size: 21px; }
+  .huge { font-size: 30px; }
+  .icon { font-size: 44px; }
+  .sub, .note { font-size: 16px; }
+  .ans { font-size: 16px; padding: .35em .7em; }
+  .rank { gap: 4px; }
+  .rank div { font-size: 16px; padding: .2em .8em; }
+  .foot { flex-wrap: nowrap; }
+  .teams { flex: 1 1 0; }
+  .foot .row { flex: none; flex-wrap: nowrap; }
+  .act { padding: 5px 10px; font-size: 14px; }
+  .act.main { padding: 6px 16px; font-size: 15px; }
+}
+#fx { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div class="wrap" id="home">
+  <a class="back" href="index.html">← לתפריט</a>
+  <h1 style="margin-top:12px">חידון אישי</h1>
+  <p class="muted">כותבים שאלות משלכם ומקרינים אותן בערב משפחתי או באירוע.</p>
+  <div class="card row spread" id="resume" hidden>
+    <span id="resumeText"></span>
+    <span class="row"><button class="btn small" id="resumeBtn" type="button">המשך</button><button class="btn small ghost" id="resumeDrop" type="button">סיום</button></span>
+  </div>
+  <div class="doors">
+    <button class="door" id="goBuild" type="button"><i aria-hidden="true">🛠️</i><b>בנייה</b><span class="muted">כתיבת חידון חדש או עריכה</span></button>
+    <button class="door" id="goPlay" type="button"><i aria-hidden="true">🎬</i><b>משחק</b><span class="muted">בחירת חידון והקרנה</span></button>
+  </div>
+</div>
+
+<div class="wrap" id="build" hidden>
+  <button class="btn small ghost" id="buildHome" type="button">← חזרה</button>
+  <p class="err" id="saveErr" hidden>השמירה בדפדפן נכשלה. כדאי לשמור את החידון לקובץ כדי לא לאבד אותו.</p>
+  <section id="buildList">
+    <h1 style="margin-top:12px">בנייה</h1>
+    <div class="row"><button class="btn" id="newQuiz" type="button">חידון חדש</button><label class="btn ghost" tabindex="0">טעינה מקובץ<input class="importer" type="file" accept=".json,application/json" hidden></label></div>
+    <p class="err importErr" hidden></p>
+    <div class="qlist" id="myQuizzes" style="margin-top:14px"></div>
+  </section>
+  <section id="editor" hidden>
+    <h1 style="margin-top:12px" id="edTitle"></h1>
+    <div class="card" id="edEvent"></div>
+    <div id="edQs"></div>
+    <div class="row"><button class="btn" id="addQ" type="button">הוספת שאלה</button><button class="btn ghost" id="saveFile" type="button">שמירה לקובץ</button><button class="btn ghost" id="edDone" type="button">סיום עריכה</button><button class="btn ghost" id="edPlay" type="button">🎬 להקרנה</button></div>
+    <p class="muted">השינויים נשמרים אוטומטית בדפדפן הזה בלבד. שמירה לקובץ מאפשרת להקרין ממחשב אחר ומגנה מפני מחיקה.</p>
+  </section>
+</div>
+
+<div class="wrap" id="play" hidden>
+  <button class="btn small ghost" id="playHome" type="button">← חזרה</button>
+  <h1 style="margin-top:12px">משחק</h1>
+  <div class="card">
+    <h2>איזה חידון?</h2>
+    <div class="qlist" id="pickQuiz"></div>
+    <div class="row" style="margin-top:12px"><label class="btn small ghost" tabindex="0">טעינה מקובץ<input class="importer" type="file" accept=".json,application/json" hidden></label></div>
+    <p class="err importErr" hidden></p>
+  </div>
+  <div class="card">
+    <h2>כמה קבוצות או שחקנים?</h2>
+    <div class="seg" id="teamCount" role="group" aria-label="מספר קבוצות"></div>
+    <div class="two" id="teamNames" style="margin-top:8px"></div>
+  </div>
+  <button class="btn" id="startShow" type="button">התחלת הקרנה</button>
+</div>
+
+<div id="show" hidden></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<script>
+const STORE = "fq-quizzes", SAVED_SHOW = "fq-show", SOUND = "fq-sound";
+const MAX_Q = 30, MAX_TEAMS = 8, FILE_TAG = "family-quiz";
+const LETTERS = ["א", "ב", "ג", "ד"];
+const EVENTS = {
+  family:   { icon: "🏡", name: "ערב משפחתי", color: "#4fc2bd" },
+  birthday: { icon: "🎂", name: "יום הולדת", color: "#ff8a65" },
+  wedding:  { icon: "💍", name: "חתונה", color: "#e6bd5c" },
+  mitzvah:  { icon: "✡️", name: "בר/בת מצווה", color: "#7ab0ff" },
+  holiday:  { icon: "🕯️", name: "חג", color: "#f2a93b" },
+  other:    { icon: "🎉", name: "אחר", color: "#c79bff" }
+};
+const $ = id => document.getElementById(id);
+// builds DOM with text nodes only: everything the author types may come from someone else's file
+function el(tag, props = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "class") n.className = v;
+    else if (k in n) n[k] = v;
+    else n.setAttribute(k, v);
+  }
+  n.append(...kids.filter(k => k != null));
+  return n;
+}
+function safeUrl(s) {
+  s = (s || "").trim();
+  if (!s) return "";
+  try {
+    const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(s) ? s : "https://" + s);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.href : "";
+  } catch (e) { return ""; }
+}
+
+// ---------- sound: synthesized with Web Audio, so there are no audio files and no rights to clear ----------
+let audio = null, soundOn = true;
+try { soundOn = localStorage.getItem(SOUND) !== "off"; } catch (e) {}
+function ac() {
+  if (!audio) { const A = window.AudioContext || window.webkitAudioContext; if (!A) return null; audio = new A(); }
+  if (audio.state === "suspended") audio.resume();
+  return audio;
+}
+function tone(c, t0, freq, dur, { type = "sine", vol = .18, to } = {}) {
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur);
+  o.connect(g).connect(c.destination); o.start(t0); o.stop(t0 + dur + .02);
+}
+function noise(c, t0, dur, vol, from, to, type = "lowpass") {
+  const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+  s.buffer = buf; f.type = type;
+  f.frequency.setValueAtTime(from, t0); f.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur);
+  s.connect(f).connect(g).connect(c.destination); s.start(t0);
+}
+// a melody: [frequency, start, length] triples
+const tune = (c, t, notes, opts) => notes.forEach(([f, d, len]) => tone(c, t + d, f, len, opts));
+const roll = (c, t, n = 12) => { for (let i = 0; i < n; i++) noise(c, t + i * .05, .06, .04 + i * .012, 900, 200); };
+const cymbal = (c, t) => { noise(c, t, 1.6, .2, 9000, 3000, "highpass"); noise(c, t, .4, .4, 600, 60); };
+const COMMON = {
+  tick:  (c, t) => tone(c, t, 1200, .05, { type: "square", vol: .06 }),
+  pulse: (c, t) => tone(c, t, 82, .22, { type: "triangle", vol: .12 })
+};
+const PACKS = {
+  festive: { name: "חגיגי", ...COMMON,
+    open:   (c, t) => { [[523, 0, .16], [523, .17, .16], [659, .34, .16], [784, .51, .7]].forEach(([f, d, l]) => { tone(c, t + d, f, l, { type: "sawtooth", vol: .07 }); tone(c, t + d, f * 2, l, { type: "triangle", vol: .07 }); }); },
+    reveal: (c, t) => { roll(c, t); tone(c, t + .62, 784, .3, { type: "triangle", vol: .16 }); },
+    right:  (c, t) => { tune(c, t, [[523, 0, .14], [659, .1, .14], [784, .2, .14], [1047, .3, .45]], { type: "triangle", vol: .17 }); noise(c, t + .3, .5, .1, 9000, 4000, "highpass"); },
+    wrong:  (c, t) => tune(c, t, [[392, 0, .25], [349, .22, .25], [294, .44, .5]], { type: "triangle", vol: .16 }),
+    timeup: (c, t) => tune(c, t, [[660, 0, .15], [660, .2, .15], [440, .4, .5]], { type: "square", vol: .07 }),
+    win:    (c, t) => {
+      roll(c, t, 16);
+      const f0 = t + .85;
+      [[523, 0, .16], [523, .17, .16], [523, .34, .16], [659, .51, .5], [587, 1.05, .16], [659, 1.22, .16], [784, 1.39, .9]]
+        .forEach(([f, d, len]) => { tone(c, f0 + d, f, len, { type: "sawtooth", vol: .07 }); tone(c, f0 + d, f * 2, len, { type: "triangle", vol: .07 }); });
+      cymbal(c, f0 + 2.35);
+      [262, 523, 659, 784, 1047, 1319].forEach(f => tone(c, f0 + 2.35, f, 2.4, { type: "triangle", vol: .07 }));
+    }
+  },
+  funny: { name: "מצחיק", ...COMMON,
+    open:   (c, t) => { tone(c, t, 300, .35, { to: 1200, vol: .14 }); tone(c, t + .38, 1200, .35, { to: 300, vol: .14 }); tone(c, t + .78, 500, .5, { to: 1500, vol: .14 }); },
+    reveal: (c, t) => { [0, .14, .28, .42].forEach((d, i) => tone(c, t + d, 200 + i * 90, .1, { type: "square", vol: .07 })); tone(c, t + .58, 900, .25, { to: 1800, vol: .14 }); },
+    right:  (c, t) => { tone(c, t, 400, .3, { to: 1600, vol: .16 }); [1319, 1568, 2093].forEach((f, i) => tone(c, t + .3 + i * .09, f, .22, { vol: .1 })); },
+    // the sad trombone
+    wrong:  (c, t) => { [[311, 0], [294, .34], [277, .68]].forEach(([f, d]) => tone(c, t + d, f, .32, { type: "sawtooth", vol: .1 })); tone(c, t + 1.02, 262, 1, { type: "sawtooth", to: 233, vol: .1 }); },
+    timeup: (c, t) => { for (let i = 0; i < 4; i++) tone(c, t + i * .16, 180, .12, { type: "square", vol: .1 }); },
+    win:    (c, t) => { [392, 494, 587, 784, 587, 784, 988, 1175].forEach((f, i) => tone(c, t + i * .15, f, .2, { type: "square", vol: .07 })); cymbal(c, t + 1.25); tone(c, t + 1.25, 300, 1.2, { to: 2000, vol: .14 }); }
+  },
+  arcade: { name: "משחקי מחשב", ...COMMON,
+    open:   (c, t) => tune(c, t, [[262, 0, .1], [330, .1, .1], [392, .2, .1], [523, .3, .1], [659, .4, .1], [784, .5, .35]], { type: "square", vol: .07 }),
+    reveal: (c, t) => { for (let i = 0; i < 12; i++) tone(c, t + i * .05, 300 + i * 80, .05, { type: "square", vol: .05 }); },
+    right:  (c, t) => tune(c, t, [[988, 0, .09], [1319, .09, .4]], { type: "square", vol: .08 }),
+    wrong:  (c, t) => tone(c, t, 400, .55, { type: "sawtooth", to: 70, vol: .1 }),
+    timeup: (c, t) => tune(c, t, [[220, 0, .18], [196, .2, .18], [165, .4, .4]], { type: "square", vol: .08 }),
+    win:    (c, t) => tune(c, t, [[523, 0, .1], [659, .1, .1], [784, .2, .1], [1047, .3, .1], [784, .4, .1], [1047, .5, .1], [1319, .6, .1], [1568, .7, .6], [1319, 1.3, .1], [1568, 1.4, .8]], { type: "square", vol: .08 })
+  }
+};
+function sfx(pack, name, delay = 0, force) {
+  if (!soundOn && !force) return;
+  try { const c = ac(); if (c) (PACKS[pack] || PACKS.festive)[name](c, c.currentTime + delay); } catch (e) {}
+}
+// confetti + fireworks on a full-screen canvas for about 7 seconds
+function celebrate(color) {
+  const cv = $("fx"), x = cv.getContext("2d");
+  if (!x || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const W = cv.width = innerWidth, H = cv.height = innerHeight;
+  const pal = [color, "#ffd23f", "#ff5e7e", "#3ec1ff", "#7cf29a", "#c27bff", "#ffffff"];
+  const pick = () => pal[Math.random() * pal.length | 0];
+  const bits = [], sparks = [];
+  for (let i = 0; i < 220; i++) bits.push({ x: Math.random() * W, y: -Math.random() * H, vx: Math.random() * 2 - 1, vy: 2 + Math.random() * 3,
+    s: 6 + Math.random() * 8, r: Math.random() * 6, vr: Math.random() * .3 - .15, c: pick() });
+  const burst = () => { const bx = W * (.15 + Math.random() * .7), by = H * (.1 + Math.random() * .4), c = pick();
+    for (let i = 0; i < 70; i++) { const a = Math.random() * 7, v = 2 + Math.random() * 5; sparks.push({ x: bx, y: by, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, c }); } };
+  const start = performance.now(); let nextBurst = 0;
+  (function frame(now) {
+    const e = now - start;
+    x.clearRect(0, 0, W, H);
+    if (e > nextBurst && e < 5500) { burst(); nextBurst = e + 350 + Math.random() * 400; }
+    for (const b of bits) {
+      b.x += b.vx + Math.sin(e / 300 + b.r); b.y += b.vy; b.r += b.vr;
+      if (b.y > H + 20 && e < 4500) { b.y = -20; b.x = Math.random() * W; }
+      x.save(); x.translate(b.x, b.y); x.rotate(b.r); x.fillStyle = b.c; x.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2 * Math.abs(Math.cos(b.r * 2)) + 1); x.restore();
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i]; p.x += p.vx; p.y += p.vy; p.vy += .06; p.vx *= .985; p.life -= .012;
+      if (p.life <= 0) { sparks.splice(i, 1); continue; }
+      x.globalAlpha = p.life; x.fillStyle = p.c; x.beginPath(); x.arc(p.x, p.y, 2.6, 0, 7); x.fill(); x.globalAlpha = 1;
+    }
+    if (e < 7500) requestAnimationFrame(frame); else x.clearRect(0, 0, W, H);
+  })(start);
+}
+
+// ---------- quiz data ----------
+const str = (v, max) => typeof v === "string" ? v.slice(0, max) : "";
+const blankQ = () => ({ q: "", options: ["", "", "", ""], answer: 0, note: "", link: "" });
+const blankQuiz = () => ({ id: "q" + Date.now().toString(36), title: "", event: "family", opening: "", closing: "", link: "", pack: "festive", timer: 0, suspense: true, questions: [blankQ()] });
+// also the gate for imported files: unknown fields are dropped and every value is coerced
+function normQuiz(r) {
+  const q = blankQuiz();
+  if (typeof r.id === "string" && r.id) q.id = r.id.slice(0, 40);
+  q.title = str(r.title, 80); q.opening = str(r.opening, 300); q.closing = str(r.closing, 300); q.link = str(r.link, 500);
+  if (EVENTS[r.event]) q.event = r.event;
+  if (PACKS[r.pack]) q.pack = r.pack;
+  q.timer = [0, 10, 20, 30, 60].includes(r.timer) ? r.timer : 0;
+  q.suspense = r.suspense !== false;
+  q.questions = (Array.isArray(r.questions) ? r.questions : []).slice(0, MAX_Q).map(x => {
+    const o = Array.isArray(x && x.options) ? x.options : [];
+    const a = Number.isInteger(x && x.answer) && x.answer >= 0 && x.answer < 4 ? x.answer : 0;
+    return { q: str(x && x.q, 300), options: [0, 1, 2, 3].map(i => str(o[i], 120)), answer: a, note: str(x && x.note, 400), link: str(x && x.link, 500) };
+  });
+  return q;
+}
+const isReady = q => q.q.trim() && q.options[q.answer].trim() && q.options.filter(o => o.trim()).length >= 2;
+const readyCount = quiz => quiz.questions.filter(isReady).length;
+function problem(q) {
+  if (!q.q.trim()) return "חסר נוסח שאלה";
+  if (q.options.filter(o => o.trim()).length < 2) return "צריך לפחות שתי תשובות";
+  if (!q.options[q.answer].trim()) return "לא סומנה תשובה נכונה";
+  return "";
+}
+// what the stage shows: finished questions only, without empty answer slots
+function playable(quiz) {
+  const questions = quiz.questions.filter(isReady).map(q => {
+    const options = []; let answer = 0;
+    q.options.forEach((o, i) => { if (o.trim()) { if (i === q.answer) answer = options.length; options.push(o.trim()); } });
+    return { q: q.q.trim(), options, answer, note: q.note.trim(), link: safeUrl(q.link) };
+  });
+  return { title: quiz.title.trim() || "חידון", event: quiz.event, opening: quiz.opening.trim(), closing: quiz.closing.trim(), link: safeUrl(quiz.link), pack: quiz.pack, timer: quiz.timer, suspense: quiz.suspense, questions };
+}
+let quizzes = [];
+try { const a = JSON.parse(localStorage.getItem(STORE) || "[]"); if (Array.isArray(a)) quizzes = a.map(normQuiz); } catch (e) {}
+function saveQuizzes() {
+  let ok = true;
+  try { localStorage.setItem(STORE, JSON.stringify(quizzes)); } catch (e) { ok = false; }
+  $("saveErr").hidden = ok;
+}
+function exportQuiz(quiz) {
+  const blob = new Blob([JSON.stringify({ app: FILE_TAG, version: 1, quiz }, null, 1)], { type: "application/json" });
+  const a = el("a", { href: URL.createObjectURL(blob), download: (quiz.title.trim().replace(/[\\/:*?"<>|]/g, "") || "חידון") + ".json" });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+// both screens have a load-from-file control; a re-imported quiz replaces the copy with the same id
+document.querySelectorAll(".importer").forEach(inp => {
+  inp.onchange = async () => {
+    const box = inp.closest("section, .card").querySelector(".importErr"); box.hidden = true;
+    const file = inp.files[0]; inp.value = "";
+    if (!file) return;
+    try {
+      if (file.size > 500000) throw 0;
+      const data = JSON.parse(await file.text());
+      if (!data || data.app !== FILE_TAG || !data.quiz) throw 0;
+      const quiz = normQuiz(data.quiz);
+      const at = quizzes.findIndex(x => x.id === quiz.id);
+      if (at >= 0) quizzes[at] = quiz; else quizzes.unshift(quiz);
+      saveQuizzes(); pick.id = quiz.id;
+      renderMine(); renderPlay();
+    } catch (e) { box.textContent = "הקובץ לא נראה כמו חידון ששמרנו כאן."; box.hidden = false; }
+  };
+});
+document.querySelectorAll("label.btn").forEach(l => { l.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); l.querySelector("input").click(); } }; });
+
+// ---------- screens ----------
+function screen(id) {
+  ["home", "build", "play"].forEach(s => { $(s).hidden = s !== id; });
+  scrollTo(0, 0);
+}
+function goHome() { renderResume(); screen("home"); }
+$("goBuild").onclick = () => { closeEditor(); screen("build"); };
+$("goPlay").onclick = () => { renderPlay(); screen("play"); };
+$("buildHome").onclick = () => { closeEditor(); goHome(); };
+$("playHome").onclick = goHome;
+
+// ---------- build ----------
+let cur = null;     // the quiz in the editor
+function renderMine() {
+  const box = $("myQuizzes"); box.replaceChildren();
+  if (!quizzes.length) box.append(el("p", { class: "muted" }, "עוד אין כאן חידונים."));
+  quizzes.forEach(q => {
+    box.append(el("div", { class: "qitem" },
+      el("span", {}, `${EVENTS[q.event].icon} `, el("b", {}, q.title.trim() || "חידון ללא שם"), el("span", { class: "muted" }, ` · ${readyCount(q)} שאלות מוכנות`)),
+      el("span", { class: "row" },
+        el("button", { class: "btn small", type: "button", onclick: () => openEditor(q) }, "עריכה"),
+        el("button", { class: "btn small ghost", type: "button", onclick: () => exportQuiz(q) }, "שמירה לקובץ"),
+        el("button", { class: "btn small danger", type: "button", onclick: () => {
+          if (!confirm(`למחוק את "${q.title.trim() || "חידון ללא שם"}"?`)) return;
+          quizzes = quizzes.filter(x => x !== q); saveQuizzes(); renderMine();
+        } }, "מחיקה"))));
+  });
+}
+function closeEditor() { cur = null; $("editor").hidden = true; $("buildList").hidden = false; renderMine(); }
+function openEditor(q) {
+  cur = q; $("buildList").hidden = true; $("editor").hidden = false;
+  renderEvent(); renderQuestions(q.questions.length === 1 ? 0 : -1); scrollTo(0, 0);
+}
+$("newQuiz").onclick = () => { const q = blankQuiz(); quizzes.unshift(q); saveQuizzes(); openEditor(q); };
+$("edDone").onclick = closeEditor;
+$("saveFile").onclick = () => exportQuiz(cur);
+$("edPlay").onclick = () => { pick.id = cur.id; closeEditor(); renderPlay(); screen("play"); };
+
+function field(label, node, hint) { return el("label", { class: "f" }, label, hint ? el("small", {}, ` (${hint})`) : null, node); }
+function bound(tag, obj, key, props = {}, after) {
+  const n = el(tag, props); n.value = obj[key];
+  n.oninput = () => { obj[key] = n.value; saveQuizzes(); if (after) after(); };
+  return n;
+}
+function select(obj, key, choices, conv = v => v) {
+  const s = el("select");
+  choices.forEach(([v, t]) => s.append(el("option", { value: String(v) }, t)));
+  s.value = String(obj[key]);
+  s.onchange = () => { obj[key] = conv(s.value); saveQuizzes(); };
+  return s;
+}
+function renderEvent() {
+  const q = cur, setHead = () => { $("edTitle").textContent = q.title.trim() || "חידון חדש"; };
+  setHead();
+  const packSel = select(q, "pack", Object.entries(PACKS).map(([k, p]) => [k, p.name]));
+  const demo = name => el("button", { class: "btn small ghost", type: "button", onclick: () => sfx(q.pack, name, 0, true) }, name === "right" ? "▶ הצלחה" : name === "wrong" ? "▶ כישלון" : "▶ ניצחון");
+  const susp = el("input", { type: "checkbox", checked: q.suspense, onchange: () => { q.suspense = susp.checked; saveQuizzes(); } });
+  $("edEvent").replaceChildren(
+    el("h2", {}, "האירוע"),
+    field("שם החידון", bound("input", q, "title", { type: "text", maxLength: 80, placeholder: "למשל: כמה אתם מכירים את סבא?" }, setHead)),
+    el("div", { class: "two" },
+      field("סוג האירוע", select(q, "event", Object.entries(EVENTS).map(([k, e]) => [k, `${e.icon} ${e.name}`]))),
+      field("קישור בסיום", bound("input", q, "link", { type: "url", maxLength: 500, dir: "ltr", placeholder: "https://" }), "אלבום, סרטון")),
+    field("משפט פתיחה", bound("textarea", q, "opening", { rows: 2, maxLength: 300 }), "לא חובה"),
+    field("הקדשה בסיום", bound("textarea", q, "closing", { rows: 2, maxLength: 300 }), "לא חובה"),
+    el("h2", { style: "margin-top:16px" }, "מוסיקה וזמן"),
+    el("div", { class: "two" },
+      field("סגנון הצלילים", packSel),
+      field("זמן לכל שאלה", select(q, "timer", [[0, "בלי שעון"], [10, "10 שניות"], [20, "20 שניות"], [30, "30 שניות"], [60, "דקה"]], Number))),
+    el("div", { class: "row" }, demo("right"), demo("wrong"), demo("win")),
+    el("label", { class: "row", style: "margin-top:10px" }, susp, "מוסיקת מתח שקטה בזמן שאלה"));
+}
+function renderQuestions(openAt) {
+  const box = $("edQs"); box.replaceChildren();
+  cur.questions.forEach((q, i) => box.append(questionCard(q, i, i === openAt)));
+  $("addQ").disabled = cur.questions.length >= MAX_Q;
+  $("addQ").textContent = cur.questions.length >= MAX_Q ? `הגעת למקסימום: ${MAX_Q} שאלות` : "הוספת שאלה";
+}
+function questionCard(q, i, open) {
+  const list = cur.questions, title = el("span"), warn = el("span", { class: "warn" });
+  const sync = () => {
+    title.textContent = `${i + 1}. ${q.q.trim() || "שאלה חדשה"} `;
+    const p = problem(q); warn.textContent = p ? `· ${p}` : "";
+  };
+  sync();
+  const radios = q.options.map((o, oi) => {
+    const r = el("input", { type: "radio", name: `ans-${i}`, checked: q.answer === oi, ariaLabel: `התשובה הנכונה היא ${LETTERS[oi]}` });
+    r.onchange = () => { q.answer = oi; saveQuizzes(); sync(); };
+    return el("div", { class: "opt" }, r, bound("input", q.options, oi, { type: "text", maxLength: 120, placeholder: `תשובה ${LETTERS[oi]}`, ariaLabel: `תשובה ${LETTERS[oi]}` }, sync));
+  });
+  const move = (d, text) => el("button", { class: "btn small ghost", type: "button", disabled: !list[i + d], onclick: () => {
+    [list[i], list[i + d]] = [list[i + d], list[i]]; saveQuizzes(); renderQuestions(i + d);
+  } }, text);
+  return el("details", { class: "qcard", open },
+    el("summary", {}, title, warn),
+    el("div", { class: "qbody" },
+      field("השאלה", bound("textarea", q, "q", { rows: 2, maxLength: 300 }, sync)),
+      el("div", { class: "muted", style: "font-size:14px" }, "מסמנים את התשובה הנכונה בעיגול. אפשר להשאיר תשובות ריקות, כל עוד יש לפחות שתיים."),
+      ...radios,
+      field("הערה או הקדשה אחרי התשובה", bound("textarea", q, "note", { rows: 2, maxLength: 400 }), "לא חובה"),
+      field("קישור", bound("input", q, "link", { type: "url", maxLength: 500, dir: "ltr", placeholder: "https://" }), "לא חובה"),
+      el("div", { class: "row" }, move(-1, "↑ למעלה"), move(1, "↓ למטה"),
+        el("button", { class: "btn small danger", type: "button", onclick: () => {
+          if ((q.q.trim() || q.options.some(o => o.trim())) && !confirm(`למחוק את שאלה ${i + 1}?`)) return;
+          list.splice(i, 1); if (!list.length) list.push(blankQ());
+          saveQuizzes(); renderQuestions(-1);
+        } }, "מחיקה"))));
+}
+$("addQ").onclick = () => {
+  cur.questions.push(blankQ()); saveQuizzes(); renderQuestions(cur.questions.length - 1);
+  $("edQs").lastElementChild.scrollIntoView({ behavior: "smooth", block: "center" });
+};
+
+// ---------- game setup ----------
+const pick = { id: null, count: 2, names: Array.from({ length: MAX_TEAMS }, (_, i) => `קבוצה ${i + 1}`) };
+function renderPlay() {
+  const box = $("pickQuiz"); box.replaceChildren();
+  const usable = quizzes.filter(q => readyCount(q));
+  if (!usable.some(q => q.id === pick.id)) pick.id = usable.length ? usable[0].id : null;
+  if (!usable.length) box.append(el("p", { class: "muted", style: "margin:0" }, "עוד אין חידון מוכן. אפשר לכתוב אחד במסך הבנייה או לטעון מקובץ."));
+  usable.forEach(q => {
+    const r = el("input", { type: "radio", name: "pickQ", checked: q.id === pick.id, onchange: () => { pick.id = q.id; renderPlay(); } });
+    const skipped = q.questions.length - readyCount(q);
+    box.append(el("label", { class: "qitem" + (q.id === pick.id ? " on" : ""), style: "cursor:pointer;justify-content:flex-start" }, r,
+      el("span", {}, `${EVENTS[q.event].icon} `, el("b", {}, q.title.trim() || "חידון ללא שם"), el("span", { class: "muted" }, ` · ${readyCount(q)} שאלות`),
+        skipped ? el("span", { class: "muted" }, ` (${skipped} לא גמורות ידולגו)`) : null)));
+  });
+  const seg = $("teamCount"); seg.replaceChildren();
+  for (let n = 0; n <= MAX_TEAMS; n++) {
+    seg.append(el("button", { type: "button", ariaPressed: String(n === pick.count), onclick: () => { pick.count = n; renderPlay(); } }, n === 0 ? "בלי ניקוד" : String(n)));
+  }
+  const names = $("teamNames"); names.replaceChildren();
+  for (let i = 0; i < pick.count; i++) {
+    const inp = el("input", { type: "text", maxLength: 20, ariaLabel: `שם קבוצה ${i + 1}` }); inp.value = pick.names[i];
+    inp.oninput = () => { pick.names[i] = inp.value; };
+    names.append(inp);
+  }
+  $("startShow").disabled = !pick.id;
+}
+$("startShow").onclick = () => {
+  const quiz = quizzes.find(q => q.id === pick.id);
+  if (!quiz) return;
+  const p = playable(quiz);
+  S = { quiz: p, teams: pick.names.slice(0, pick.count).map((n, i) => n.trim() || `קבוצה ${i + 1}`), i: 0, phase: "intro", marks: p.questions.map(() => []) };
+  $("show").hidden = false; fullscreen(true);
+  enter();
+};
+
+// ---------- the stage: everything on it is drawn from S, a plain object that can be saved and restored ----------
+let S = null;       // { quiz, teams, i, phase: intro|question|reveal|final, marks: per question, the teams that were right }
+let countdown = null, pulse = null;
+const score = t => S.marks.reduce((n, m) => n + (m.includes(t) ? 1 : 0), 0);
+function stopClock() { clearInterval(countdown); clearInterval(pulse); countdown = pulse = null; }
+function persist() {
+  try { if (S.phase === "final") localStorage.removeItem(SAVED_SHOW); else localStorage.setItem(SAVED_SHOW, JSON.stringify(S)); } catch (e) {}
+}
+// runs when the phase changes: sound and clocks; drawing stays in renderShow, so a restore or a mute redraw is silent
+function enter(fresh = true) {
+  stopClock(); persist();
+  // focus may still sit on the setup button behind the stage, where Space would restart the show
+  if (document.activeElement && !$("show").contains(document.activeElement)) document.activeElement.blur();
+  const { quiz, phase } = S;
+  if (fresh) {
+    if (phase === "intro") sfx(quiz.pack, "open");
+    if (phase === "reveal") sfx(quiz.pack, "reveal");
+    if (phase === "final") {
+      sfx(quiz.pack, "win", .3);
+      celebrate(EVENTS[quiz.event].color);
+    }
+  }
+  renderShow();
+  if (phase === "question") {
+    if (quiz.suspense) pulse = setInterval(() => sfx(quiz.pack, "pulse"), 700);
+    if (quiz.timer) {
+      let left = quiz.timer;
+      const show = () => { const n = $("clockN"); if (n) { n.textContent = left; n.className = "clockn" + (left <= 5 ? " low" : ""); } };
+      show();
+      countdown = setInterval(() => {
+        left--; show();
+        if (left > 0 && left <= 5) sfx(quiz.pack, "tick");
+        if (left <= 0) { stopClock(); sfx(quiz.pack, "timeup"); }
+      }, 1000);
+    }
+  }
+}
+function next() {
+  if (S.phase === "intro") { S.phase = "question"; S.i = 0; }
+  else if (S.phase === "question") S.phase = "reveal";
+  else if (S.phase === "reveal") {
+    if (S.i + 1 < S.quiz.questions.length) { S.i++; S.phase = "question"; } else S.phase = "final";
+  } else return;
+  enter();
+}
+function back() {
+  if (S.phase === "reveal") S.phase = "question";
+  else if (S.phase === "question") { if (S.i > 0) { S.i--; S.phase = "reveal"; } else S.phase = "intro"; }
+  else if (S.phase === "final") S.phase = "reveal";
+  else return;
+  enter(false);
+}
+function toggleTeam(t) {
+  if (S.phase !== "reveal" || t >= S.teams.length) return;
+  const m = S.marks[S.i], at = m.indexOf(t);
+  if (at >= 0) m.splice(at, 1); else { m.push(t); sfx(S.quiz.pack, "right"); }
+  persist(); renderShow();
+}
+function nobody() {
+  if (S.phase !== "reveal") return;
+  S.marks[S.i] = []; sfx(S.quiz.pack, "wrong");
+  persist(); renderShow();
+}
+function fullscreen(on) {
+  try {
+    if (on && !document.fullscreenElement) { const p = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); if (p) p.catch(() => {}); }
+    if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  } catch (e) {}
+}
+function exitShow() {
+  stopClock(); fullscreen(false);
+  $("show").hidden = true; goHome();
+}
+function toggleSound() {
+  soundOn = !soundOn;
+  try { localStorage.setItem(SOUND, soundOn ? "on" : "off"); } catch (e) {}
+  if ($("muteBtn")) { $("muteBtn").textContent = soundOn ? "🔊" : "🔇"; $("muteBtn").ariaLabel = soundOn ? "השתקה" : "הפעלת קול"; }
+}
+function linkEl(url, text) { return el("a", { class: "lk", href: url, target: "_blank", rel: "noopener noreferrer" }, text); }
+function renderShow() {
+  const { quiz, phase, i, teams } = S, ev = EVENTS[quiz.event], q = quiz.questions[i], total = quiz.questions.length, stage = $("show");
+  stage.style.setProperty("--ev", ev.color);
+  const top = el("div", { class: "bar" },
+    el("span", {}, phase === "question" || phase === "reveal" ? `שאלה ${i + 1} מתוך ${total}` : quiz.title),
+    phase === "question" && quiz.timer ? el("span", { class: "clockn", id: "clockN", ariaLive: "off" }, String(quiz.timer)) : null,
+    el("span", { class: "row" },
+      el("button", { id: "muteBtn", type: "button", ariaLabel: soundOn ? "השתקה" : "הפעלת קול", onclick: toggleSound }, soundOn ? "🔊" : "🔇"),
+      el("button", { type: "button", ariaLabel: "מסך מלא", onclick: () => fullscreen(!document.fullscreenElement) }, "⛶"),
+      el("button", { type: "button", onclick: exitShow }, "יציאה")));
+  const mid = el("div", { class: "mid" });
+  if (phase === "intro") {
+    mid.append(el("div", { class: "icon", ariaHidden: "true" }, ev.icon), el("p", { class: "big huge" }, quiz.title));
+    if (quiz.opening) mid.append(el("p", { class: "sub" }, quiz.opening));
+  }
+  if (phase === "question" || phase === "reveal") {
+    const shown = phase === "reveal";
+    mid.append(el("p", { class: "big" }, q.q), el("div", { class: "grid" }, ...q.options.map((o, oi) =>
+      el("div", { class: "ans" + (shown ? (oi === q.answer ? " yes" : " no") : "") }, el("b", {}, LETTERS[oi]), el("span", {}, o)))));
+    if (shown && q.note) mid.append(el("p", { class: "note" }, q.note));
+    if (shown && q.link) mid.append(el("p", { class: "note" }, linkEl(q.link, "לקישור")));
+  }
+  if (phase === "final") {
+    const order = teams.map((name, t) => ({ name, s: score(t) })).sort((a, b) => b.s - a.s);
+    const best = order.length ? order[0].s : 0;
+    mid.append(el("div", { class: "icon", ariaHidden: "true" }, "🏆"));
+    if (order.length) {
+      const firsts = order.filter(o => o.s === best).map(o => o.name);
+      mid.append(el("p", { class: "big" }, firsts.length > 1 ? `תיקו: ${firsts.join(", ")}` : `במקום הראשון: ${firsts[0]}`),
+        el("div", { class: "rank" }, ...order.map(o => el("div", { class: o.s === best ? "first" : "" }, el("span", {}, o.name), el("span", {}, String(o.s))))));
+    } else mid.append(el("p", { class: "big huge" }, "כל הכבוד!"));
+    if (quiz.closing) mid.append(el("p", { class: "sub" }, quiz.closing));
+    if (quiz.link) mid.append(el("p", { class: "note" }, linkEl(quiz.link, "לקישור")));
+  }
+  const reveal = phase === "reveal";
+  const chips = teams.length && (reveal || phase === "question") ? el("div", { class: "teams" }, ...teams.map((name, t) =>
+    el("button", { class: "team", type: "button", disabled: !reveal, ariaPressed: String(reveal && S.marks[i].includes(t)), onclick: () => toggleTeam(t) }, `${name}: ${score(t)}`))) : el("span");
+  const acts = el("div", { class: "row" });
+  if (reveal && teams.length) acts.append(el("button", { class: "act", type: "button", onclick: nobody }, "אף אחד לא צדק"));
+  if (reveal && !teams.length) acts.append(
+    el("button", { class: "act", type: "button", onclick: () => sfx(quiz.pack, "right") }, "🎉 צדקו"),
+    el("button", { class: "act", type: "button", onclick: () => sfx(quiz.pack, "wrong") }, "😬 טעו"));
+  if (phase !== "intro" && phase !== "final") acts.append(el("button", { class: "act", type: "button", onclick: back }, "חזרה"));
+  if (phase === "final") acts.append(el("button", { class: "act main", type: "button", onclick: () => { S = null; try { localStorage.removeItem(SAVED_SHOW); } catch (e) {} exitShow(); } }, "סיום"));
+  else acts.append(el("button", { class: "act main", type: "button", id: "nextBtn", onclick: next },
+    phase === "intro" ? "מתחילים" : phase === "question" ? "חשיפת התשובה" : i + 1 < total ? "השאלה הבאה" : "לתוצאות"));
+  const keys = reveal && teams.length ? "ספרות 1–" + teams.length + ": מי צדק · 0: אף אחד · רווח: הלאה · F: מסך מלא · M: השתקה"
+    : "רווח או PageDown: הלאה · PageUp: חזרה · F: מסך מלא · M: השתקה";
+  stage.replaceChildren(top, mid, el("div", { class: "foot" }, chips, acts, el("div", { class: "keys" }, keys)));
+}
+// a mouse click must not leave focus on a button, or the next Space would press it again
+$("show").addEventListener("click", e => { if (e.detail > 0 && document.activeElement) document.activeElement.blur(); });
+// presentation clickers send PageDown/PageUp; left is forward because the page runs right to left
+document.addEventListener("keydown", e => {
+  if ($("show").hidden || !S || e.ctrlKey || e.metaKey || e.altKey) return;
+  const onBtn = e.target.closest && e.target.closest("#show button, #show a");
+  if (onBtn && (e.key === " " || e.key === "Enter")) return;
+  const k = e.key.toLowerCase();
+  if ([" ", "enter", "arrowleft", "pagedown"].includes(k)) { e.preventDefault(); next(); }
+  else if (["arrowright", "pageup", "backspace"].includes(k)) { e.preventDefault(); back(); }
+  else if (k === "f") fullscreen(!document.fullscreenElement);
+  else if (k === "m") toggleSound();
+  else if (k === "0") nobody();
+  else if (/^[1-8]$/.test(k)) {
+    if (S.teams.length) toggleTeam(+k - 1);
+    else if (k === "1" && S.phase === "reveal") sfx(S.quiz.pack, "right");
+  }
+});
+
+// ---------- a refresh or a closed tab in the middle of the evening keeps the score ----------
+function savedShow() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVED_SHOW) || "null");
+    return s && s.quiz && Array.isArray(s.quiz.questions) && s.quiz.questions[s.i] && Array.isArray(s.marks) && Array.isArray(s.teams) ? s : null;
+  } catch (e) { return null; }
+}
+function renderResume() {
+  const s = savedShow();
+  $("resume").hidden = !s;
+  if (s) $("resumeText").textContent = `יש הקרנה באמצע: ${s.quiz.title}, שאלה ${s.i + 1} מתוך ${s.quiz.questions.length}`;
+}
+$("resumeBtn").onclick = () => { S = savedShow(); if (!S) return renderResume(); $("show").hidden = false; fullscreen(true); enter(false); };
+$("resumeDrop").onclick = () => { try { localStorage.removeItem(SAVED_SHOW); } catch (e) {} renderResume(); };
+
+renderMine(); goHome();
+</script>
+</body>
+</html>
