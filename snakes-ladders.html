@@ -64,6 +64,8 @@ a.btn { display: inline-block; text-decoration: none; }
 .btn:disabled { opacity: .45; cursor: default; }
 
 /* setup */
+/* the personal quiz and kids mode open over this page, so the address never changes */
+#inner { position: fixed; inset: 0; z-index: 20; width: 100%; height: 100%; border: 0; background: var(--bg); }
 /* first screen: pick a game */
 .menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; max-width: 760px; }
 .door {
@@ -305,6 +307,7 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
     </div>
   </section>
 </div>
+<iframe id="inner" title="משחק" allow="fullscreen; autoplay" hidden></iframe>
 <canvas id="fx" aria-hidden="true"></canvas>
 
 <script>
@@ -887,6 +890,16 @@ async function openBoard() {
   if (G.phase !== "question" && G.phase !== "done" || !G.q) { G.q = pickQuestion(); G.pick = null; G.phase = "question"; }
   showGame();
 }
+document.querySelectorAll('a[href="quiz.html"], a[href="kids.html"]').forEach(a => {
+  a.onclick = e => { e.preventDefault(); $("inner").src = a.getAttribute("href"); $("inner").hidden = false; };
+});
+// kids mode comes back through #board while this page is still loaded under it
+window.addEventListener("hashchange", () => {
+  if (location.hash !== "#board") return;
+  $("inner").hidden = true; $("inner").removeAttribute("src");
+  history.replaceState(null, "", location.pathname + location.search);
+  showSetup();
+});
 $("goBoard").onclick = openBoard;
 $("setupMenu").onclick = showMenu;
 $("resumeGame").onclick = openBoard;
