@@ -134,6 +134,12 @@ button.ans:hover { border-color: var(--ev); background: rgba(255,255,255,.16); }
 .verdict.miss { color: #ff9d92; }
 @keyframes pop { 40% { transform: scale(1.04); } }
 .note { text-align: center; font-size: clamp(18px, 2.4vw, 34px); margin: 0; overflow-wrap: anywhere; }
+/* a long explanation: the question and answers step back so the story fits and reads easily */
+.mid.long { gap: clamp(8px, 1.4vh, 18px); }
+.mid.long .big { font-size: clamp(20px, min(2.8vw, 4.4vh), 50px); }
+.mid.long .ans { font-size: clamp(15px, min(1.9vw, 3vh), 34px); padding: .25em .7em; border-width: 2px; }
+.mid.long .verdict { font-size: clamp(17px, min(2vw, 3.2vh), 36px); }
+.note.long { text-align: start; font-size: clamp(17px, min(2vw, 3.1vh), 40px); line-height: 1.55; padding: .6em 1em; border-radius: 12px; background: rgba(255,255,255,.07); }
 a.lk { color: #8fe0ff; font-weight: 700; overflow-wrap: anywhere; }
 .foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .teams { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -381,7 +387,7 @@ function normQuiz(r) {
   q.questions = (Array.isArray(r.questions) ? r.questions : []).slice(0, MAX_Q).map(x => {
     const o = Array.isArray(x && x.options) ? x.options : [];
     const a = Number.isInteger(x && x.answer) && x.answer >= 0 && x.answer < 4 ? x.answer : 0;
-    return { q: str(x && x.q, 300), options: [0, 1, 2, 3].map(i => str(o[i], 120)), answer: a, note: str(x && x.note, 400), link: str(x && x.link, 500) };
+    return { q: str(x && x.q, 300), options: [0, 1, 2, 3].map(i => str(o[i], 120)), answer: a, note: str(x && x.note, 1500), link: str(x && x.link, 500) };
   });
   return q;
 }
@@ -534,7 +540,7 @@ function questionCard(q, i, open) {
       field("השאלה", bound("textarea", q, "q", { rows: 2, maxLength: 300 }, sync)),
       el("div", { class: "muted", style: "font-size:14px" }, "מסמנים את התשובה הנכונה בעיגול. אפשר להשאיר תשובות ריקות, כל עוד יש לפחות שתיים."),
       ...radios,
-      field("הערה או הקדשה אחרי התשובה", bound("textarea", q, "note", { rows: 2, maxLength: 400 }), "לא חובה"),
+      field("הערה או הקדשה אחרי התשובה", bound("textarea", q, "note", { rows: 5, maxLength: 1500 }), "לא חובה"),
       field("קישור", bound("input", q, "link", { type: "url", maxLength: 500, dir: "ltr", placeholder: "https://" }), "לא חובה"),
       el("div", { class: "row" }, move(-1, "↑ למעלה"), move(1, "↓ למטה"),
         el("button", { class: "btn small danger", type: "button", onclick: () => {
@@ -693,7 +699,11 @@ function renderShow() {
     if (shown && chosen != null) mid.append(chosen === q.answer
       ? el("p", { class: "verdict good" }, "נכון!")
       : el("p", { class: "verdict miss" }, `לא נכון. התשובה הנכונה: ${q.options[q.answer]}`));
-    if (shown && q.note) mid.append(el("p", { class: "note" }, q.note));
+    if (shown && q.note) {
+      const long = q.note.length > 160;
+      if (long) mid.classList.add("long");
+      mid.append(el("p", { class: "note" + (long ? " long" : "") }, q.note));
+    }
     if (shown && q.link) mid.append(el("p", { class: "note" }, linkEl(q.link, "לקישור")));
   }
   if (phase === "final") {
