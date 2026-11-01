@@ -125,6 +125,13 @@ textarea { resize: vertical; min-height: 44px; }
 .ans.yes { background: #1d7a46; border-color: #7be3a6; animation: pop .45s ease; }
 .ans.yes > b { color: #fff; }
 .ans.no { opacity: .35; }
+button.ans { width: 100%; color: inherit; text-align: start; cursor: pointer; }
+button.ans:hover { border-color: var(--ev); background: rgba(255,255,255,.16); }
+.ans.bad { background: #a3271f; border-color: #ff9d92; animation: pop .45s ease; }
+.ans.bad > b { color: #fff; }
+.verdict { text-align: center; margin: 0; font: 800 clamp(20px, 3vw, 44px) var(--display); }
+.verdict.good { color: #7be3a6; }
+.verdict.miss { color: #ff9d92; }
 @keyframes pop { 40% { transform: scale(1.04); } }
 .note { text-align: center; font-size: clamp(18px, 2.4vw, 34px); margin: 0; overflow-wrap: anywhere; }
 a.lk { color: #8fe0ff; font-weight: 700; overflow-wrap: anywhere; }
@@ -571,13 +578,13 @@ $("startShow").onclick = () => {
   const quiz = quizzes.find(q => q.id === pick.id);
   if (!quiz) return;
   const p = playable(quiz);
-  S = { quiz: p, teams: pick.names.slice(0, pick.count).map((n, i) => n.trim() || `קבוצה ${i + 1}`), i: 0, phase: "intro", marks: p.questions.map(() => []) };
+  S = { quiz: p, teams: pick.names.slice(0, pick.count).map((n, i) => n.trim() || `קבוצה ${i + 1}`), i: 0, phase: "intro", marks: p.questions.map(() => []), picks: [] };
   $("show").hidden = false; fullscreen(true);
   enter();
 };
 
 // ---------- the stage: everything on it is drawn from S, a plain object that can be saved and restored ----------
-let S = null;       // { quiz, teams, i, phase: intro|question|reveal|final, marks: per question, the teams that were right }
+let S = null;       // { quiz, teams, i, phase: intro|question|reveal|final, marks: per question, the teams that were right, picks: per question, the answer chosen on screen }
 let countdown = null, pulse = null;
 const score = t => S.marks.reduce((n, m) => n + (m.includes(t) ? 1 : 0), 0);
 function stopClock() { clearInterval(countdown); clearInterval(pulse); countdown = pulse = null; }
@@ -621,8 +628,15 @@ function next() {
   } else return;
   enter();
 }
+// choosing an answer on screen reveals the right one, with the sound for how it went
+function choose(oi) {
+  if (S.phase !== "question" || !S.quiz.questions[S.i].options[oi]) return;
+  (S.picks = S.picks || [])[S.i] = oi; S.phase = "reveal";
+  enter(false);
+  sfx(S.quiz.pack, oi === S.quiz.questions[S.i].answer ? "right" : "wrong");
+}
 function back() {
-  if (S.phase === "reveal") S.phase = "question";
+  if (S.phase === "reveal") { S.phase = "question"; if (S.picks) S.picks[S.i] = null; }
   else if (S.phase === "question") { if (S.i > 0) { S.i--; S.phase = "reveal"; } else S.phase = "intro"; }
   else if (S.phase === "final") S.phase = "reveal";
   else return;
@@ -656,6 +670,7 @@ function toggleSound() {
 }
 function linkEl(url, text) { return el("a", { class: "lk", href: url, target: "_blank", rel: "noopener noreferrer" }, text); }
 function renderShow() {
+  const chosen = S.picks && S.picks[S.i] != null ? S.picks[S.i] : null;
   const { quiz, phase, i, teams } = S, ev = EVENTS[quiz.event], q = quiz.questions[i], total = quiz.questions.length, stage = $("show");
   stage.style.setProperty("--ev", ev.color);
   const top = el("div", { class: "bar" },
@@ -672,8 +687,12 @@ function renderShow() {
   }
   if (phase === "question" || phase === "reveal") {
     const shown = phase === "reveal";
-    mid.append(el("p", { class: "big" }, q.q), el("div", { class: "grid" }, ...q.options.map((o, oi) =>
-      el("div", { class: "ans" + (shown ? (oi === q.answer ? " yes" : " no") : "") }, el("b", {}, LETTERS[oi]), el("span", {}, o)))));
+    mid.append(el("p", { class: "big" }, q.q), el("div", { class: "grid" }, ...q.options.map((o, oi) => shown
+      ? el("div", { class: "ans" + (oi === q.answer ? " yes" : oi === chosen ? " bad" : " no") }, el("b", {}, LETTERS[oi]), el("span", {}, o))
+      : el("button", { class: "ans", type: "button", onclick: () => choose(oi) }, el("b", {}, LETTERS[oi]), el("span", {}, o)))));
+    if (shown && chosen != null) mid.append(chosen === q.answer
+      ? el("p", { class: "verdict good" }, "נכון!")
+      : el("p", { class: "verdict miss" }, `לא נכון. התשובה הנכונה: ${q.options[q.answer]}`));
     if (shown && q.note) mid.append(el("p", { class: "note" }, q.note));
     if (shown && q.link) mid.append(el("p", { class: "note" }, linkEl(q.link, "לקישור")));
   }
@@ -694,7 +713,7 @@ function renderShow() {
     el("button", { class: "team", type: "button", disabled: !reveal, ariaPressed: String(reveal && S.marks[i].includes(t)), onclick: () => toggleTeam(t) }, `${name}: ${score(t)}`))) : el("span");
   const acts = el("div", { class: "row" });
   if (reveal && teams.length) acts.append(el("button", { class: "act", type: "button", onclick: nobody }, "אף אחד לא צדק"));
-  if (reveal && !teams.length) acts.append(
+  if (reveal && !teams.length && chosen == null) acts.append(
     el("button", { class: "act", type: "button", onclick: () => sfx(quiz.pack, "right") }, "🎉 צדקו"),
     el("button", { class: "act", type: "button", onclick: () => sfx(quiz.pack, "wrong") }, "😬 טעו"));
   if (phase !== "intro" && phase !== "final") acts.append(el("button", { class: "act", type: "button", onclick: back }, "חזרה"));
@@ -702,6 +721,7 @@ function renderShow() {
   else acts.append(el("button", { class: "act main", type: "button", id: "nextBtn", onclick: next },
     phase === "intro" ? "מתחילים" : phase === "question" ? "חשיפת התשובה" : i + 1 < total ? "השאלה הבאה" : "לתוצאות"));
   const keys = reveal && teams.length ? "ספרות 1–" + teams.length + ": מי צדק · 0: אף אחד · רווח: הלאה · F: מסך מלא · M: השתקה"
+    : phase === "question" ? "ספרות 1–" + q.options.length + ": בחירת תשובה · רווח: חשיפה · F: מסך מלא · M: השתקה"
     : "רווח או PageDown: הלאה · PageUp: חזרה · F: מסך מלא · M: השתקה";
   stage.replaceChildren(top, mid, el("div", { class: "foot" }, chips, acts, el("div", { class: "keys" }, keys)));
 }
@@ -719,7 +739,8 @@ document.addEventListener("keydown", e => {
   else if (k === "m") toggleSound();
   else if (k === "0") nobody();
   else if (/^[1-8]$/.test(k)) {
-    if (S.teams.length) toggleTeam(+k - 1);
+    if (S.phase === "question") choose(+k - 1);
+    else if (S.teams.length) toggleTeam(+k - 1);
     else if (k === "1" && S.phase === "reveal") sfx(S.quiz.pack, "right");
   }
 });
