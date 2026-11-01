@@ -890,8 +890,9 @@ async function openBoard() {
   if (G.phase !== "question" && G.phase !== "done" || !G.q) { G.q = pickQuestion(); G.pick = null; G.phase = "question"; }
   showGame();
 }
+// opened with a fresh address each time: always the latest version, not a cached copy
 document.querySelectorAll('a[href="quiz.html"], a[href="kids.html"]').forEach(a => {
-  a.onclick = e => { e.preventDefault(); $("inner").src = a.getAttribute("href"); $("inner").hidden = false; };
+  a.onclick = e => { e.preventDefault(); $("inner").src = a.getAttribute("href") + "?v=" + Date.now(); $("inner").hidden = false; };
 });
 // kids mode comes back through #board while this page is still loaded under it
 window.addEventListener("hashchange", () => {
