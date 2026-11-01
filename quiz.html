@@ -399,12 +399,14 @@ function problem(q) {
   if (!q.options[q.answer].trim()) return "לא סומנה תשובה נכונה";
   return "";
 }
-// what the stage shows: finished questions only, without empty answer slots
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+// what the stage shows: finished questions only, without empty answer slots, answers in a new random order each show
 function playable(quiz) {
   const questions = quiz.questions.filter(isReady).map(q => {
     const options = []; let answer = 0;
     q.options.forEach((o, i) => { if (o.trim()) { if (i === q.answer) answer = options.length; options.push(o.trim()); } });
-    return { q: q.q.trim(), options, answer, note: q.note.trim(), link: safeUrl(q.link) };
+    const order = shuffle(options.map((_, i) => i));
+    return { q: q.q.trim(), options: order.map(i => options[i]), answer: order.indexOf(answer), note: q.note.trim(), link: safeUrl(q.link) };
   });
   return { title: quiz.title.trim() || "חידון", event: quiz.event, opening: quiz.opening.trim(), closing: quiz.closing.trim(), link: safeUrl(quiz.link), pack: quiz.pack, timer: quiz.timer, suspense: quiz.suspense, questions };
 }
