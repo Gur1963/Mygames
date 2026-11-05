@@ -95,6 +95,9 @@ svg.map { width: 100%; max-width: 680px; justify-self: center; height: auto; dis
 .map.picking .hex:not(.legal):not(.sel) { opacity: .5; }
 @media (hover: hover) { .hex.legal:hover polygon { stroke-width: 1.8; } }
 .side { display: grid; gap: 14px; }
+.map-alert { font: 800 clamp(17px, 2.6vw, 22px) var(--display); background: var(--accent); color: var(--accent-ink); padding: 10px 16px; border-radius: 10px; text-align: center; }
+@media (prefers-reduced-motion: no-preference) { .map-alert { animation: alertPulse 1.2s ease-in-out infinite; } }
+@keyframes alertPulse { 50% { opacity: .7; } }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; }
 .players { display: grid; gap: 6px; }
 .pl { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 8px; border: 2px solid transparent; }
@@ -173,6 +176,7 @@ svg.map { width: 100%; max-width: 680px; justify-self: center; height: auto; dis
 
   <section class="game" id="game" hidden>
     <div class="map-col">
+      <div class="map-alert" id="mapAlert" role="alert" hidden>בחרו משבצת מסומנת ליד יריב שתהפוך ל־❓</div>
       <svg class="map" id="map" viewBox="-62 -56 124 112" role="group" aria-label="מפת המשחק"></svg>
     </div>
     <div class="side">
@@ -496,6 +500,7 @@ function answer(oi) {
   if (ok && a.got < a.need) { G.phase = "between"; G.msg = `נכון! נשארו עוד ${a.need - a.got}.`; }
   else resolve(ok);
   save(); render();
+  if (G.phase === "convert") $("mapAlert").scrollIntoView({ block: "start", behavior: "smooth" });
 }
 function resolve(ok) {
   const a = G.act, i = G.sel, c = G.cells[i], me = G.turn, name = G.players[me].name;
@@ -587,6 +592,7 @@ function drawMap() {
 }
 function render() {
   drawMap();
+  $("mapAlert").hidden = G.phase !== "convert";
   const pick = isPick();
   $("players").innerHTML = G.players.map((p, i) => {
     const topic = pick ? `${DOMAINS[G.topics[i]].icon} ${DOMAINS[G.topics[i]].name} · ` : "";
