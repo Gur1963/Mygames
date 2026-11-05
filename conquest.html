@@ -164,10 +164,6 @@ svg.map { width: 100%; max-width: 680px; justify-self: center; height: auto; dis
       <p class="hint" id="levelHint"></p>
     </div>
     <div class="field">
-      <span class="lbl">אורך המשחק</span>
-      <div class="seg" id="rounds" role="group" aria-label="מספר סבבים"></div>
-    </div>
-    <div class="field">
       <span class="lbl">איך משחקים</span>
       <ul class="rules" id="rules"></ul>
     </div>
@@ -255,7 +251,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const any = a => a[Math.floor(Math.random() * a.length)];
 
-let setup = { mode: "pick", count: 2, names: ["", "", "", ""], topics: [0, 3, 2, 5], level: 4, rounds: 12 };
+let setup = { mode: "pick", count: 2, names: ["", "", "", ""], topics: [0, 3, 2, 5], level: 4 };
 let G = null;
 const bank = {};   // level -> questions
 
@@ -265,10 +261,10 @@ const RULES = {
     "כל שחקן בוחר נושא משלו. הלוח נבנה לפי הבחירות: המשבצות מחולקות לסירוגין בין הנושאים של השחקנים, וכל שחקן מתחיל בבירה בפינה.",
     "על כל משבצת שואלים שאלה בנושא שלה. משבצת בנושא שלך נוחה לך, ומשבצת בנושא של יריב תדרוש לענות בתחום שלו.",
     "בכל תור עושים פעולה אחת: <b>כיבוש</b> של משבצת ריקה שצמודה לשטח שלך, <b>התקפה</b> על משבצת של יריב שצמודה לשטח שלך, או <b>ביצור</b> של משבצת שלך.",
-    "<b>כל כיבוש עושה שני דברים:</b> המשבצת שכבשת הופכת לנושא שלך, ואתה בוחר משבצת ריקה ליד יריב שתהפוך ל־❓, נושא שנשאר על השולחן ואף אחד לא בחר. כך חוסמים את היריב.",
-    "<b>❓ משבצות לא ידועות:</b> השאלות בהן קשות בשתי רמות. ארבע משבצות ה־❓ שבמרכז שוות 2 נקודות כל אחת.",
+    "<b>כל כיבוש עושה שני דברים:</b> המשבצת שכבשת הופכת לנושא שלך, ואתה בוחר משבצת ריקה ליד יריב שתהפוך ל־❓. כך חוסמים את היריב.",
+    "<b>❓ משבצות לא ידועות:</b> שאלה ברמה 11, הקשה ביותר, מנושא מקרי מכל הנושאים. ארבע משבצות ה־❓ שבמרכז שוות 2 נקודות כל אחת.",
     "<b>כיבוש נועז:</b> שאלה קשה יותר, ואם עניתם נכון המשבצת מגיעה עם מגן 🛡️. כדי לכבוש משבצת של יריב צריך לענות נכון ברצף על שאלה אחת, ועוד אחת על כל מגן. התקפה שנכשלה מוסיפה מגן.",
-    "<b>ניקוד:</b> נקודה לכל משבצת, ו־2 לכל משבצת מרכז. בסוף הסבבים מנצח מי שצבר הכי הרבה.",
+    "<b>סוף המשחק:</b> משחקים עד שאין יותר משבצות ריקות. נקודה לכל משבצת ו־2 לכל משבצת מרכז, ומנצח מי שצבר הכי הרבה.",
   ],
   fixed: [
     "המפה מחולקת לשישה תחומי ידע. כל שחקן מתחיל במשבצת בירה אחת בפינה של המפה.",
@@ -276,7 +272,7 @@ const RULES = {
     "<b>כיבוש נועז:</b> שאלה קשה יותר, ואם עניתם נכון המשבצת מגיעה כבר מבוצרת.",
     "<b>הגנה:</b> כדי לכבוש משבצת של יריב צריך לענות נכון ברצף על שאלה אחת, ועוד שאלה על כל מגן 🛡️. התקפה שנכשלה מוסיפה למגינים מגן.",
     "<b>תחום שלם:</b> מי שמחזיק בכל שש המשבצות של תחום מקבל 2 נקודות בונוס, וכל המשבצות בתחום מקבלות מגן נוסף. מי שמחזיק שלושה תחומים שלמים מנצח מיד.",
-    "<b>ניקוד:</b> נקודה לכל משבצת, 2 לכל תחום שלם ו־2 על הפסגה ⭐ שבמרכז. בסוף הסבבים מנצח מי שצבר הכי הרבה.",
+    "<b>סוף המשחק:</b> משחקים עד שאין יותר משבצות ריקות. נקודה לכל משבצת, 2 לכל תחום שלם ו־2 על הפסגה ⭐ שבמרכז, ומנצח מי שצבר הכי הרבה.",
   ],
 };
 function seg(id, values, cur, set, label = v => v) {
@@ -292,11 +288,10 @@ function renderSetup() {
   seg("mode", ["pick", "fixed"], setup.mode, v => setup.mode = v, v => v === "pick" ? "נושאים לפי בחירה" : "מפה קבועה");
   seg("count", [2, 3, 4], setup.count, v => setup.count = v);
   seg("levels", Array.from({ length: MAX_LEVEL }, (_, i) => i + 1), setup.level, v => setup.level = v);
-  seg("rounds", [8, 12, 16], setup.rounds, v => setup.rounds = v, v => `${v} סבבים`);
   const pick = setup.mode === "pick";
   $("namesLbl").textContent = pick ? "שמות ונושאים" : "שמות";
   $("levelHint").textContent = pick
-    ? "כיבוש וביצור ברמה שבחרתם. התקפה קשה ממנה ברמה אחת, וכיבוש נועז ומשבצות ❓ קשים ממנה בשתי רמות."
+    ? "כיבוש וביצור ברמה שבחרתם. התקפה קשה ממנה ברמה אחת, וכיבוש נועז קשה ממנה בשתי רמות. משבצות ❓ תמיד ברמה 11."
     : "כיבוש וביצור ברמה שבחרתם. התקפה קשה ממנה ברמה אחת, וכיבוש נועז והפסגה קשים ממנה בשתי רמות.";
   $("rules").innerHTML = RULES[setup.mode].map(r => `<li>${r}</li>`).join("");
   const nm = $("names"); nm.innerHTML = "";
@@ -377,7 +372,7 @@ async function begin(fresh) {
       if (pick) cells[i].topic = topics[p];
     });
     G = {
-      mode: setup.mode, level: setup.level, rounds: setup.rounds, round: 1, turn: 0,
+      mode: setup.mode, level: setup.level, round: 1, turn: 0,
       topics: pick ? topics : null,
       left: pick ? DOMAINS.map((_, k) => k).filter(k => !topics.includes(k)) : null,
       players: Array.from({ length: n }, (_, i) => ({ name: (setup.names[i] || "").trim() || `שחקן ${i + 1}`, right: 0, asked: 0 })),
@@ -409,6 +404,7 @@ function savedGame() {
 
 // ---------- rules ----------
 const isPick = () => G.mode === "pick";
+const emptyLeft = () => G.cells.filter(c => c.owner === -1).length;
 const owned = p => G.cells.reduce((n, c) => n + (c.owner === p), 0);
 function domainOwner(d) {
   if (isPick()) return -1;
@@ -435,7 +431,7 @@ function actionsFor(i, p) {
   if (!touching && !landing) return [];
   if (c.owner === -1) {
     if (!isPick() && i === CENTER) return [{ kind: "summit", level: lv(G.level + 2), need: 1 }];
-    if (c.topic === MYSTERY) return [{ kind: "mystery", level: lv(G.level + 2), need: 1 }];
+    if (c.topic === MYSTERY) return [{ kind: "mystery", level: MAX_LEVEL, need: 1 }];
     return [{ kind: "conquer", level: G.level, need: 1 }, { kind: "bold", level: lv(G.level + 2), need: 1 }];
   }
   return [{ kind: "attack", level: lv(G.level + 1), need: defense(i) }];
@@ -451,7 +447,7 @@ const ACT_TEXT = {
   conquer: a => ["כיבוש", `שאלה אחת ברמה ${a.level}. תשובה נכונה והמשבצת שלך.`],
   bold: a => ["כיבוש נועז", `שאלה אחת ברמה ${a.level}. תשובה נכונה והמשבצת שלך, כבר עם מגן 🛡️.`],
   summit: a => ["כיבוש הפסגה", `שאלה אחת ברמה ${a.level} מתחום מקרי. הפסגה שווה 2 נקודות נוספות.`],
-  mystery: a => ["כיבוש משבצת ❓", `שאלה אחת ברמה ${a.level}, בנושא שאף אחד לא בחר.`],
+  mystery: a => ["כיבוש משבצת ❓", `שאלה אחת ברמה ${a.level}, מנושא מקרי, כל נושא אפשרי.`],
   attack: a => ["התקפה", `${a.need === 1 ? "שאלה אחת" : a.need + " שאלות ברצף"} ברמה ${a.level}. אם תיכשלו, המגינים יקבלו מגן נוסף.`],
   fortify: a => ["ביצור", `שאלה אחת ברמה ${a.level}. תשובה נכונה מוסיפה מגן 🛡️ (עד ${MAX_FORT}).`],
 };
@@ -484,7 +480,8 @@ function choose(i) {
 }
 function startAction(a) {
   const t = G.cells[G.sel].topic;
-  const dom = t >= 0 ? t : t === MYSTERY ? any(G.left) : Math.floor(Math.random() * DOMAINS.length);
+  // ❓ hexes and the summit draw from any topic
+  const dom = t >= 0 ? t : Math.floor(Math.random() * DOMAINS.length);
   G.act = { ...a, dom, got: 0, results: [] };
   G.q = pickQuestion(dom, a.level); G.pick = null; G.phase = "question";
   render();
@@ -537,9 +534,10 @@ function nextTurn() {
   G.turn = (G.turn + 1) % G.players.length;
   if (G.turn === 0) G.round++;
   G.sel = null; G.act = null; G.q = null; G.pick = null; G.msg = "";
-  if (G.round > G.rounds) {
+  // the game always plays the board to the end: it finishes once no hex is left empty
+  if (!emptyLeft()) {
     const best = G.players.map((_, p) => p).sort((x, y) => score(y) - score(x) || owned(y) - owned(x));
-    G.winner = best[0]; G.round = G.rounds; G.phase = "done";
+    G.winner = best[0]; G.phase = "done";
   } else G.phase = "pick";
 }
 $("nextBtn").onclick = () => {
@@ -598,12 +596,12 @@ function render() {
       <div><div class="nm2">${esc(p.name)}</div><div class="det">${topic}${owned(i)} משבצות${extra} · ${p.right}/${p.asked} נכונות</div></div>
       <span class="sc">${score(i)}</span></div>`;
   }).join("");
-  $("roundInfo").textContent = `סבב ${G.round} מתוך ${G.rounds} · רמה ${G.level}`;
+  $("roundInfo").textContent = `סבב ${G.round} · נשארו ${emptyLeft()} משבצות ריקות · רמה ${G.level}`;
   if (pick) {
     $("domTitle").textContent = "נושאים";
     $("domains").innerHTML = G.topics.map((t, p) =>
       `<div class="dom" style="background:color-mix(in srgb, ${COLORS[p]} 24%, var(--panel))"><span aria-hidden="true">${DOMAINS[t].icon}</span>${DOMAINS[t].name}<small>${esc(G.players[p].name)}</small></div>`).join("") +
-      `<div class="dom" style="background:var(--dc)"><span aria-hidden="true">❓</span>על השולחן: ${G.left.map(k => DOMAINS[k].icon).join(" ")}</div>`;
+      `<div class="dom" style="background:var(--dc)"><span aria-hidden="true">❓</span>שאלה ברמה 11 מנושא מקרי</div>`;
   } else {
     $("domTitle").textContent = "תחומים";
     $("domains").innerHTML = DOMAINS.map((d, k) => {
@@ -635,7 +633,7 @@ function render() {
     const c = document.createElement("button"); c.type = "button"; c.className = "btn ghost"; c.textContent = "בחירת משבצת אחרת";
     c.onclick = () => { G.sel = null; G.phase = "pick"; render(); };
     acts.appendChild(c);
-  } else if (G.phase === "convert") $("sub").textContent = "בחרו על המפה משבצת ריקה ליד יריב. היא תהפוך ל־❓, נושא שאף אחד לא בחר, ויהיה קשה לכבוש אותה.";
+  } else if (G.phase === "convert") $("sub").textContent = "בחרו על המפה משבצת ריקה ליד יריב. היא תהפוך ל־❓: מי שירצה לכבוש אותה יקבל שאלה ברמה 11 מנושא מקרי.";
   else $("sub").textContent = G.act ? ACT_TEXT[G.act.kind](G.act)[0] : "";
 
   // question
