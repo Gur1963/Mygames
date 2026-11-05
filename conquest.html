@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>כיבוש</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Territory game: a hex map split into six knowledge domains; answer questions to take, attack and fortify hexes */
+:root {
+  --bg: #eef3f2; --panel: #fbfdfc; --ink: #17282a; --muted: #5a6e70; --line: #cfdcda;
+  --accent: #0e6a6a; --accent-ink: #ffffff;
+  --good: #1d7a46; --good-soft: #def2e5; --bad: #b3261e; --bad-soft: #f8e2df;
+  --p1: #d64545; --p2: #2f6fd6; --p3: #d89b00; --p4: #2e9a5a;
+  --d0: #eadfcb; --d1: #d6e3f1; --d2: #d8ebd3; --d3: #eedaE6; --d4: #f0e8c8; --d5: #d3e9e7; --dc: #f3eee0;
+  --hexline: #9fb3b1;
+  --display: "Rubik", "Segoe UI", Arial, sans-serif;
+  --body: "Assistant", "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101818; --panel: #172222; --ink: #e3eeec; --muted: #94a9a8; --line: #2b3b3a;
+    --accent: #4fc2bd; --accent-ink: #0d1a1a;
+    --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d;
+    --p1: #e05a5a; --p2: #4f86e8; --p3: #e0b030; --p4: #44b070;
+    --d0: #3a3226; --d1: #243246; --d2: #263a26; --d3: #3a2836; --d4: #3a3620; --d5: #213a38; --dc: #34302a;
+    --hexline: #4a5e5c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101818; --panel: #172222; --ink: #e3eeec; --muted: #94a9a8; --line: #2b3b3a;
+  --accent: #4fc2bd; --accent-ink: #0d1a1a;
+  --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d;
+  --p1: #e05a5a; --p2: #4f86e8; --p3: #e0b030; --p4: #44b070;
+  --d0: #3a3226; --d1: #243246; --d2: #263a26; --d3: #3a2836; --d4: #3a3620; --d5: #213a38; --dc: #34302a;
+  --hexline: #4a5e5c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5; direction: rtl; }
+.wrap {
+  max-width: 1180px; margin: 0 auto; padding-block: 16px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(24px, 4.5vw, 34px); margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 18px; margin: 0; }
+.back { color: var(--accent); font-weight: 700; text-decoration: none; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible, .hex:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn {
+  font: 700 16px var(--body); padding: 10px 20px; border-radius: 8px; cursor: pointer;
+  border: 2px solid var(--accent); background: var(--accent); color: var(--accent-ink);
+}
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: default; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.err { color: var(--bad); font-weight: 600; margin: 0; }
+.hint { color: var(--muted); font-size: 14px; margin: 0; }
+
+/* setup */
+.setup { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px; display: grid; gap: 22px; max-width: 680px; }
+.field { display: grid; gap: 10px; }
+.lbl { font-weight: 700; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button {
+  min-width: 44px; padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--line);
+  background: transparent; cursor: pointer; font-family: var(--display); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.names { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.nm { display: flex; align-items: center; gap: 8px; }
+.nm input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+.chip { width: 16px; height: 16px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--line); }
+.rules { margin: 0; padding-inline-start: 20px; display: grid; gap: 4px; }
+.rules b { font-weight: 700; }
+
+/* game */
+.game { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .game { grid-template-columns: 1fr; } }
+.map-col { display: grid; gap: 10px; min-width: 0; }
+svg.map { width: 100%; max-width: 680px; justify-self: center; height: auto; display: block; }
+.hex polygon { stroke: var(--hexline); stroke-width: .6; }
+.hex text { pointer-events: none; text-anchor: middle; dominant-baseline: central; }
+.hex .ico { font-size: 6.4px; }
+.hex .fort { font-size: 3.6px; }
+.hex.legal { cursor: pointer; }
+.hex.legal polygon { stroke: var(--ink); stroke-width: 1.1; stroke-dasharray: 2 1.2; }
+.hex.sel polygon { stroke: var(--accent); stroke-width: 1.8; stroke-dasharray: none; }
+.map.picking .hex:not(.legal):not(.sel) { opacity: .5; }
+@media (hover: hover) { .hex.legal:hover polygon { stroke-width: 1.8; } }
+.side { display: grid; gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; }
+.players { display: grid; gap: 6px; }
+.pl { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 8px; border: 2px solid transparent; }
+.pl.now { border-color: var(--accent); }
+.pl .nm2 { font-weight: 700; }
+.pl .det { color: var(--muted); font-size: 13px; }
+.pl .sc { font: 800 22px var(--display); font-variant-numeric: tabular-nums; }
+.domains { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; font-size: 14px; }
+.dom { display: flex; gap: 6px; align-items: center; padding: 4px 8px; border-radius: 6px; }
+.dom small { color: var(--muted); margin-inline-start: auto; }
+.who { font: 800 20px var(--display); }
+.sub { color: var(--muted); }
+.acts { display: grid; gap: 8px; }
+.act { text-align: start; padding: 10px 12px; border-radius: 10px; border: 2px solid var(--line); background: transparent; cursor: pointer; display: grid; gap: 2px; }
+.act:hover { border-color: var(--accent); }
+.act b { font: 700 16px var(--display); }
+.act span { color: var(--muted); font-size: 14px; }
+.qhead { display: flex; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 14px; }
+.qhead .tag { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 1px 8px; }
+.qtext { font: 700 19px var(--display); margin: 0; }
+.opts { display: grid; gap: 8px; }
+.opt { text-align: start; padding: 10px 14px; border-radius: 10px; border: 2px solid var(--line); background: var(--bg); cursor: pointer; font-weight: 600; }
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--good); background: var(--good-soft); }
+.opt.wrong { border-color: var(--bad); background: var(--bad-soft); }
+.progress { display: flex; gap: 6px; }
+.progress i { width: 26px; height: 8px; border-radius: 4px; background: var(--line); }
+.progress i.ok { background: var(--good); }
+.progress i.no { background: var(--bad); }
+.fb { padding: 10px 12px; border-radius: 10px; font-weight: 600; }
+.fb.ok { background: var(--good-soft); }
+.fb.no { background: var(--bad-soft); }
+.more summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+.more p { margin: 6px 0 0; }
+.win { text-align: center; justify-items: center; }
+.trophy { font-size: 56px; line-height: 1; }
+.big { font: 800 24px var(--display); }
+.rank { display: grid; gap: 4px; width: 100%; max-width: 360px; }
+.rank div { display: flex; justify-content: space-between; gap: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>כיבוש</h1>
+    <a class="back" href="index.html" target="_top">← לתפריט</a>
+  </div>
+  <p class="err" id="crash" hidden></p>
+
+  <section class="setup" id="setup">
+    <div class="field">
+      <span class="lbl">מספר שחקנים</span>
+      <div class="seg" id="count" role="group" aria-label="מספר שחקנים"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">שמות</span>
+      <div class="names" id="names"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">רמת קושי</span>
+      <div class="seg" id="levels" role="group" aria-label="רמת קושי"></div>
+      <p class="hint">כיבוש וביצור ברמה שבחרתם. התקפה קשה ממנה ברמה אחת, וכיבוש נועז והפסגה קשים ממנה בשתי רמות.</p>
+    </div>
+    <div class="field">
+      <span class="lbl">אורך המשחק</span>
+      <div class="seg" id="rounds" role="group" aria-label="מספר סבבים"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">איך משחקים</span>
+      <ul class="rules">
+        <li>המפה מחולקת לשישה תחומי ידע. כל שחקן מתחיל במשבצת בירה אחת בפינה של המפה.</li>
+        <li>בכל תור עושים פעולה אחת: <b>כיבוש</b> של משבצת ריקה שצמודה לשטח שלך, <b>התקפה</b> על משבצת של יריב שצמודה לשטח שלך, או <b>ביצור</b> של משבצת שלך. השאלה תמיד מהתחום של המשבצת.</li>
+        <li><b>כיבוש נועז:</b> שאלה קשה יותר, ואם עניתם נכון המשבצת מגיעה כבר מבוצרת.</li>
+        <li><b>הגנה:</b> כדי לכבוש משבצת של יריב צריך לענות נכון ברצף על שאלה אחת, ועוד שאלה על כל מגן 🛡️. התקפה שנכשלה מוסיפה למגינים מגן.</li>
+        <li><b>תחום שלם:</b> מי שמחזיק בכל שש המשבצות של תחום מקבל 2 נקודות בונוס, וכל המשבצות בתחום מקבלות מגן נוסף. מי שמחזיק שלושה תחומים שלמים מנצח מיד.</li>
+        <li><b>ניקוד:</b> נקודה לכל משבצת, 2 לכל תחום שלם ו-2 על הפסגה ⭐ שבמרכז. בסוף הסבבים מנצח מי שצבר הכי הרבה.</li>
+      </ul>
+    </div>
+    <p class="err" id="loadErr" hidden></p>
+    <div class="row"><button class="btn" id="resumeBtn" type="button" hidden>המשך המשחק</button><button class="btn" id="startBtn" type="button">התחלת משחק</button></div>
+  </section>
+
+  <section class="game" id="game" hidden>
+    <div class="map-col">
+      <svg class="map" id="map" viewBox="-62 -56 124 112" role="group" aria-label="מפת המשחק"></svg>
+    </div>
+    <div class="side">
+      <div class="card">
+        <div class="players" id="players"></div>
+        <div class="row"><span class="hint" id="roundInfo"></span></div>
+        <div class="row"><button class="btn ghost" id="newBtn" type="button">משחק חדש</button></div>
+      </div>
+
+      <div class="card" id="turnCard">
+        <div class="who" id="who"></div>
+        <div class="sub" id="sub"></div>
+        <div class="acts" id="acts"></div>
+      </div>
+
+      <div class="card" id="qCard" hidden>
+        <div class="qhead" id="qHead"></div>
+        <div class="progress" id="progress"></div>
+        <p class="qtext" id="qText"></p>
+        <div class="opts" id="qOpts"></div>
+        <div class="fb" id="fb" hidden></div>
+        <details class="more" id="more" open hidden><summary>הרחבה: עוד על הנושא</summary><p id="moreText"></p></details>
+        <div><button class="btn" id="nextBtn" type="button" hidden></button></div>
+      </div>
+
+      <div class="card win" id="winCard" hidden>
+        <div class="trophy" aria-hidden="true">🏆</div>
+        <div class="big" id="winText"></div>
+        <div class="rank" id="rank"></div>
+        <div><button class="btn" id="againBtn" type="button">משחק חדש</button></div>
+      </div>
+
+      <div class="card">
+        <h2>תחומים</h2>
+        <div class="domains" id="domains"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// ---------- map: a hexagon of radius 3; the centre is the summit, each of six wedges is one domain ----------
+const DOMAINS = [
+  { name: "היסטוריה וישראל", icon: "🏛️", cats: ["היסטוריה", "ישראל"] },
+  { name: "מדע וטכנולוגיה", icon: "🔬", cats: ["מדע", "טכנולוגיה", "מתמטיקה"] },
+  { name: "טבע וגוף האדם", icon: "🌿", cats: ["טבע", "גוף האדם"] },
+  { name: "מוזיקה ואמנות", icon: "🎵", cats: ["מוזיקה", "אמנות", "קולנוע", "טלוויזיה"] },
+  { name: "ספר ומסורת", icon: "📜", cats: ["ספרות", "שפה", 'תנ"ך', "יהדות"] },
+  { name: "עולם ופנאי", icon: "🌍", cats: ["גאוגרפיה", "ספורט", "אוכל", "כללי"] },
+];
+const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+const RADIUS = 3, MAX_LEVEL = 11, MAX_FORT = 2, WIN_DOMAINS = 3;
+const HEXES = [{ q: 0, r: 0, dom: -1 }];
+for (let k = 1; k <= RADIUS; k++) {
+  let q = DIRS[4][0] * k, r = DIRS[4][1] * k;
+  for (let i = 0; i < 6; i++) for (let j = 0; j < k; j++) {
+    HEXES.push({ q, r, dom: i, corner: k === RADIUS && j === 0 ? i : undefined });
+    q += DIRS[i][0]; r += DIRS[i][1];
+  }
+}
+const KEY = new Map(HEXES.map((h, i) => [h.q + "," + h.r, i]));
+const NEIGH = HEXES.map(h => DIRS.map(([dq, dr]) => KEY.get((h.q + dq) + "," + (h.r + dr))).filter(i => i !== undefined));
+const CENTER = 0;
+// players start in opposite or spread corners of the outer ring
+const STARTS = { 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4] };
+const COLORS = ["var(--p1)", "var(--p2)", "var(--p3)", "var(--p4)"];
+const SAVE_KEY = "conquest-v1";
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const any = a => a[Math.floor(Math.random() * a.length)];
+
+let setup = { count: 2, names: ["", "", "", ""], level: 4, rounds: 12 };
+let G = null;
+const bank = {};   // level -> questions
+
+// ---------- setup ----------
+function seg(id, values, cur, set, label = v => v) {
+  const el = $(id); el.innerHTML = "";
+  for (const v of values) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = label(v);
+    b.setAttribute("aria-pressed", v === cur);
+    b.onclick = () => { set(v); renderSetup(); };
+    el.appendChild(b);
+  }
+}
+function renderSetup() {
+  seg("count", [2, 3, 4], setup.count, v => setup.count = v);
+  seg("levels", Array.from({ length: MAX_LEVEL }, (_, i) => i + 1), setup.level, v => setup.level = v);
+  seg("rounds", [8, 12, 16], setup.rounds, v => setup.rounds = v, v => `${v} סבבים`);
+  const nm = $("names"); nm.innerHTML = "";
+  for (let i = 0; i < setup.count; i++) {
+    const row = document.createElement("div"); row.className = "nm";
+    row.innerHTML = `<span class="chip" style="background:${COLORS[i]}"></span><input maxlength="16" aria-label="שם שחקן ${i + 1}">`;
+    const inp = row.querySelector("input"); inp.value = setup.names[i];
+    inp.oninput = () => { setup.names[i] = inp.value; };
+    nm.appendChild(row);
+  }
+  const saved = savedGame();
+  $("resumeBtn").hidden = !saved;
+  $("startBtn").textContent = saved ? "משחק חדש (המשחק השמור יימחק)" : "התחלת משחק";
+  $("startBtn").className = saved ? "btn ghost" : "btn";
+}
+async function loadBank() {
+  const need = [];
+  for (let l = 1; l <= MAX_LEVEL; l++) if (!bank[l]) need.push(l);
+  await Promise.all(need.map(async l => {
+    const r = await fetch(`questions/level-${String(l).padStart(2, "0")}.json`);
+    if (!r.ok) throw new Error(l);
+    // follow-ups and clock-face questions need extra context, so this game skips them
+    bank[l] = (await r.json()).questions.filter(q => !q.parent && !q.clock && !q.face);
+  }));
+}
+async function begin(fresh) {
+  $("loadErr").hidden = true;
+  try { await loadBank(); }
+  catch (e) {
+    $("loadErr").textContent = "לא הצלחתי לטעון את קובצי השאלות מהתיקייה questions.";
+    $("loadErr").hidden = false; return;
+  }
+  if (fresh) {
+    const cells = HEXES.map(() => ({ owner: -1, fort: 0 }));
+    STARTS[setup.count].forEach((corner, p) => {
+      const i = HEXES.findIndex(h => h.corner === corner);
+      cells[i] = { owner: p, fort: 1 };
+    });
+    G = {
+      level: setup.level, rounds: setup.rounds, round: 1, turn: 0,
+      players: Array.from({ length: setup.count }, (_, i) => ({ name: (setup.names[i] || "").trim() || `שחקן ${i + 1}`, right: 0, asked: 0 })),
+      cells, used: [], phase: "pick", sel: null, act: null, q: null, msg: "", winner: null
+    };
+  } else {
+    G = savedGame();
+    // a question that was open when the page closed is drawn again rather than answered twice
+    if (G.phase === "question" || G.phase === "between") { G.phase = "pick"; G.sel = null; G.act = null; G.q = null; }
+    if (G.phase === "result") nextTurn();
+  }
+  $("setup").hidden = true; $("game").hidden = false;
+  render();
+}
+$("startBtn").onclick = () => begin(true);
+$("resumeBtn").onclick = () => begin(false);
+$("newBtn").onclick = () => { if (G.phase === "done" || confirm("להתחיל משחק חדש? המשחק הנוכחי יימחק.")) newGame(); };
+$("againBtn").onclick = newGame;
+function newGame() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+  G = null; $("game").hidden = true; $("setup").hidden = false; renderSetup(); scrollTo(0, 0);
+}
+function save() {
+  try { if (G.phase === "done") localStorage.removeItem(SAVE_KEY); else localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) {}
+}
+function savedGame() {
+  try { const g = JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); return g && g.cells && g.phase !== "done" ? g : null; } catch (e) { return null; }
+}
+
+// ---------- rules ----------
+const owned = p => G.cells.reduce((n, c) => n + (c.owner === p), 0);
+function domainOwner(d) {
+  const idx = HEXES.map((h, i) => h.dom === d ? i : -1).filter(i => i >= 0);
+  const o = G.cells[idx[0]].owner;
+  return o >= 0 && idx.every(i => G.cells[i].owner === o) ? o : -1;
+}
+const domainsOf = p => DOMAINS.filter((_, d) => domainOwner(d) === p).length;
+const score = p => owned(p) + 2 * domainsOf(p) + (G.cells[CENTER].owner === p ? 2 : 0);
+// questions an attacker must answer in a row: one, plus one per shield, plus one if the whole domain is held
+function defense(i) {
+  const c = G.cells[i], d = HEXES[i].dom;
+  return Math.min(4, 1 + c.fort + (d >= 0 && domainOwner(d) === c.owner ? 1 : 0));
+}
+const lv = n => Math.max(1, Math.min(MAX_LEVEL, n));
+// the actions open to player p on hex i
+function actionsFor(i, p) {
+  const c = G.cells[i];
+  if (c.owner === p) return c.fort < MAX_FORT ? [{ kind: "fortify", level: G.level, need: 1 }] : [];
+  const touching = NEIGH[i].some(n => G.cells[n].owner === p);
+  // a player wiped off the map lands again on any empty hex
+  const landing = owned(p) === 0 && c.owner === -1 && i !== CENTER;
+  if (!touching && !landing) return [];
+  if (c.owner === -1) {
+    if (i === CENTER) return [{ kind: "summit", level: lv(G.level + 2), need: 1 }];
+    return [{ kind: "conquer", level: G.level, need: 1 }, { kind: "bold", level: lv(G.level + 2), need: 1 }];
+  }
+  return [{ kind: "attack", level: lv(G.level + 1), need: defense(i) }];
+}
+const ACT_TEXT = {
+  conquer: a => ["כיבוש", `שאלה אחת ברמה ${a.level}. תשובה נכונה והמשבצת שלך.`],
+  bold: a => ["כיבוש נועז", `שאלה אחת ברמה ${a.level}. תשובה נכונה והמשבצת שלך, כבר עם מגן 🛡️.`],
+  summit: a => ["כיבוש הפסגה", `שאלה אחת ברמה ${a.level} מתחום מקרי. הפסגה שווה 2 נקודות נוספות.`],
+  attack: a => ["התקפה", `${a.need === 1 ? "שאלה אחת" : a.need + " שאלות ברצף"} ברמה ${a.level}. אם תיכשלו, המגינים יקבלו מגן נוסף.`],
+  fortify: a => ["ביצור", `שאלה אחת ברמה ${a.level}. תשובה נכונה מוסיפה מגן 🛡️ (עד ${MAX_FORT}).`],
+};
+
+function pickQuestion(dom, level) {
+  const cats = DOMAINS[dom].cats;
+  // the nearest level that still has an unused question in this domain
+  for (const pass of [0, 1]) {
+    for (const off of [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, 6, -6, 7, -7, 8, -8, 9, -9, 10, -10]) {
+      const l = level + off; if (l < 1 || l > MAX_LEVEL) continue;
+      const pool = bank[l].filter(q => cats.includes(q.cat) && !G.used.includes(q.id));
+      if (pool.length) {
+        const q = any(pool); G.used.push(q.id);
+        return { id: q.id, level: l, cat: q.cat, q: q.q, options: q.options, answer: q.answer, explain: q.explain || "", expansion: q.expansion || "", order: shuffle([0, 1, 2, 3]) };
+      }
+    }
+    // every question in the domain was asked: start over on it
+    G.used = G.used.filter(id => !Object.values(bank).some(b => b.some(q => q.id === id && cats.includes(q.cat))));
+  }
+}
+
+// ---------- turn flow ----------
+function choose(i) {
+  if (G.phase !== "pick" && G.phase !== "confirm") return;
+  if (!actionsFor(i, G.turn).length) return;
+  G.sel = i; G.phase = "confirm"; render();
+  // on a phone the choice appears below the map
+  $("turnCard").scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+function startAction(a) {
+  const i = G.sel, d = HEXES[i].dom;
+  G.act = { ...a, dom: d >= 0 ? d : Math.floor(Math.random() * DOMAINS.length), got: 0, results: [] };
+  G.q = pickQuestion(G.act.dom, a.level); G.pick = null; G.phase = "question";
+  render();
+  $("qCard").scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+function answer(oi) {
+  if (G.phase !== "question") return;
+  const p = G.players[G.turn], ok = oi === G.q.answer, a = G.act;
+  G.pick = oi; p.asked++; if (ok) p.right++;
+  a.results.push(ok);
+  if (ok) a.got++;
+  if (ok && a.got < a.need) { G.phase = "between"; G.msg = `נכון! נשארו עוד ${a.need - a.got}.`; }
+  else { resolve(ok); }
+  save(); render();
+}
+function resolve(ok) {
+  const a = G.act, i = G.sel, c = G.cells[i], me = G.turn, name = G.players[me].name;
+  if (ok) {
+    if (a.kind === "fortify") { c.fort++; G.msg = `נכון! המשבצת קיבלה מגן, ויש לה עכשיו ${c.fort}.`; }
+    else {
+      const prev = c.owner;
+      G.cells[i] = { owner: me, fort: a.kind === "bold" ? 1 : 0 };
+      G.msg = prev >= 0 ? `נכון! ${name} כבש משבצת מ${G.players[prev].name}.` : a.kind === "summit" ? `נכון! ${name} על הפסגה.` : "נכון! המשבצת שלך.";
+      const d = HEXES[i].dom;
+      if (d >= 0 && domainOwner(d) === me) G.msg += ` התחום "${DOMAINS[d].name}" כולו שלך!`;
+    }
+  } else if (a.kind === "attack") {
+    c.fort = Math.min(MAX_FORT, c.fort + 1);
+    G.msg = `לא נכון. ההגנה של ${G.players[c.owner].name} החזיקה, והמשבצת קיבלה מגן.`;
+  } else G.msg = "לא נכון. התור עובר.";
+  G.lastOk = ok;
+  if (domainsOf(me) >= WIN_DOMAINS) { G.winner = me; G.phase = "done"; G.msg += ` שלושה תחומים שלמים: ${name} מנצח!`; return; }
+  G.phase = "result";
+}
+function nextQuestion() {
+  G.q = pickQuestion(G.act.dom, G.act.level); G.pick = null; G.phase = "question"; render();
+}
+function nextTurn() {
+  G.turn = (G.turn + 1) % G.players.length;
+  if (G.turn === 0) G.round++;
+  G.sel = null; G.act = null; G.q = null; G.pick = null; G.msg = "";
+  if (G.round > G.rounds) {
+    const best = G.players.map((_, p) => p).sort((x, y) => score(y) - score(x) || owned(y) - owned(x));
+    G.winner = best[0]; G.round = G.rounds; G.phase = "done";
+  } else G.phase = "pick";
+}
+$("nextBtn").onclick = () => {
+  if (G.phase === "between") nextQuestion();
+  else if (G.phase === "result") { nextTurn(); save(); render(); $("turnCard").scrollIntoView({ block: "nearest" }); }
+};
+
+// ---------- drawing ----------
+const SIZE = 10, SQ3 = Math.sqrt(3);
+const center = h => [SIZE * SQ3 * (h.q + h.r / 2), SIZE * 1.5 * h.r];
+const corners = (x, y) => Array.from({ length: 6 }, (_, k) => {
+  const a = Math.PI / 180 * (60 * k - 30);
+  return `${(x + SIZE * .97 * Math.cos(a)).toFixed(2)},${(y + SIZE * .97 * Math.sin(a)).toFixed(2)}`;
+}).join(" ");
+function drawMap() {
+  const svg = $("map"), picking = G.phase === "pick" || G.phase === "confirm";
+  svg.classList.toggle("picking", picking);
+  svg.innerHTML = HEXES.map((h, i) => {
+    const [x, y] = center(h), c = G.cells[i];
+    const legal = picking && actionsFor(i, G.turn).length > 0;
+    const fill = c.owner >= 0 ? COLORS[c.owner] : h.dom >= 0 ? `var(--d${h.dom})` : "var(--dc)";
+    const icon = h.dom >= 0 ? DOMAINS[h.dom].icon : "⭐";
+    const shields = defenseIcons(i);
+    const label = `${h.dom >= 0 ? DOMAINS[h.dom].name : "הפסגה"}, ${c.owner >= 0 ? "של " + G.players[c.owner].name : "ריקה"}${c.fort ? `, ${c.fort} מגנים` : ""}`;
+    return `<g class="hex${legal ? " legal" : ""}${G.sel === i ? " sel" : ""}" data-i="${i}" ${legal ? 'tabindex="0" role="button"' : ""} aria-label="${esc(label)}">
+      <polygon points="${corners(x, y)}" fill="${fill}"/>
+      <text class="ico" x="${x.toFixed(2)}" y="${(y - (shields ? 1.4 : 0)).toFixed(2)}">${icon}</text>
+      ${shields ? `<text class="fort" x="${x.toFixed(2)}" y="${(y + 5).toFixed(2)}">${shields}</text>` : ""}
+    </g>`;
+  }).join("");
+  svg.querySelectorAll(".hex.legal").forEach(g => {
+    const i = +g.dataset.i;
+    g.onclick = () => choose(i);
+    g.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choose(i); } };
+  });
+}
+function defenseIcons(i) {
+  const c = G.cells[i]; if (c.owner < 0) return "";
+  return "🛡️".repeat(defense(i) - 1);
+}
+function render() {
+  drawMap();
+  // players
+  $("players").innerHTML = G.players.map((p, i) => `<div class="pl${i === G.turn && G.phase !== "done" ? " now" : ""}">
+      <span class="chip" style="background:${COLORS[i]}"></span>
+      <div><div class="nm2">${esc(p.name)}</div><div class="det">${owned(i)} משבצות · ${domainsOf(i)} תחומים${G.cells[CENTER].owner === i ? " · ⭐ פסגה" : ""} · ${p.right}/${p.asked} נכונות</div></div>
+      <span class="sc">${score(i)}</span></div>`).join("");
+  $("roundInfo").textContent = `סבב ${G.round} מתוך ${G.rounds} · רמה ${G.level}`;
+  $("domains").innerHTML = DOMAINS.map((d, k) => {
+    const o = domainOwner(k);
+    return `<div class="dom" style="background:var(--d${k})"><span aria-hidden="true">${d.icon}</span>${d.name}${o >= 0 ? `<small style="color:${COLORS[o]};font-weight:700">${esc(G.players[o].name)}</small>` : ""}</div>`;
+  }).join("");
+
+  const p = G.players[G.turn], done = G.phase === "done";
+  $("turnCard").hidden = done; $("winCard").hidden = !done;
+  $("who").innerHTML = `<span class="chip" style="display:inline-block;background:${COLORS[G.turn]};margin-inline-end:8px"></span>התור של ${esc(p.name)}`;
+  const acts = $("acts"); acts.innerHTML = "";
+  if (G.phase === "pick") {
+    $("sub").textContent = "בחרו משבצת מסומנת על המפה: ריקה לכיבוש, של יריב להתקפה, או שלכם לביצור.";
+    if (!HEXES.some((_, i) => actionsFor(i, G.turn).length)) {
+      $("sub").textContent = "אין לך מהלך אפשרי בתור הזה.";
+      const s = document.createElement("button"); s.type = "button"; s.className = "btn"; s.textContent = "דילוג על התור";
+      s.onclick = () => { nextTurn(); render(); };
+      acts.appendChild(s);
+    }
+  }
+  else if (G.phase === "confirm") {
+    const h = HEXES[G.sel];
+    $("sub").textContent = h.dom >= 0 ? `משבצת בתחום ${DOMAINS[h.dom].name}. מה עושים?` : "הפסגה שבמרכז המפה. מה עושים?";
+    for (const a of actionsFor(G.sel, G.turn)) {
+      const [t, s] = ACT_TEXT[a.kind](a);
+      const b = document.createElement("button"); b.type = "button"; b.className = "act";
+      b.innerHTML = `<b>${t}</b><span>${s}</span>`; b.onclick = () => startAction(a);
+      acts.appendChild(b);
+    }
+    const c = document.createElement("button"); c.type = "button"; c.className = "btn ghost"; c.textContent = "בחירת משבצת אחרת";
+    c.onclick = () => { G.sel = null; G.phase = "pick"; render(); };
+    acts.appendChild(c);
+  } else $("sub").textContent = G.act ? ACT_TEXT[G.act.kind](G.act)[0] : "";
+
+  // question
+  const showQ = G.q && ["question", "between", "result"].includes(G.phase) || (done && G.q);
+  $("qCard").hidden = !showQ;
+  if (showQ) {
+    const q = G.q, a = G.act;
+    $("qHead").innerHTML = `<span class="tag">${DOMAINS[a.dom].icon} ${esc(q.cat)}</span><span class="tag">רמה ${q.level}</span><span class="tag">${ACT_TEXT[a.kind](a)[0]}</span>`;
+    $("progress").hidden = a.need < 2;
+    $("progress").innerHTML = Array.from({ length: a.need }, (_, k) => `<i class="${a.results[k] === true ? "ok" : a.results[k] === false ? "no" : ""}"></i>`).join("");
+    $("qText").textContent = q.q;
+    const answered = G.phase !== "question";
+    $("qOpts").innerHTML = "";
+    for (const oi of q.order) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "opt"; b.textContent = q.options[oi];
+      if (answered) {
+        b.disabled = true;
+        if (oi === q.answer) b.classList.add("right");
+        else if (oi === G.pick) b.classList.add("wrong");
+      } else b.onclick = () => answer(oi);
+      $("qOpts").appendChild(b);
+    }
+    $("fb").hidden = !answered;
+    if (answered) {
+      const ok = G.pick === q.answer;
+      $("fb").className = "fb " + (ok ? "ok" : "no");
+      $("fb").textContent = G.msg + (ok ? "" : ` התשובה הנכונה: ${q.options[q.answer]}.`) + (q.explain ? " " + q.explain : "");
+    }
+    $("more").hidden = !answered || !q.expansion;
+    $("moreText").textContent = q.expansion;
+    $("nextBtn").hidden = !answered || done;
+    $("nextBtn").textContent = G.phase === "between" ? "לשאלה הבאה" : "התור הבא";
+  }
+
+  if (done) {
+    $("winText").textContent = `${G.players[G.winner].name} ניצח!`;
+    const order = G.players.map((_, i) => i).sort((x, y) => (y === G.winner) - (x === G.winner) || score(y) - score(x));
+    $("rank").innerHTML = order.map((i, k) => `<div><span>${k + 1}. ${esc(G.players[i].name)}</span><b>${score(i)} נק'</b></div>`).join("");
+  }
+  save();
+}
+
+window.addEventListener("error", e => {
+  const box = $("crash");
+  box.textContent = "משהו השתבש במשחק. המצב נשמר, ורענון של הדף ימשיך מאותה נקודה. פרטים לתיקון: " + (e.message || e.error);
+  box.hidden = false;
+});
+renderSetup();
+</script>
+</body>
+</html>

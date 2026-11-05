@@ -79,7 +79,7 @@ a.btn { display: inline-block; text-decoration: none; }
 /* computer screens: the menu fills the page */
 @media (min-width: 861px) {
   .wrap:has(#menu:not([hidden])) > h1 { text-align: center; font-size: clamp(34px, 3.4vw, 54px); margin-block: 2vh 3vh; }
-  .menu { max-width: none; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .menu { max-width: none; grid-template-columns: repeat(3, 1fr); gap: 28px; }
   .door { min-height: 62vh; justify-content: center; gap: 14px; border-radius: 22px; }
   .door i { font-size: clamp(90px, 9vw, 150px); }
   .door b { font-size: clamp(32px, 3vw, 48px); }
@@ -232,6 +232,7 @@ svg.over { position: absolute; inset: 0; width: 100%; height: 100%; pointer-even
   <section class="menu" id="menu">
     <button class="door" id="goBoard" type="button"><i aria-hidden="true">🐍</i><b>סולמות ונחשים</b><span id="boardNote"></span></button>
     <a class="door" href="quiz.html"><i aria-hidden="true">🎬</i><b>חידון אישי</b><span>כותבים שאלות משלכם ומקרינים אותן</span></a>
+    <a class="door" href="conquest.html"><i aria-hidden="true">🗺️</i><b>כיבוש</b><span>משחק אסטרטגיה: כובשים תחומי ידע על המפה</span></a>
   </section>
 
   <section class="setup" id="setup" hidden>
@@ -891,7 +892,7 @@ async function openBoard() {
   showGame();
 }
 // opened with a fresh address each time: always the latest version, not a cached copy
-document.querySelectorAll('a[href="quiz.html"], a[href="kids.html"]').forEach(a => {
+document.querySelectorAll('a[href="quiz.html"], a[href="kids.html"], a[href="conquest.html"]').forEach(a => {
   a.onclick = e => { e.preventDefault(); $("inner").src = a.getAttribute("href") + "?v=" + Date.now(); $("inner").hidden = false; };
 });
 // kids mode comes back through #board while this page is still loaded under it
