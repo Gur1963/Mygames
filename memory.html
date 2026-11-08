@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Assistant:wght@400;600;700&display=swap">
 <style>
 /* Memory card game. Pairs are identical or "smart" (two things that go together),
-   and optional special cards peek, shuffle or act as a joker. */
+   and optional special cards give a peek (wave / sparkle / flash) or shuffle some closed cards. */
 :root {
   --bg: #f1f0f7; --panel: #fcfcfe; --ink: #1d1b2c; --muted: #625f78; --line: #d6d4e3;
   --accent: #5b3fc4; --accent-ink: #ffffff;
@@ -68,16 +68,17 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
 .pl b { font: 800 18px var(--display); font-variant-numeric: tabular-nums; }
 .pl.now { border-color: var(--pc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc) 25%, transparent); }
 .status { font: 700 16px var(--display); color: var(--muted); margin-inline-start: auto; }
-.board-area { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
-.grid { --cols: 4; --rows: 4; display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: clamp(6px, 1.2vw, 12px);
-  width: min(100%, calc((100vh - 190px) * var(--cols) / var(--rows) * .78)); min-width: 200px; }
-.card { aspect-ratio: 4 / 5; perspective: 800px; border: 0; padding: 0; background: none; cursor: pointer; border-radius: 12px; }
+.board-area { flex: 1; display: flex; align-items: flex-start; justify-content: center; min-height: 0; }
+/* columns, card width (--cw) and gap are set by layout() to fit the window */
+.grid { --cols: 4; --cw: 100px; --gap: 10px; display: grid; grid-template-columns: repeat(var(--cols), var(--cw)); gap: var(--gap); }
+.card { width: var(--cw); aspect-ratio: 4 / 5; perspective: 800px; border: 0; padding: 0; background: none; cursor: pointer; border-radius: calc(var(--cw) * .12); }
 .card .in { position: relative; width: 100%; height: 100%; transition: transform .45s; transform-style: preserve-3d; }
-.card.up .in, .card.done .in { transform: rotateY(180deg); }
-.card .f, .card .b { position: absolute; inset: 0; border-radius: 12px; backface-visibility: hidden; display: grid; place-items: center; }
-.card .b { background: repeating-linear-gradient(45deg, var(--back1) 0 10px, var(--back2) 10px 20px); box-shadow: 0 2px 6px rgb(0 0 0 / .18); }
-.card .b::after { content: "?"; font: 800 clamp(20px, 4vw, 40px) var(--display); color: rgb(255 255 255 / .55); }
-.card .f { background: var(--face); border: 2px solid var(--line); transform: rotateY(180deg); font-size: clamp(26px, 6vw, 64px); line-height: 1; }
+.grid.quick .card .in { transition-duration: .22s; }
+.card.up .in, .card.done .in, .card.peek .in { transform: rotateY(180deg); }
+.card .f, .card .b { position: absolute; inset: 0; border-radius: inherit; backface-visibility: hidden; display: grid; place-items: center; }
+.card .b { background: repeating-linear-gradient(45deg, var(--back1) 0 calc(var(--cw) * .1), var(--back2) 0 calc(var(--cw) * .2)); box-shadow: 0 2px 6px rgb(0 0 0 / .18); }
+.card .b::after { content: "?"; font: 800 calc(var(--cw) * .36) var(--display); color: rgb(255 255 255 / .55); }
+.card .f { background: var(--face); border: 2px solid var(--line); transform: rotateY(180deg); font-size: calc(var(--cw) * .58); line-height: 1; }
 .card.done .f { border-color: var(--pc, var(--good)); background: color-mix(in srgb, var(--pc, var(--good)) 14%, var(--face)); }
 .card.done { cursor: default; }
 @media (prefers-reduced-motion: reduce) { .card .in { transition: none; } }
@@ -88,6 +89,7 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
 @media (prefers-reduced-motion: no-preference) {
   .card.moved .in { animation: wig .6s ease-in-out 2; }
   .card.got .in { animation: pop .5s ease-out; }
+  .card.got.peek .in, .card.moved.peek .in { animation: none; }
 }
 @keyframes wig { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
 @keyframes pop { 50% { transform: rotateY(180deg) scale(1.12); } }
@@ -150,22 +152,26 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
 <script>
 const $ = id => document.getElementById(id);
 const COLORS = ["var(--p1)", "var(--p2)", "var(--p3)", "var(--p4)"];
-const SIZES = [{ n: 12, cols: 4, rows: 3, label: "קטן · 12" }, { n: 16, cols: 4, rows: 4, label: "בינוני · 16" },
-               { n: 20, cols: 5, rows: 4, label: "גדול · 20" }, { n: 30, cols: 6, rows: 5, label: "ענק · 30" }];
+// board sizes in pairs; special cards come on top of these (sp = how many of each kind)
+const SIZES = [{ pairs: 6, sp: 1, label: "קטן · 6 זוגות" }, { pairs: 10, sp: 1, label: "בינוני · 10 זוגות" },
+               { pairs: 15, sp: 2, label: "גדול · 15 זוגות" }, { pairs: 24, sp: 2, label: "ענק · 24 זוגות" },
+               { pairs: 50, sp: 4, label: "מפלצת · 50 זוגות" }];
 const KINDS = [{ id: "same", label: "זוגות זהים", hint: "מחפשים שני קלפים זהים." },
                { id: "smart", label: "זוגות חכמים", hint: "מחפשים שני קלפים שהולכים יחד: 🔑 עם 🔒, 🐝 עם 🍯, 🐛 עם 🦋. צריך לזכור וגם לחשוב." }];
 const SPECIALS = [{ id: false, label: "בלי" }, { id: true, label: "עם קלפים מיוחדים" }];
-const SPECIAL_HINT = "🔍 הצצה: כל הקלפים נפתחים לרגע.  🌀 ערבוב: כמה קלפים סגורים מחליפים מקום.  🃏 ג'וקר: מתאים לכל קלף, ומקבלים את הזוג שלו.  קלף 🔍 או 🌀 לא מסיים את התור: ממשיכים להפוך.";
-const SAME = "🦁🐘🦒🐢🐙🦋🐝🦉🐧🦊🐸🐳🦓🦜🐌🦔🍉🍋🍇🍓🥑🍕🧁🍩🌵🌻🍄⭐🌈🔥⚽🎸🎈🚀⛵🚲🎩👑🔑⏰💡🎲🧩🪁🏰🗿🎻🧸".match(/\p{Extended_Pictographic}/gu);
+const SPECIAL_HINT = "🔍 הצצה: הקלפים מתהפכים לרגע ונסגרים, כל פעם בצורה אחרת (גל, נצנוץ, הבזק).  🌀 ערבוב: כמה קלפים סגורים מחליפים מקום.  קלף מיוחד לא מסיים את התור: ממשיכים להפוך.";
+const SAME = "🦁🐘🦒🐢🐙🦋🐝🦉🐧🦊🐸🐳🦓🦜🐌🦔🍉🍋🍇🍓🥑🍕🧁🍩🌵🌻🍄⭐🌈🔥⚽🎸🎈🚀⛵🚲🎩👑🔑⏰💡🎲🧩🪁🏰🗿🎻🧸🐼🐨🦄🐞🦀🐬🍒🌽🍦🎁🛸🚁🎺🥁🎯🧲🌙🍀🦩🦚".match(/\p{Extended_Pictographic}/gu);
 // related pairs; no emoji appears twice, and none sits too close to another pair
 const SMART = [["🔑", "🔒"], ["🐝", "🍯"], ["🐄", "🥛"], ["🐑", "🧶"], ["🌧️", "☂️"], ["⚽", "🥅"], ["🪡", "🧵"], ["🖌️", "🎨"],
   ["🐒", "🍌"], ["🐰", "🥕"], ["🐶", "🦴"], ["🦷", "🪥"], ["🪛", "🔩"], ["🧦", "👟"], ["🚀", "🌕"], ["⛵", "🌊"],
   ["🍿", "🎬"], ["📮", "✉️"], ["🌱", "🌳"], ["🐛", "🦋"], ["🔦", "🔋"], ["🥣", "🥄"], ["❄️", "⛄"], ["💍", "💒"],
-  ["🐣", "🥚"], ["🏹", "🎯"], ["🎂", "🕯️"], ["🧲", "📎"]];
-// special cards per board size (kept even so the regular cards still make whole pairs)
-const SP_SET = { 12: ["peek", "joker"], 16: ["peek", "shuffle", "joker", "peek"], 20: ["peek", "shuffle", "joker", "peek"], 30: ["peek", "shuffle", "joker", "peek", "shuffle", "joker"] };
-const SP_FACE = { peek: "🔍", shuffle: "🌀", joker: "🃏" };
-const LS = "memory-setup-v2";
+  ["🐣", "🥚"], ["🏹", "🎯"], ["🧲", "📎"], ["🐼", "🎋"], ["🐿️", "🌰"], ["🕷️", "🕸️"], ["🎣", "🐟"], ["✂️", "📄"],
+  ["🚗", "⛽"], ["✈️", "🧳"], ["🎹", "🎼"], ["📷", "🖼️"], ["🧽", "🧼"], ["🌋", "🔥"], ["🐸", "🦟"], ["🦁", "👑"],
+  ["🦉", "🌙"], ["🐫", "🏜️"], ["🐭", "🧀"], ["🐓", "🌅"], ["🕎", "🍩"], ["🍷", "🍇"], ["🍞", "🧈"], ["🍝", "🍅"],
+  ["🍔", "🍟"], ["🥜", "🐘"], ["🧊", "🥤"], ["👓", "📖"], ["⏰", "🛏️"], ["🧤", "🧣"], ["🎁", "🎀"], ["🪁", "🌬️"],
+  ["🚂", "🛤️"], ["🔭", "⭐"], ["🧭", "🗺️"], ["🩺", "❤️"], ["🏰", "👸"]];
+const SP_FACE = { peek: "🔍", shuffle: "🌀" };
+const LS = "memory-setup-v3";
 
 let setup = { count: 2, names: ["", "", "", ""], size: 1, kind: "same", special: true };
 try { Object.assign(setup, JSON.parse(localStorage.getItem(LS) || "{}")); } catch (e) {}
@@ -220,8 +226,8 @@ function renderSetup() {
 }
 
 function deal() {
-  const S = SIZES[setup.size], sps = setup.special ? SP_SET[S.n] : [], pairs = (S.n - sps.length) / 2;
-  const cards = [];
+  const S = SIZES[setup.size], pairs = S.pairs, cards = [];
+  const sps = setup.special ? Array.from({ length: S.sp }, () => ["peek", "shuffle"]).flat() : [];
   if (setup.kind === "smart") shuffle([...SMART]).slice(0, pairs).forEach((p, k) => p.forEach(f => cards.push({ f, k })));
   else shuffle([...SAME]).slice(0, pairs).forEach((f, k) => cards.push({ f, k }, { f, k }));
   sps.forEach((sp, i) => cards.push({ f: SP_FACE[sp], k: "sp" + i, sp }));
@@ -230,12 +236,10 @@ function deal() {
 
 function start() {
   try { localStorage.setItem(LS, JSON.stringify(setup)); } catch (e) {}
-  const S = SIZES[setup.size];
   G = { cards: deal(), players: Array.from({ length: setup.count }, (_, i) => ({ name: nameOf(i), pairs: 0 })),
-        turn: 0, open: [], lock: false, moves: 0, peek: false };
+        turn: 0, open: [], lock: false, moves: 0, peekSet: new Set(), peekStyle: -1 };
   $("setup").hidden = true; $("game").hidden = false; $("newBtn").hidden = false; $("msg").textContent = "";
   const grid = $("grid");
-  grid.style.setProperty("--cols", S.cols); grid.style.setProperty("--rows", S.rows);
   grid.innerHTML = "";
   G.cards.forEach((c, i) => {
     const b = document.createElement("button");
@@ -244,8 +248,26 @@ function start() {
     b.onclick = () => flip(i);
     grid.append(b);
   });
-  render();
+  render(); layout();
 }
+
+// picks the column count that gives the biggest cards in the space left under the bar
+function layout() {
+  if (!G) return;
+  const grid = $("grid"), n = G.cards.length, area = grid.parentElement;
+  const W = area.clientWidth, H = Math.max(160, innerHeight - area.getBoundingClientRect().top - 30);
+  const gap = n > 60 ? 4 : n > 30 ? 6 : 10;
+  let best = { cw: 0, cols: 4 };
+  for (let cols = 2; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols);
+    const cw = Math.min((W - gap * (cols - 1)) / cols, ((H - gap * (rows - 1)) / rows) * .8);
+    if (cw > best.cw) best = { cw, cols };
+  }
+  grid.style.setProperty("--cols", best.cols);
+  grid.style.setProperty("--cw", Math.floor(best.cw) + "px");
+  grid.style.setProperty("--gap", gap + "px");
+}
+addEventListener("resize", layout);
 
 // ---------- play ----------
 function say(text, ms = 2200) {
@@ -257,9 +279,10 @@ function render() {
     `<span class="pl${i === G.turn ? " now" : ""}" style="--pc:${COLORS[i]}"><i></i>${esc(p.name)} <b>${p.pairs}</b></span>`).join("") +
     `<span class="status">${G.players.length === 1 ? `מהלכים: ${G.moves}` : `התור של ${esc(G.players[G.turn].name)}`}</span>`;
   [...$("grid").children].forEach((el, i) => {
-    const c = G.cards[i], shown = c.up || c.owner !== -1 || (G.peek && !c.sp);
+    const c = G.cards[i], shown = c.up || c.owner !== -1;
     el.querySelector(".f").textContent = c.f;
     el.classList.toggle("up", shown);
+    el.classList.toggle("peek", G.peekSet.has(i));
     el.classList.toggle("done", c.owner >= 0);
     el.classList.toggle("used", c.owner === -2);
     el.classList.toggle("sp", !!c.sp && c.owner === -1);
@@ -281,8 +304,7 @@ async function flip(i) {
     await sleep(500);
     c.owner = -2; c.up = false;
     if (c.sp === "peek") {
-      sMagic(); say("🔍 הצצה! כל הקלפים נפתחים לרגע…", 2600);
-      G.peek = true; render(); await sleep(1600); G.peek = false;
+      await peek();
     } else {
       const pick = shuffle(closedRegular()).slice(0, 6);
       if (pick.length > 1) {
@@ -301,7 +323,6 @@ async function flip(i) {
   G.moves++; G.lock = true;
   const [a, b] = G.open.map(k => G.cards[k]);
   await sleep(550);
-  if (a.sp === "joker" || b.sp === "joker") return jokerPair(a, b);
   if (a.k === b.k) {
     sPair();
     if (setup.kind === "smart") say(`${a.f} הולך עם ${b.f}`);
@@ -311,17 +332,35 @@ async function flip(i) {
   sMiss(); a.up = b.up = false; G.open = []; G.turn = (G.turn + 1) % G.players.length; G.lock = false; render();
 }
 
-// a joker takes the other card and that card's partner, wherever it is on the board
-async function jokerPair(a, b) {
-  const other = a.sp === "joker" ? b : a;
-  const idx = [...G.open];
-  if (other.sp !== "joker") {
-    const twin = G.cards.findIndex(c => c !== other && c.k === other.k && c.owner === -1);
-    if (twin >= 0) { G.cards[twin].up = true; idx.push(twin); render(); await sleep(700); }
-    say(`🃏 ג'וקר! קיבלת את ${other.f} ואת בן הזוג שלו`, 2600);
-  } else say("🃏🃏 שני ג'וקרים! זוג בשבילך", 2400);
-  sMagic();
-  take(idx);
+// Peek: the closed cards flip open and shut again, each one for a moment, in one of
+// three patterns, never the same pattern twice in a row:
+//   wave    a sweep across the board, column by column
+//   sparkle random cards blink open in a quick scattered order
+//   flash   everything opens at once, briefly
+const PEEKS = [
+  { id: "wave", text: "🔍 הצצה בגל! הקלפים מתהפכים לאורך הלוח" },
+  { id: "sparkle", text: "🔍 הצצה מנצנצת! קלפים נפתחים ונסגרים בפיזור" },
+  { id: "flash", text: "🔍 הבזק! הכול נפתח לרגע קצר" }];
+async function peek() {
+  let s; do s = Math.random() * PEEKS.length | 0; while (s === G.peekStyle); G.peekStyle = s;
+  const P = PEEKS[s], idx = closedRegular(), cols = +$("grid").style.getPropertyValue("--cols") || 4;
+  sMagic(); say(P.text, 3000);
+  const plan = [];   // [card index, open at ms, open for ms]
+  if (P.id === "wave") {
+    const step = Math.max(70, Math.min(200, 1500 / cols));
+    idx.forEach(i => plan.push([i, (i % cols) * step + Math.floor(i / cols) * 25, 950]));
+  } else if (P.id === "sparkle") {
+    const gap = Math.max(25, Math.min(160, 2000 / idx.length));
+    shuffle([...idx]).forEach((i, n) => plan.push([i, n * gap, 750]));
+  } else idx.forEach(i => plan.push([i, 0, 1000]));
+  $("grid").classList.add("quick");
+  const end = Math.max(0, ...plan.map(([, t, d]) => t + d));
+  plan.forEach(([i, t, d]) => {
+    setTimeout(() => { G.peekSet.add(i); render(); }, t);
+    setTimeout(() => { G.peekSet.delete(i); render(); }, t + d);
+  });
+  await sleep(end + 300);
+  G.peekSet.clear(); $("grid").classList.remove("quick");
 }
 
 function take(idx) {
