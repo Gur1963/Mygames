@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>זיכרון</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Memory card game. Flip two cards; a pair is yours. In question mode a found pair
+   must be earned with a trivia question from the bank, or it goes back face down. */
+:root {
+  --bg: #f1f0f7; --panel: #fcfcfe; --ink: #1d1b2c; --muted: #625f78; --line: #d6d4e3;
+  --accent: #5b3fc4; --accent-ink: #ffffff;
+  --back1: #5b3fc4; --back2: #7d63e0; --face: #ffffff;
+  --good: #1d7a46; --good-soft: #def2e5; --bad: #b3261e; --bad-soft: #f8e2df;
+  --p1: #d64545; --p2: #2f6fd6; --p3: #c98f00; --p4: #2e9a5a;
+  --display: "Rubik", "Segoe UI", Arial, sans-serif;
+  --body: "Assistant", "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13121c; --panel: #1c1a28; --ink: #e8e6f3; --muted: #a29fba; --line: #312e44;
+    --accent: #a08cf5; --accent-ink: #15121f; --back1: #4a33a8; --back2: #6a52cc; --face: #26233a;
+    --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d;
+    --p1: #e05a5a; --p2: #4f86e8; --p3: #e0b030; --p4: #44b070; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13121c; --panel: #1c1a28; --ink: #e8e6f3; --muted: #a29fba; --line: #312e44;
+  --accent: #a08cf5; --accent-ink: #15121f; --back1: #4a33a8; --back2: #6a52cc; --face: #26233a;
+  --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d;
+  --p1: #e05a5a; --p2: #4f86e8; --p3: #e0b030; --p4: #44b070; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5; direction: rtl; }
+.wrap {
+  max-width: 1100px; margin: 0 auto; padding-block: 12px 24px; min-height: 100%;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 10px;
+}
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(22px, 4vw, 32px); margin: 0; }
+.back { color: var(--accent); font-weight: 700; text-decoration: none; }
+button, input { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn { font: 700 16px var(--body); padding: 10px 20px; border-radius: 8px; cursor: pointer; border: 2px solid var(--accent); background: var(--accent); color: var(--accent-ink); }
+.btn.ghost { background: transparent; color: var(--accent); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* setup */
+.setup { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px; display: grid; gap: 20px; max-width: 720px; width: 100%; align-self: center; }
+.field { display: grid; gap: 8px; }
+.lbl { font: 700 15px var(--display); }
+.hint { color: var(--muted); font-size: 14px; margin: 0; }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button { min-width: 44px; padding: 8px 14px; border-radius: 8px; border: 2px solid var(--line); background: transparent; cursor: pointer; font-family: var(--display); font-weight: 700; }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.names { display: grid; gap: 8px; }
+.names input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--line); background: var(--bg); border-inline-start: 6px solid var(--pc); }
+
+/* game */
+.bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pl { display: flex; align-items: center; gap: 8px; padding: 4px 12px; border-radius: 999px; border: 2px solid transparent; background: var(--panel); font-weight: 700; }
+.pl i { width: 12px; height: 12px; border-radius: 50%; background: var(--pc); }
+.pl b { font: 800 18px var(--display); font-variant-numeric: tabular-nums; }
+.pl.now { border-color: var(--pc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc) 25%, transparent); }
+.status { font: 700 16px var(--display); color: var(--muted); margin-inline-start: auto; }
+.board-area { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
+.grid { --cols: 4; --rows: 4; display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: clamp(6px, 1.2vw, 12px);
+  width: min(100%, calc((100vh - 150px) * var(--cols) / var(--rows) * .78)); min-width: 200px; }
+.card { aspect-ratio: 4 / 5; perspective: 800px; border: 0; padding: 0; background: none; cursor: pointer; border-radius: 12px; }
+.card .in { position: relative; width: 100%; height: 100%; transition: transform .45s; transform-style: preserve-3d; }
+.card.up .in, .card.done .in { transform: rotateY(180deg); }
+.card .f, .card .b { position: absolute; inset: 0; border-radius: 12px; backface-visibility: hidden; display: grid; place-items: center; }
+.card .b { background: repeating-linear-gradient(45deg, var(--back1) 0 10px, var(--back2) 10px 20px); box-shadow: 0 2px 6px rgb(0 0 0 / .18); }
+.card .b::after { content: "?"; font: 800 clamp(20px, 4vw, 40px) var(--display); color: rgb(255 255 255 / .55); }
+.card .f { background: var(--face); border: 2px solid var(--line); transform: rotateY(180deg); font-size: clamp(26px, 6vw, 64px); line-height: 1; }
+.card.done .f { border-color: var(--pc, var(--good)); background: color-mix(in srgb, var(--pc, var(--good)) 14%, var(--face)); }
+.card.done { cursor: default; }
+@media (prefers-reduced-motion: reduce) { .card .in { transition: none; } }
+
+/* question / end dialog */
+.veil { position: fixed; inset: 0; background: rgb(10 8 20 / .55); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.dlg { background: var(--panel); border-radius: 14px; padding: 20px; width: min(640px, 100%); max-height: calc(100vh - 32px); overflow: auto; display: grid; gap: 12px; }
+.dlg h2 { font: 800 20px var(--display); margin: 0; }
+.qhead { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 14px; flex-wrap: wrap; }
+.qhead .tag { border: 1px solid var(--line); border-radius: 6px; padding: 1px 8px; }
+.qtext { font: 700 clamp(18px, 2.6vw, 22px) var(--display); margin: 0; }
+.opts { display: grid; gap: 8px; }
+.opt { text-align: start; padding: 10px 14px; border-radius: 10px; border: 2px solid var(--line); background: var(--bg); cursor: pointer; font-weight: 600; }
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--good); background: var(--good-soft); }
+.opt.wrong { border-color: var(--bad); background: var(--bad-soft); }
+.verdict { font: 800 18px var(--display); margin: 0; }
+.verdict.ok { color: var(--good); } .verdict.no { color: var(--bad); }
+details { color: var(--muted); } summary { cursor: pointer; color: var(--accent); font-weight: 700; }
+.rank { display: grid; gap: 6px; }
+.rank .pl { justify-content: space-between; }
+.big { font-size: 56px; text-align: center; line-height: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>🃏 זיכרון</h1>
+    <div class="row">
+      <button class="btn ghost" id="newBtn" type="button" hidden>משחק חדש</button>
+      <a class="back" href="index.html" target="_top">← לתפריט</a>
+    </div>
+  </div>
+
+  <section class="setup" id="setup">
+    <div class="field">
+      <span class="lbl">מספר שחקנים</span>
+      <div class="seg" id="count"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">שמות</span>
+      <div class="names" id="names"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">גודל הלוח</span>
+      <div class="seg" id="size"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">סוג משחק</span>
+      <div class="seg" id="mode"></div>
+      <p class="hint" id="modeHint"></p>
+    </div>
+    <div class="field" id="levelField">
+      <span class="lbl">רמת השאלות</span>
+      <div class="seg" id="level"></div>
+    </div>
+    <div class="row"><button class="btn" id="startBtn" type="button">התחלת משחק</button></div>
+    <p class="hint" id="loadErr" hidden></p>
+  </section>
+
+  <section id="game" hidden style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">
+    <div class="bar" id="bar"></div>
+    <div class="board-area"><div class="grid" id="grid"></div></div>
+  </section>
+</div>
+
+<div class="veil" id="veil" hidden><div class="dlg" id="dlg" role="dialog" aria-modal="true"></div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const COLORS = ["var(--p1)", "var(--p2)", "var(--p3)", "var(--p4)"];
+const SIZES = [{ n: 12, cols: 4, rows: 3, label: "קטן · 12" }, { n: 16, cols: 4, rows: 4, label: "בינוני · 16" },
+               { n: 20, cols: 5, rows: 4, label: "גדול · 20" }, { n: 30, cols: 6, rows: 5, label: "ענק · 30" }];
+const MODES = [{ id: "quiz", label: "זיכרון + שאלות", hint: "מצאתם זוג? עונים על שאלה. תשובה נכונה: הזוג שלכם ותור נוסף. טעות: הקלפים חוזרים הפוך ללוח, והתור עובר." },
+               { id: "classic", label: "זיכרון קלאסי", hint: "בלי שאלות: כל זוג שמוצאים שלכם, ומקבלים תור נוסף." }];
+const EMOJI = "🦁🐘🦒🐢🐙🦋🐝🦉🐧🦊🐸🐳🦓🦜🐌🦔🍉🍋🍇🍓🥑🍕🧁🍩🌵🌻🍄⭐🌈🔥⚽🎸🎈🚀⛵🚲🎩👑🔑⏰💡🎲🧩🪁🏰🗿🎻🧸".match(/\p{Extended_Pictographic}/gu);
+const LS = "memory-setup-v1";
+
+let setup = { count: 2, names: ["", "", "", ""], size: 1, mode: "quiz", level: 4 };
+try { Object.assign(setup, JSON.parse(localStorage.getItem(LS) || "{}")); } catch (e) {}
+let G = null;
+const bank = {};
+
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const nameOf = i => setup.names[i].trim() || `שחקן ${i + 1}`;
+
+// ---------- sound ----------
+let ac = null;
+function beep(freqs, dur = .12, type = "sine") {
+  try {
+    ac ||= new AudioContext();
+    freqs.forEach((f, i) => {
+      const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + i * dur;
+      o.type = type; o.frequency.value = f; g.gain.setValueAtTime(.12, t); g.gain.exponentialRampToValueAtTime(.001, t + dur * .95);
+      o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur);
+    });
+  } catch (e) {}
+}
+const sFlip = () => beep([520], .06, "triangle"), sPair = () => beep([660, 880], .1), sGood = () => beep([523, 659, 784], .11),
+      sBad = () => beep([300, 220], .16, "sawtooth");
+
+// ---------- setup ----------
+function seg(el, items, current, pick) {
+  el.innerHTML = "";
+  items.forEach(it => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = it.label; b.setAttribute("aria-pressed", it.value === current);
+    b.onclick = () => { pick(it.value); renderSetup(); };
+    el.append(b);
+  });
+}
+function renderSetup() {
+  seg($("count"), [1, 2, 3, 4].map(n => ({ label: n, value: n })), setup.count, v => setup.count = v);
+  $("names").innerHTML = "";
+  for (let i = 0; i < setup.count; i++) {
+    const inp = document.createElement("input");
+    inp.placeholder = `שחקן ${i + 1}`; inp.value = setup.names[i]; inp.maxLength = 16;
+    inp.style.setProperty("--pc", COLORS[i]); inp.setAttribute("aria-label", `שם שחקן ${i + 1}`);
+    inp.oninput = () => { setup.names[i] = inp.value; };
+    $("names").append(inp);
+  }
+  seg($("size"), SIZES.map((s, i) => ({ label: s.label, value: i })), setup.size, v => setup.size = v);
+  seg($("mode"), MODES.map(m => ({ label: m.label, value: m.id })), setup.mode, v => setup.mode = v);
+  $("modeHint").textContent = MODES.find(m => m.id === setup.mode).hint;
+  $("levelField").hidden = setup.mode !== "quiz";
+  seg($("level"), Array.from({ length: 11 }, (_, i) => ({ label: i + 1, value: i + 1 })), setup.level, v => setup.level = v);
+}
+
+async function loadLevel(l) {
+  if (bank[l]) return bank[l];
+  const r = await fetch(`questions/level-${String(l).padStart(2, "0")}.json`);
+  if (!r.ok) throw new Error(r.status);
+  const d = await r.json();
+  return bank[l] = shuffle(d.questions.filter(q => !q.parent));
+}
+
+async function start() {
+  try { localStorage.setItem(LS, JSON.stringify(setup)); } catch (e) {}
+  $("loadErr").hidden = true;
+  if (setup.mode === "quiz") {
+    try { await loadLevel(setup.level); }
+    catch (e) { $("loadErr").textContent = "לא הצלחתי לטעון את השאלות. אפשר לשחק במצב קלאסי."; $("loadErr").hidden = false; return; }
+  }
+  const S = SIZES[setup.size], faces = shuffle([...EMOJI]).slice(0, S.n / 2);
+  G = {
+    cards: shuffle([...faces, ...faces].map(f => ({ f, up: false, owner: -1 }))),
+    players: Array.from({ length: setup.count }, (_, i) => ({ name: nameOf(i), pairs: 0, right: 0, wrong: 0 })),
+    turn: 0, open: [], lock: false, moves: 0, qi: 0
+  };
+  $("setup").hidden = true; $("game").hidden = false; $("newBtn").hidden = false;
+  const grid = $("grid");
+  grid.style.setProperty("--cols", S.cols); grid.style.setProperty("--rows", S.rows);
+  grid.innerHTML = "";
+  G.cards.forEach((c, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "card"; b.setAttribute("aria-label", "קלף הפוך");
+    b.innerHTML = `<div class="in"><div class="b"></div><div class="f">${c.f}</div></div>`;
+    b.onclick = () => flip(i);
+    grid.append(b);
+  });
+  render();
+}
+
+// ---------- play ----------
+function render() {
+  const bar = $("bar");
+  bar.innerHTML = G.players.map((p, i) =>
+    `<span class="pl${i === G.turn ? " now" : ""}" style="--pc:${COLORS[i]}"><i></i>${esc(p.name)} <b>${p.pairs}</b></span>`).join("") +
+    `<span class="status">${G.players.length === 1 ? `מהלכים: ${G.moves}` : `התור של ${esc(G.players[G.turn].name)}`}</span>`;
+  [...$("grid").children].forEach((el, i) => {
+    const c = G.cards[i];
+    el.classList.toggle("up", c.up);
+    el.classList.toggle("done", c.owner >= 0);
+    if (c.owner >= 0) el.style.setProperty("--pc", COLORS[c.owner]); else el.style.removeProperty("--pc");
+    el.setAttribute("aria-label", c.up || c.owner >= 0 ? c.f : "קלף הפוך");
+    el.disabled = c.owner >= 0;
+  });
+}
+
+function flip(i) {
+  const c = G.cards[i];
+  if (G.lock || c.up || c.owner >= 0) return;
+  c.up = true; G.open.push(i); sFlip(); render();
+  if (G.open.length < 2) return;
+  G.moves++; G.lock = true;
+  const [a, b] = G.open.map(k => G.cards[k]);
+  if (a.f === b.f) {
+    sPair();
+    setTimeout(() => setup.mode === "quiz" ? askQuestion() : takePair(), 550);
+  } else {
+    setTimeout(() => { a.up = b.up = false; G.open = []; nextTurn(); G.lock = false; render(); }, 1100);
+  }
+}
+
+function takePair() {
+  G.open.forEach(k => { G.cards[k].owner = G.turn; G.cards[k].up = false; });
+  G.players[G.turn].pairs++; G.open = []; G.lock = false; render();
+  if (G.cards.every(c => c.owner >= 0)) setTimeout(finish, 600);
+}
+function nextTurn() { G.turn = (G.turn + 1) % G.players.length; }
+
+function askQuestion() {
+  const list = bank[setup.level], q = list[G.qi++ % list.length];
+  const order = shuffle([0, 1, 2, 3]);
+  const p = G.players[G.turn];
+  $("dlg").innerHTML = `
+    <div class="qhead"><span>${G.cards[G.open[0]].f}${G.cards[G.open[0]].f} מצאת זוג, ${esc(p.name)}! עכשיו הוא צריך להיות שלך:</span>
+      <span class="tag">${esc(q.cat || "")}</span><span class="tag">רמה ${setup.level}</span></div>
+    <p class="qtext">${esc(q.q)}</p>
+    <div class="opts">${order.map(k => `<button type="button" class="opt" data-k="${k}">${esc(q.options[k])}</button>`).join("")}</div>
+    <div id="after" hidden></div>`;
+  $("veil").hidden = false;
+  $("dlg").querySelector(".opt").focus();
+  $("dlg").querySelectorAll(".opt").forEach(btn => btn.onclick = () => answer(q, +btn.dataset.k));
+}
+
+function answer(q, k) {
+  const ok = k === 0, p = G.players[G.turn];
+  $("dlg").querySelectorAll(".opt").forEach(b => {
+    b.disabled = true;
+    if (+b.dataset.k === 0) b.classList.add("right"); else if (+b.dataset.k === k) b.classList.add("wrong");
+  });
+  ok ? (sGood(), p.right++) : (sBad(), p.wrong++);
+  const more = q.expansion || q.explain;
+  const after = $("after");
+  after.hidden = false;
+  after.innerHTML = `
+    <p class="verdict ${ok ? "ok" : "no"}">${ok ? "נכון! הזוג שלך, ויש לך תור נוסף." : "לא נכון. הקלפים חוזרים הפוכים ללוח, והתור עובר."}</p>
+    ${more ? `<details><summary>להרחבה</summary><p>${esc(more)}</p></details>` : ""}
+    <div class="row"><button class="btn" type="button" id="goOn">המשך</button></div>`;
+  $("goOn").focus();
+  $("goOn").onclick = () => {
+    $("veil").hidden = true;
+    if (ok) takePair();
+    else { G.open.forEach(k2 => G.cards[k2].up = false); G.open = []; nextTurn(); G.lock = false; render(); }
+  };
+}
+
+function finish() {
+  const ps = G.players.map((p, i) => ({ ...p, i })).sort((a, b) => b.pairs - a.pairs);
+  const solo = G.players.length === 1, top = ps[0].pairs, winners = ps.filter(p => p.pairs === top);
+  const title = solo ? `סיימת ב-${G.moves} מהלכים!` : winners.length > 1 ? "תיקו!" : `${esc(winners[0].name)} ניצח/ה!`;
+  const quizLine = p => setup.mode === "quiz" ? ` <small>(${p.right} נכונות, ${p.wrong} טעויות)</small>` : "";
+  $("dlg").innerHTML = `
+    <div class="big">🏆</div><h2 style="text-align:center">${title}</h2>
+    <div class="rank">${ps.map(p => `<span class="pl" style="--pc:${COLORS[p.i]}"><span><i style="display:inline-block;margin-inline-end:8px"></i>${esc(p.name)}${quizLine(p)}</span><b>${p.pairs} זוגות</b></span>`).join("")}</div>
+    <div class="row"><button class="btn" type="button" id="again">עוד משחק</button><button class="btn ghost" type="button" id="toSetup">הגדרות</button></div>`;
+  $("veil").hidden = false;
+  beep([523, 659, 784, 1047], .14);
+  $("again").onclick = () => { $("veil").hidden = true; start(); };
+  $("toSetup").onclick = toSetup;
+}
+
+function toSetup() { $("veil").hidden = true; $("game").hidden = true; $("setup").hidden = false; $("newBtn").hidden = true; G = null; renderSetup(); }
+$("newBtn").onclick = toSetup;
+$("startBtn").onclick = start;
+renderSetup();
+</script>
+</body>
+</html>
