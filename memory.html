@@ -102,6 +102,15 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
 .rank { display: grid; gap: 6px; }
 .rank .pl { justify-content: space-between; }
 .big { font-size: 56px; text-align: center; line-height: 1; }
+.clock { font: 800 18px var(--display); font-variant-numeric: tabular-nums; color: var(--ink); background: var(--panel); border-radius: 999px; padding: 4px 12px; }
+.tbl { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.tbl th, .tbl td { padding: 6px 8px; text-align: start; border-bottom: 1px solid var(--line); }
+.tbl th { font: 700 13px var(--display); color: var(--muted); }
+.tbl td b { font: 800 17px var(--display); }
+.tbl .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--pc); margin-inline-end: 6px; }
+.tblwrap { overflow-x: auto; }
+.rec { color: var(--good); font-weight: 800; }
+.formula { color: var(--muted); font-size: 13px; text-align: center; margin: 0; }
 </style>
 </head>
 <body>
@@ -122,6 +131,7 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
     <div class="field">
       <span class="lbl">שמות</span>
       <div class="names" id="names"></div>
+      <p class="hint">כל שם שומר סטטיסטיקה משלו: משחקים, ניצחונות ושיאים.</p>
     </div>
     <div class="field">
       <span class="lbl">גודל הלוח</span>
@@ -142,7 +152,7 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
       <div class="seg" id="hints"></div>
       <p class="hint" id="hintsHint"></p>
     </div>
-    <div class="row"><button class="btn" id="startBtn" type="button">התחלת משחק</button></div>
+    <div class="row"><button class="btn" id="startBtn" type="button">התחלת משחק</button><button class="btn ghost" id="statsBtn" type="button">📊 סטטיסטיקה</button></div>
   </section>
 
   <section id="game" hidden style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">
@@ -179,11 +189,13 @@ const HINTS = [{ id: false, label: "בלי" }, { id: true, label: "מדי פעם
 const HINTS_HINT = "💡 אחרי כל 3 פספוסים, כמה קלפים נחשפים לרגע ונסגרים מייד. ביניהם תמיד זוג אחד שלם, למי שמספיק לקלוט.";
 const HINT_EVERY = 3;
 const SP_FACE = { peek: "🔍", shuffle: "🌀" };
-const LS = "memory-setup-v3";
+const LS = "memory-setup-v3", LS_STATS = "memory-stats-v1";
+// score: 100 per pair, minus 15 per miss (a lift of two cards that didn't match), minus 2 per second of your own turns
+const PT_PAIR = 100, PT_MISS = 15, PT_SEC = 2;
 
 let setup = { count: 2, names: ["", "", "", ""], size: 1, kind: "same", special: true, hints: true };
 try { Object.assign(setup, JSON.parse(localStorage.getItem(LS) || "{}")); } catch (e) {}
-let G = null, msgTimer = 0;
+let G = null, msgTimer = 0, clockTimer = 0;
 
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -247,8 +259,10 @@ function deal() {
 
 function start() {
   try { localStorage.setItem(LS, JSON.stringify(setup)); } catch (e) {}
-  G = { cards: deal(), players: Array.from({ length: setup.count }, (_, i) => ({ name: nameOf(i), pairs: 0 })),
-        turn: 0, open: [], lock: false, moves: 0, misses: 0, peekSet: new Set(), peekStyle: -1 };
+  clearInterval(clockTimer);
+  G = { cards: deal(), players: Array.from({ length: setup.count }, (_, i) => ({ name: nameOf(i), named: !!setup.names[i].trim(), pairs: 0, moves: 0, time: 0 })),
+        turn: 0, open: [], lock: false, moves: 0, misses: 0, peekSet: new Set(), peekStyle: -1, t0: 0, t1: 0, turnT0: 0 };
+  clockTimer = setInterval(tick, 500);
   $("setup").hidden = true; $("game").hidden = false; $("newBtn").hidden = false; $("msg").textContent = "";
   const grid = $("grid");
   grid.innerHTML = "";
@@ -288,7 +302,8 @@ function say(text, ms = 2200) {
 function render() {
   $("bar").innerHTML = G.players.map((p, i) =>
     `<span class="pl${i === G.turn ? " now" : ""}" style="--pc:${COLORS[i]}"><i></i>${esc(p.name)} <b>${p.pairs}</b></span>`).join("") +
-    `<span class="status">${G.players.length === 1 ? `מהלכים: ${G.moves}` : `התור של ${esc(G.players[G.turn].name)}`}</span>`;
+    `<span class="status">${G.players.length === 1 ? `הרמות: ${G.moves}` : `התור של ${esc(G.players[G.turn].name)}`}</span>` +
+    `<span class="clock" id="clock">⏱ ${fmt(elapsed())}</span>`;
   [...$("grid").children].forEach((el, i) => {
     const c = G.cards[i], shown = c.up || c.owner !== -1;
     el.querySelector(".f").textContent = c.f;
@@ -302,12 +317,21 @@ function render() {
     el.disabled = c.owner !== -1;
   });
 }
+// ---------- clock & score ----------
+const elapsed = () => !G || !G.t0 ? 0 : (G.t1 || Date.now()) - G.t0;
+const fmt = ms => { const s = Math.floor(ms / 1000); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
+function tick() { if (G && $("clock")) $("clock").textContent = "⏱ " + fmt(elapsed()); }
+// charges the time since the turn began to the player whose turn it is
+function charge() { if (!G.t0) return; const now = Date.now(); G.players[G.turn].time += now - G.turnT0; G.turnT0 = now; }
+const scoreOf = p => Math.max(0, p.pairs * PT_PAIR - (p.moves - p.pairs) * PT_MISS - Math.round(p.time / 1000) * PT_SEC);
+
 const closedRegular = () => G.cards.map((c, i) => i).filter(i => G.cards[i].owner === -1 && !G.cards[i].up && !G.cards[i].sp);
 const flash = (idx, cls, ms) => { idx.forEach(i => $("grid").children[i].classList.add(cls)); setTimeout(() => idx.forEach(i => $("grid").children[i]?.classList.remove(cls)), ms); };
 
 async function flip(i) {
   const c = G.cards[i];
   if (G.lock || c.up || c.owner !== -1) return;
+  if (!G.t0) G.t0 = G.turnT0 = Date.now();   // the clock starts with the first card
   c.up = true; sFlip(); render();
 
   if (c.sp === "peek" || c.sp === "shuffle") {
@@ -331,7 +355,7 @@ async function flip(i) {
 
   G.open.push(i);
   if (G.open.length < 2) return;
-  G.moves++; G.lock = true;
+  G.moves++; G.players[G.turn].moves++; G.lock = true;
   const [a, b] = G.open.map(k => G.cards[k]);
   await sleep(550);
   if (a.k === b.k) {
@@ -340,8 +364,8 @@ async function flip(i) {
     return take(G.open);
   }
   await sleep(550);
-  sMiss(); a.up = b.up = false; G.open = []; G.turn = (G.turn + 1) % G.players.length; render();
-  if (setup.hints && ++G.misses % HINT_EVERY === 0) { await sleep(450); await hint(); }
+  sMiss(); a.up = b.up = false; G.open = []; charge(); G.turn = (G.turn + 1) % G.players.length; render();
+  if (setup.hints && ++G.misses % HINT_EVERY === 0) { await sleep(450); await hint(); G.turnT0 = Date.now(); }
   G.lock = false; render();
 }
 
@@ -405,26 +429,75 @@ function take(idx) {
 function checkEnd() {
   if (G.cards.some(c => c.owner === -1 && !c.sp)) return;
   G.cards.forEach(c => { if (c.owner === -1) c.owner = -2; });
+  charge(); G.t1 = Date.now(); clearInterval(clockTimer);
   G.lock = true; render();
   setTimeout(finish, 700);
 }
 
 function finish() {
-  const ps = G.players.map((p, i) => ({ ...p, i })).sort((a, b) => b.pairs - a.pairs);
-  const solo = G.players.length === 1, top = ps[0].pairs, winners = ps.filter(p => p.pairs === top);
-  const title = solo ? `סיימת ב-${G.moves} מהלכים!` : winners.length > 1 ? "תיקו!" : `${esc(winners[0].name)} ניצח/ה!`;
+  const ps = G.players.map((p, i) => ({ ...p, i, score: scoreOf(p) })).sort((a, b) => b.score - a.score || b.pairs - a.pairs);
+  const solo = G.players.length === 1, winners = ps.filter(p => p.score === ps[0].score && p.pairs === ps[0].pairs);
+  const recs = saveStats(ps, solo, winners);
+  const title = solo ? `סיימת ב-${fmt(elapsed())} עם ${G.moves} הרמות!` : winners.length > 1 ? "תיקו!" : `${esc(winners[0].name)} ניצח/ה!`;
   $("dlg").innerHTML = `
     <div class="big">🏆</div><h2 style="text-align:center">${title}</h2>
-    <div class="rank">${ps.map(p => `<span class="pl" style="--pc:${COLORS[p.i]}"><span><i style="display:inline-block;margin-inline-end:8px"></i>${esc(p.name)}</span><b>${p.pairs} זוגות</b></span>`).join("")}</div>
-    <div class="row"><button class="btn" type="button" id="again">עוד משחק</button><button class="btn ghost" type="button" id="toSetup">הגדרות</button></div>`;
+    <div class="tblwrap"><table class="tbl"><thead><tr><th>שחקן</th><th>זוגות</th><th>הרמות</th><th>זמן</th><th>ציון</th></tr></thead><tbody>
+    ${ps.map(p => `<tr style="--pc:${COLORS[p.i]}"><td><span class="dot"></span>${esc(p.name)}</td><td>${p.pairs}</td><td>${p.moves}</td><td>${fmt(p.time)}</td>
+      <td><b>${p.score}</b>${recs.has(p.i) ? ` <span class="rec">🏅 שיא אישי!</span>` : ""}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="formula">ציון: ${PT_PAIR} לכל זוג, פחות ${PT_MISS} לכל הרמה שלא מצאה זוג, פחות ${PT_SEC} לכל שנייה בתור שלך</p>
+    <div class="row"><button class="btn" type="button" id="again">עוד משחק</button><button class="btn ghost" type="button" id="toSetup">הגדרות</button><button class="btn ghost" type="button" id="endStats">📊 סטטיסטיקה</button></div>`;
   $("veil").hidden = false;
   beep([523, 659, 784, 1047], .14);
   $("again").focus();
   $("again").onclick = () => { $("veil").hidden = true; start(); };
   $("toSetup").onclick = toSetup;
+  $("endStats").onclick = showStats;
 }
 
-function toSetup() { $("veil").hidden = true; $("game").hidden = true; $("setup").hidden = false; $("newBtn").hidden = true; G = null; renderSetup(); }
+// ---------- stats per name (kept in this browser) ----------
+function loadStats() { try { return JSON.parse(localStorage.getItem(LS_STATS) || "{}"); } catch (e) { return {}; } }
+const boardKey = () => `${setup.size}-${setup.kind}`;
+const boardName = key => { const [s, k] = key.split("-"); return `${SIZES[s]?.label || s}, ${KINDS.find(x => x.id === k)?.label || k}`; };
+// returns the set of player indexes who set a new personal best score on this board
+function saveStats(ps, solo, winners) {
+  const st = loadStats(), recs = new Set(), key = boardKey();
+  ps.filter(p => p.named).forEach(p => {
+    const name = p.name.trim(), r = st[name] ||= { games: 0, wins: 0, pairs: 0, moves: 0, ms: 0, best: {} };
+    r.games++; r.pairs += p.pairs; r.moves += p.moves; r.ms += p.time;
+    if (!solo && winners.length === 1 && winners[0].i === p.i) r.wins++;
+    const b = r.best[key] ||= {};
+    if (b.score === undefined || p.score > b.score) { if (b.score !== undefined) recs.add(p.i); b.score = p.score; }
+    if (solo && (b.ms === undefined || p.time < b.ms)) b.ms = p.time;
+    if (solo && (b.moves === undefined || p.moves < b.moves)) b.moves = p.moves;
+  });
+  try { localStorage.setItem(LS_STATS, JSON.stringify(st)); } catch (e) {}
+  return recs;
+}
+function showStats() {
+  const st = loadStats(), names = Object.keys(st).sort((a, b) => st[b].games - st[a].games);
+  const rows = names.map(n => {
+    const r = st[n], acc = r.moves ? Math.round(100 * r.pairs / r.moves) : 0;
+    const best = Object.entries(r.best).map(([k, b]) =>
+      `<div>${esc(boardName(k))}: <b>${b.score}</b>${b.ms !== undefined ? ` · לבד ${fmt(b.ms)}, ${b.moves} הרמות` : ""}</div>`).join("");
+    return `<tr><td><b>${esc(n)}</b></td><td>${r.games}</td><td>${r.wins}</td><td>${acc}%</td><td>${fmt(r.ms)}</td><td style="font-size:13px">${best}</td></tr>`;
+  }).join("");
+  $("dlg").innerHTML = `
+    <h2>📊 סטטיסטיקה לפי שם</h2>
+    ${names.length ? `<div class="tblwrap"><table class="tbl"><thead><tr><th>שם</th><th>משחקים</th><th>ניצחונות</th><th>דיוק</th><th>זמן משחק</th><th>שיאים (ציון)</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="hint">דיוק = כמה מההרמות מצאו זוג. נשמר בדפדפן הזה בלבד. משחק בלי שם לא נספר.</p>`
+    : `<p class="hint">עוד אין נתונים. כתבו שם לפני המשחק, והתוצאות יישמרו כאן.</p>`}
+    <div class="row"><button class="btn" type="button" id="statsClose">סגירה</button>${names.length ? `<button class="btn ghost" type="button" id="statsReset">מחיקת הכול</button>` : ""}</div>`;
+  $("veil").hidden = false;
+  $("statsClose").onclick = () => { $("veil").hidden = true; };
+  if ($("statsReset")) $("statsReset").onclick = () => {
+    if (confirm("למחוק את כל הסטטיסטיקה?")) { try { localStorage.removeItem(LS_STATS); } catch (e) {} showStats(); }
+  };
+  $("statsClose").focus();
+}
+$("statsBtn").onclick = showStats;
+
+function toSetup() { clearInterval(clockTimer); $("veil").hidden = true; $("game").hidden = true; $("setup").hidden = false; $("newBtn").hidden = true; G = null; renderSetup(); }
 $("newBtn").onclick = toSetup;
 $("startBtn").onclick = start;
 renderSetup();
