@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Assistant:wght@400;600;700&display=swap">
 <style>
-/* Memory card game. Flip two cards; a pair is yours. In question mode a found pair
-   must be earned with a trivia question from the bank, or it goes back face down. */
+/* Memory card game. Pairs are identical or "smart" (two things that go together),
+   and optional special cards peek, shuffle or act as a joker. */
 :root {
   --bg: #f1f0f7; --panel: #fcfcfe; --ink: #1d1b2c; --muted: #625f78; --line: #d6d4e3;
   --accent: #5b3fc4; --accent-ink: #ffffff;
@@ -70,7 +70,7 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
 .status { font: 700 16px var(--display); color: var(--muted); margin-inline-start: auto; }
 .board-area { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
 .grid { --cols: 4; --rows: 4; display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: clamp(6px, 1.2vw, 12px);
-  width: min(100%, calc((100vh - 150px) * var(--cols) / var(--rows) * .78)); min-width: 200px; }
+  width: min(100%, calc((100vh - 190px) * var(--cols) / var(--rows) * .78)); min-width: 200px; }
 .card { aspect-ratio: 4 / 5; perspective: 800px; border: 0; padding: 0; background: none; cursor: pointer; border-radius: 12px; }
 .card .in { position: relative; width: 100%; height: 100%; transition: transform .45s; transform-style: preserve-3d; }
 .card.up .in, .card.done .in { transform: rotateY(180deg); }
@@ -82,22 +82,21 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
 .card.done { cursor: default; }
 @media (prefers-reduced-motion: reduce) { .card .in { transition: none; } }
 
-/* question / end dialog */
+.card.used .f { border-style: dashed; border-color: var(--line); background: var(--bg); opacity: .55; }
+.card.sp .f { border-color: var(--accent); box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+.card.moved .b { outline: 4px solid #f2b705; outline-offset: -4px; }
+@media (prefers-reduced-motion: no-preference) {
+  .card.moved .in { animation: wig .6s ease-in-out 2; }
+  .card.got .in { animation: pop .5s ease-out; }
+}
+@keyframes wig { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+@keyframes pop { 50% { transform: rotateY(180deg) scale(1.12); } }
+.msg { font: 800 clamp(16px, 2.4vw, 20px) var(--display); text-align: center; min-height: 1.6em; color: var(--accent); margin: 0; }
+
+/* end dialog */
 .veil { position: fixed; inset: 0; background: rgb(10 8 20 / .55); display: grid; place-items: center; padding: 16px; z-index: 10; }
 .dlg { background: var(--panel); border-radius: 14px; padding: 20px; width: min(640px, 100%); max-height: calc(100vh - 32px); overflow: auto; display: grid; gap: 12px; }
 .dlg h2 { font: 800 20px var(--display); margin: 0; }
-.qhead { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 14px; flex-wrap: wrap; }
-.qhead .tag { border: 1px solid var(--line); border-radius: 6px; padding: 1px 8px; }
-.qtext { font: 700 clamp(18px, 2.6vw, 22px) var(--display); margin: 0; }
-.opts { display: grid; gap: 8px; }
-.opt { text-align: start; padding: 10px 14px; border-radius: 10px; border: 2px solid var(--line); background: var(--bg); cursor: pointer; font-weight: 600; }
-.opt:hover:not(:disabled) { border-color: var(--accent); }
-.opt:disabled { cursor: default; }
-.opt.right { border-color: var(--good); background: var(--good-soft); }
-.opt.wrong { border-color: var(--bad); background: var(--bad-soft); }
-.verdict { font: 800 18px var(--display); margin: 0; }
-.verdict.ok { color: var(--good); } .verdict.no { color: var(--bad); }
-details { color: var(--muted); } summary { cursor: pointer; color: var(--accent); font-weight: 700; }
 .rank { display: grid; gap: 6px; }
 .rank .pl { justify-content: space-between; }
 .big { font-size: 56px; text-align: center; line-height: 1; }
@@ -127,20 +126,21 @@ details { color: var(--muted); } summary { cursor: pointer; color: var(--accent)
       <div class="seg" id="size"></div>
     </div>
     <div class="field">
-      <span class="lbl">סוג משחק</span>
-      <div class="seg" id="mode"></div>
-      <p class="hint" id="modeHint"></p>
+      <span class="lbl">סוג הזוגות</span>
+      <div class="seg" id="kind"></div>
+      <p class="hint" id="kindHint"></p>
     </div>
-    <div class="field" id="levelField">
-      <span class="lbl">רמת השאלות</span>
-      <div class="seg" id="level"></div>
+    <div class="field">
+      <span class="lbl">קלפים מיוחדים</span>
+      <div class="seg" id="special"></div>
+      <p class="hint" id="specialHint"></p>
     </div>
     <div class="row"><button class="btn" id="startBtn" type="button">התחלת משחק</button></div>
-    <p class="hint" id="loadErr" hidden></p>
   </section>
 
   <section id="game" hidden style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">
     <div class="bar" id="bar"></div>
+    <p class="msg" id="msg" aria-live="polite"></p>
     <div class="board-area"><div class="grid" id="grid"></div></div>
   </section>
 </div>
@@ -152,19 +152,29 @@ const $ = id => document.getElementById(id);
 const COLORS = ["var(--p1)", "var(--p2)", "var(--p3)", "var(--p4)"];
 const SIZES = [{ n: 12, cols: 4, rows: 3, label: "קטן · 12" }, { n: 16, cols: 4, rows: 4, label: "בינוני · 16" },
                { n: 20, cols: 5, rows: 4, label: "גדול · 20" }, { n: 30, cols: 6, rows: 5, label: "ענק · 30" }];
-const MODES = [{ id: "quiz", label: "זיכרון + שאלות", hint: "מצאתם זוג? עונים על שאלה. תשובה נכונה: הזוג שלכם ותור נוסף. טעות: הקלפים חוזרים הפוך ללוח, והתור עובר." },
-               { id: "classic", label: "זיכרון קלאסי", hint: "בלי שאלות: כל זוג שמוצאים שלכם, ומקבלים תור נוסף." }];
-const EMOJI = "🦁🐘🦒🐢🐙🦋🐝🦉🐧🦊🐸🐳🦓🦜🐌🦔🍉🍋🍇🍓🥑🍕🧁🍩🌵🌻🍄⭐🌈🔥⚽🎸🎈🚀⛵🚲🎩👑🔑⏰💡🎲🧩🪁🏰🗿🎻🧸".match(/\p{Extended_Pictographic}/gu);
-const LS = "memory-setup-v1";
+const KINDS = [{ id: "same", label: "זוגות זהים", hint: "מחפשים שני קלפים זהים." },
+               { id: "smart", label: "זוגות חכמים", hint: "מחפשים שני קלפים שהולכים יחד: 🔑 עם 🔒, 🐝 עם 🍯, 🐛 עם 🦋. צריך לזכור וגם לחשוב." }];
+const SPECIALS = [{ id: false, label: "בלי" }, { id: true, label: "עם קלפים מיוחדים" }];
+const SPECIAL_HINT = "🔍 הצצה: כל הקלפים נפתחים לרגע.  🌀 ערבוב: כמה קלפים סגורים מחליפים מקום.  🃏 ג'וקר: מתאים לכל קלף, ומקבלים את הזוג שלו.  קלף 🔍 או 🌀 לא מסיים את התור: ממשיכים להפוך.";
+const SAME = "🦁🐘🦒🐢🐙🦋🐝🦉🐧🦊🐸🐳🦓🦜🐌🦔🍉🍋🍇🍓🥑🍕🧁🍩🌵🌻🍄⭐🌈🔥⚽🎸🎈🚀⛵🚲🎩👑🔑⏰💡🎲🧩🪁🏰🗿🎻🧸".match(/\p{Extended_Pictographic}/gu);
+// related pairs; no emoji appears twice, and none sits too close to another pair
+const SMART = [["🔑", "🔒"], ["🐝", "🍯"], ["🐄", "🥛"], ["🐑", "🧶"], ["🌧️", "☂️"], ["⚽", "🥅"], ["🪡", "🧵"], ["🖌️", "🎨"],
+  ["🐒", "🍌"], ["🐰", "🥕"], ["🐶", "🦴"], ["🦷", "🪥"], ["🪛", "🔩"], ["🧦", "👟"], ["🚀", "🌕"], ["⛵", "🌊"],
+  ["🍿", "🎬"], ["📮", "✉️"], ["🌱", "🌳"], ["🐛", "🦋"], ["🔦", "🔋"], ["🥣", "🥄"], ["❄️", "⛄"], ["💍", "💒"],
+  ["🐣", "🥚"], ["🏹", "🎯"], ["🎂", "🕯️"], ["🧲", "📎"]];
+// special cards per board size (kept even so the regular cards still make whole pairs)
+const SP_SET = { 12: ["peek", "joker"], 16: ["peek", "shuffle", "joker", "peek"], 20: ["peek", "shuffle", "joker", "peek"], 30: ["peek", "shuffle", "joker", "peek", "shuffle", "joker"] };
+const SP_FACE = { peek: "🔍", shuffle: "🌀", joker: "🃏" };
+const LS = "memory-setup-v2";
 
-let setup = { count: 2, names: ["", "", "", ""], size: 1, mode: "quiz", level: 4 };
+let setup = { count: 2, names: ["", "", "", ""], size: 1, kind: "same", special: true };
 try { Object.assign(setup, JSON.parse(localStorage.getItem(LS) || "{}")); } catch (e) {}
-let G = null;
-const bank = {};
+let G = null, msgTimer = 0;
 
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const nameOf = i => setup.names[i].trim() || `שחקן ${i + 1}`;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ---------- sound ----------
 let ac = null;
@@ -178,8 +188,8 @@ function beep(freqs, dur = .12, type = "sine") {
     });
   } catch (e) {}
 }
-const sFlip = () => beep([520], .06, "triangle"), sPair = () => beep([660, 880], .1), sGood = () => beep([523, 659, 784], .11),
-      sBad = () => beep([300, 220], .16, "sawtooth");
+const sFlip = () => beep([520], .06, "triangle"), sPair = () => beep([660, 880], .1), sMagic = () => beep([880, 1175, 1568], .08),
+      sSwirl = () => beep([400, 520, 400, 520], .07, "triangle"), sMiss = () => beep([300, 240], .12, "triangle");
 
 // ---------- setup ----------
 function seg(el, items, current, pick) {
@@ -202,41 +212,35 @@ function renderSetup() {
     $("names").append(inp);
   }
   seg($("size"), SIZES.map((s, i) => ({ label: s.label, value: i })), setup.size, v => setup.size = v);
-  seg($("mode"), MODES.map(m => ({ label: m.label, value: m.id })), setup.mode, v => setup.mode = v);
-  $("modeHint").textContent = MODES.find(m => m.id === setup.mode).hint;
-  $("levelField").hidden = setup.mode !== "quiz";
-  seg($("level"), Array.from({ length: 11 }, (_, i) => ({ label: i + 1, value: i + 1 })), setup.level, v => setup.level = v);
+  seg($("kind"), KINDS.map(k => ({ label: k.label, value: k.id })), setup.kind, v => setup.kind = v);
+  $("kindHint").textContent = KINDS.find(k => k.id === setup.kind).hint;
+  seg($("special"), SPECIALS.map(s => ({ label: s.label, value: s.id })), setup.special, v => setup.special = v);
+  $("specialHint").textContent = setup.special ? SPECIAL_HINT : "";
+  $("specialHint").hidden = !setup.special;
 }
 
-async function loadLevel(l) {
-  if (bank[l]) return bank[l];
-  const r = await fetch(`questions/level-${String(l).padStart(2, "0")}.json`);
-  if (!r.ok) throw new Error(r.status);
-  const d = await r.json();
-  return bank[l] = shuffle(d.questions.filter(q => !q.parent));
+function deal() {
+  const S = SIZES[setup.size], sps = setup.special ? SP_SET[S.n] : [], pairs = (S.n - sps.length) / 2;
+  const cards = [];
+  if (setup.kind === "smart") shuffle([...SMART]).slice(0, pairs).forEach((p, k) => p.forEach(f => cards.push({ f, k })));
+  else shuffle([...SAME]).slice(0, pairs).forEach((f, k) => cards.push({ f, k }, { f, k }));
+  sps.forEach((sp, i) => cards.push({ f: SP_FACE[sp], k: "sp" + i, sp }));
+  return shuffle(cards).map(c => ({ ...c, up: false, owner: -1 }));
 }
 
-async function start() {
+function start() {
   try { localStorage.setItem(LS, JSON.stringify(setup)); } catch (e) {}
-  $("loadErr").hidden = true;
-  if (setup.mode === "quiz") {
-    try { await loadLevel(setup.level); }
-    catch (e) { $("loadErr").textContent = "לא הצלחתי לטעון את השאלות. אפשר לשחק במצב קלאסי."; $("loadErr").hidden = false; return; }
-  }
-  const S = SIZES[setup.size], faces = shuffle([...EMOJI]).slice(0, S.n / 2);
-  G = {
-    cards: shuffle([...faces, ...faces].map(f => ({ f, up: false, owner: -1 }))),
-    players: Array.from({ length: setup.count }, (_, i) => ({ name: nameOf(i), pairs: 0, right: 0, wrong: 0 })),
-    turn: 0, open: [], lock: false, moves: 0, qi: 0
-  };
-  $("setup").hidden = true; $("game").hidden = false; $("newBtn").hidden = false;
+  const S = SIZES[setup.size];
+  G = { cards: deal(), players: Array.from({ length: setup.count }, (_, i) => ({ name: nameOf(i), pairs: 0 })),
+        turn: 0, open: [], lock: false, moves: 0, peek: false };
+  $("setup").hidden = true; $("game").hidden = false; $("newBtn").hidden = false; $("msg").textContent = "";
   const grid = $("grid");
   grid.style.setProperty("--cols", S.cols); grid.style.setProperty("--rows", S.rows);
   grid.innerHTML = "";
   G.cards.forEach((c, i) => {
     const b = document.createElement("button");
-    b.type = "button"; b.className = "card"; b.setAttribute("aria-label", "קלף הפוך");
-    b.innerHTML = `<div class="in"><div class="b"></div><div class="f">${c.f}</div></div>`;
+    b.type = "button"; b.className = "card";
+    b.innerHTML = `<div class="in"><div class="b"></div><div class="f"></div></div>`;
     b.onclick = () => flip(i);
     grid.append(b);
   });
@@ -244,91 +248,107 @@ async function start() {
 }
 
 // ---------- play ----------
+function say(text, ms = 2200) {
+  clearTimeout(msgTimer); $("msg").textContent = text;
+  if (ms) msgTimer = setTimeout(() => $("msg").textContent = "", ms);
+}
 function render() {
-  const bar = $("bar");
-  bar.innerHTML = G.players.map((p, i) =>
+  $("bar").innerHTML = G.players.map((p, i) =>
     `<span class="pl${i === G.turn ? " now" : ""}" style="--pc:${COLORS[i]}"><i></i>${esc(p.name)} <b>${p.pairs}</b></span>`).join("") +
     `<span class="status">${G.players.length === 1 ? `מהלכים: ${G.moves}` : `התור של ${esc(G.players[G.turn].name)}`}</span>`;
   [...$("grid").children].forEach((el, i) => {
-    const c = G.cards[i];
-    el.classList.toggle("up", c.up);
+    const c = G.cards[i], shown = c.up || c.owner !== -1 || (G.peek && !c.sp);
+    el.querySelector(".f").textContent = c.f;
+    el.classList.toggle("up", shown);
     el.classList.toggle("done", c.owner >= 0);
+    el.classList.toggle("used", c.owner === -2);
+    el.classList.toggle("sp", !!c.sp && c.owner === -1);
     if (c.owner >= 0) el.style.setProperty("--pc", COLORS[c.owner]); else el.style.removeProperty("--pc");
-    el.setAttribute("aria-label", c.up || c.owner >= 0 ? c.f : "קלף הפוך");
-    el.disabled = c.owner >= 0;
+    el.setAttribute("aria-label", shown ? c.f : "קלף הפוך");
+    el.disabled = c.owner !== -1;
   });
 }
+const closedRegular = () => G.cards.map((c, i) => i).filter(i => G.cards[i].owner === -1 && !G.cards[i].up && !G.cards[i].sp);
+const flash = (idx, cls, ms) => { idx.forEach(i => $("grid").children[i].classList.add(cls)); setTimeout(() => idx.forEach(i => $("grid").children[i]?.classList.remove(cls)), ms); };
 
-function flip(i) {
+async function flip(i) {
   const c = G.cards[i];
-  if (G.lock || c.up || c.owner >= 0) return;
-  c.up = true; G.open.push(i); sFlip(); render();
+  if (G.lock || c.up || c.owner !== -1) return;
+  c.up = true; sFlip(); render();
+
+  if (c.sp === "peek" || c.sp === "shuffle") {
+    G.lock = true;
+    await sleep(500);
+    c.owner = -2; c.up = false;
+    if (c.sp === "peek") {
+      sMagic(); say("🔍 הצצה! כל הקלפים נפתחים לרגע…", 2600);
+      G.peek = true; render(); await sleep(1600); G.peek = false;
+    } else {
+      const pick = shuffle(closedRegular()).slice(0, 6);
+      if (pick.length > 1) {
+        const moved = shuffle(pick.map(k => G.cards[k]));
+        pick.forEach((k, n) => G.cards[k] = moved[n]);
+        sSwirl(); say("🌀 ערבוב! הקלפים המסומנים החליפו מקומות ביניהם", 2600);
+        flash(pick, "moved", 1300);
+      } else say("🌀 ערבוב! אבל לא נשארו מספיק קלפים לערבב", 2200);
+    }
+    G.lock = false; render();
+    return checkEnd();
+  }
+
+  G.open.push(i);
   if (G.open.length < 2) return;
   G.moves++; G.lock = true;
   const [a, b] = G.open.map(k => G.cards[k]);
-  if (a.f === b.f) {
+  await sleep(550);
+  if (a.sp === "joker" || b.sp === "joker") return jokerPair(a, b);
+  if (a.k === b.k) {
     sPair();
-    setTimeout(() => setup.mode === "quiz" ? askQuestion() : takePair(), 550);
-  } else {
-    setTimeout(() => { a.up = b.up = false; G.open = []; nextTurn(); G.lock = false; render(); }, 1100);
+    if (setup.kind === "smart") say(`${a.f} הולך עם ${b.f}`);
+    return take(G.open);
   }
+  await sleep(550);
+  sMiss(); a.up = b.up = false; G.open = []; G.turn = (G.turn + 1) % G.players.length; G.lock = false; render();
 }
 
-function takePair() {
-  G.open.forEach(k => { G.cards[k].owner = G.turn; G.cards[k].up = false; });
+// a joker takes the other card and that card's partner, wherever it is on the board
+async function jokerPair(a, b) {
+  const other = a.sp === "joker" ? b : a;
+  const idx = [...G.open];
+  if (other.sp !== "joker") {
+    const twin = G.cards.findIndex(c => c !== other && c.k === other.k && c.owner === -1);
+    if (twin >= 0) { G.cards[twin].up = true; idx.push(twin); render(); await sleep(700); }
+    say(`🃏 ג'וקר! קיבלת את ${other.f} ואת בן הזוג שלו`, 2600);
+  } else say("🃏🃏 שני ג'וקרים! זוג בשבילך", 2400);
+  sMagic();
+  take(idx);
+}
+
+function take(idx) {
+  idx.forEach(k => { G.cards[k].owner = G.turn; G.cards[k].up = false; });
+  flash(idx, "got", 600);
   G.players[G.turn].pairs++; G.open = []; G.lock = false; render();
-  if (G.cards.every(c => c.owner >= 0)) setTimeout(finish, 600);
-}
-function nextTurn() { G.turn = (G.turn + 1) % G.players.length; }
-
-function askQuestion() {
-  const list = bank[setup.level], q = list[G.qi++ % list.length];
-  const order = shuffle([0, 1, 2, 3]);
-  const p = G.players[G.turn];
-  $("dlg").innerHTML = `
-    <div class="qhead"><span>${G.cards[G.open[0]].f}${G.cards[G.open[0]].f} מצאת זוג, ${esc(p.name)}! עכשיו הוא צריך להיות שלך:</span>
-      <span class="tag">${esc(q.cat || "")}</span><span class="tag">רמה ${setup.level}</span></div>
-    <p class="qtext">${esc(q.q)}</p>
-    <div class="opts">${order.map(k => `<button type="button" class="opt" data-k="${k}">${esc(q.options[k])}</button>`).join("")}</div>
-    <div id="after" hidden></div>`;
-  $("veil").hidden = false;
-  $("dlg").querySelector(".opt").focus();
-  $("dlg").querySelectorAll(".opt").forEach(btn => btn.onclick = () => answer(q, +btn.dataset.k));
+  checkEnd();
 }
 
-function answer(q, k) {
-  const ok = k === 0, p = G.players[G.turn];
-  $("dlg").querySelectorAll(".opt").forEach(b => {
-    b.disabled = true;
-    if (+b.dataset.k === 0) b.classList.add("right"); else if (+b.dataset.k === k) b.classList.add("wrong");
-  });
-  ok ? (sGood(), p.right++) : (sBad(), p.wrong++);
-  const more = q.expansion || q.explain;
-  const after = $("after");
-  after.hidden = false;
-  after.innerHTML = `
-    <p class="verdict ${ok ? "ok" : "no"}">${ok ? "נכון! הזוג שלך, ויש לך תור נוסף." : "לא נכון. הקלפים חוזרים הפוכים ללוח, והתור עובר."}</p>
-    ${more ? `<details><summary>להרחבה</summary><p>${esc(more)}</p></details>` : ""}
-    <div class="row"><button class="btn" type="button" id="goOn">המשך</button></div>`;
-  $("goOn").focus();
-  $("goOn").onclick = () => {
-    $("veil").hidden = true;
-    if (ok) takePair();
-    else { G.open.forEach(k2 => G.cards[k2].up = false); G.open = []; nextTurn(); G.lock = false; render(); }
-  };
+function checkEnd() {
+  if (G.cards.some(c => c.owner === -1 && !c.sp)) return;
+  G.cards.forEach(c => { if (c.owner === -1) c.owner = -2; });
+  G.lock = true; render();
+  setTimeout(finish, 700);
 }
 
 function finish() {
   const ps = G.players.map((p, i) => ({ ...p, i })).sort((a, b) => b.pairs - a.pairs);
   const solo = G.players.length === 1, top = ps[0].pairs, winners = ps.filter(p => p.pairs === top);
   const title = solo ? `סיימת ב-${G.moves} מהלכים!` : winners.length > 1 ? "תיקו!" : `${esc(winners[0].name)} ניצח/ה!`;
-  const quizLine = p => setup.mode === "quiz" ? ` <small>(${p.right} נכונות, ${p.wrong} טעויות)</small>` : "";
   $("dlg").innerHTML = `
     <div class="big">🏆</div><h2 style="text-align:center">${title}</h2>
-    <div class="rank">${ps.map(p => `<span class="pl" style="--pc:${COLORS[p.i]}"><span><i style="display:inline-block;margin-inline-end:8px"></i>${esc(p.name)}${quizLine(p)}</span><b>${p.pairs} זוגות</b></span>`).join("")}</div>
+    <div class="rank">${ps.map(p => `<span class="pl" style="--pc:${COLORS[p.i]}"><span><i style="display:inline-block;margin-inline-end:8px"></i>${esc(p.name)}</span><b>${p.pairs} זוגות</b></span>`).join("")}</div>
     <div class="row"><button class="btn" type="button" id="again">עוד משחק</button><button class="btn ghost" type="button" id="toSetup">הגדרות</button></div>`;
   $("veil").hidden = false;
   beep([523, 659, 784, 1047], .14);
+  $("again").focus();
   $("again").onclick = () => { $("veil").hidden = true; start(); };
   $("toSetup").onclick = toSetup;
 }
