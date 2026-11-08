@@ -137,6 +137,11 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
       <div class="seg" id="special"></div>
       <p class="hint" id="specialHint"></p>
     </div>
+    <div class="field">
+      <span class="lbl">רמזים</span>
+      <div class="seg" id="hints"></div>
+      <p class="hint" id="hintsHint"></p>
+    </div>
     <div class="row"><button class="btn" id="startBtn" type="button">התחלת משחק</button></div>
   </section>
 
@@ -170,10 +175,13 @@ const SMART = [["🔑", "🔒"], ["🐝", "🍯"], ["🐄", "🥛"], ["🐑", "�
   ["🦉", "🌙"], ["🐫", "🏜️"], ["🐭", "🧀"], ["🐓", "🌅"], ["🕎", "🍩"], ["🍷", "🍇"], ["🍞", "🧈"], ["🍝", "🍅"],
   ["🍔", "🍟"], ["🥜", "🐘"], ["🧊", "🥤"], ["👓", "📖"], ["⏰", "🛏️"], ["🧤", "🧣"], ["🎁", "🎀"], ["🪁", "🌬️"],
   ["🚂", "🛤️"], ["🔭", "⭐"], ["🧭", "🗺️"], ["🩺", "❤️"], ["🏰", "👸"]];
+const HINTS = [{ id: false, label: "בלי" }, { id: true, label: "מדי פעם" }];
+const HINTS_HINT = "💡 אחרי כל 3 פספוסים, כמה קלפים נחשפים לרגע ונסגרים מייד. ביניהם תמיד זוג אחד שלם, למי שמספיק לקלוט.";
+const HINT_EVERY = 3;
 const SP_FACE = { peek: "🔍", shuffle: "🌀" };
 const LS = "memory-setup-v3";
 
-let setup = { count: 2, names: ["", "", "", ""], size: 1, kind: "same", special: true };
+let setup = { count: 2, names: ["", "", "", ""], size: 1, kind: "same", special: true, hints: true };
 try { Object.assign(setup, JSON.parse(localStorage.getItem(LS) || "{}")); } catch (e) {}
 let G = null, msgTimer = 0;
 
@@ -223,6 +231,9 @@ function renderSetup() {
   seg($("special"), SPECIALS.map(s => ({ label: s.label, value: s.id })), setup.special, v => setup.special = v);
   $("specialHint").textContent = setup.special ? SPECIAL_HINT : "";
   $("specialHint").hidden = !setup.special;
+  seg($("hints"), HINTS.map(h => ({ label: h.label, value: h.id })), setup.hints, v => setup.hints = v);
+  $("hintsHint").textContent = setup.hints ? HINTS_HINT : "";
+  $("hintsHint").hidden = !setup.hints;
 }
 
 function deal() {
@@ -237,7 +248,7 @@ function deal() {
 function start() {
   try { localStorage.setItem(LS, JSON.stringify(setup)); } catch (e) {}
   G = { cards: deal(), players: Array.from({ length: setup.count }, (_, i) => ({ name: nameOf(i), pairs: 0 })),
-        turn: 0, open: [], lock: false, moves: 0, peekSet: new Set(), peekStyle: -1 };
+        turn: 0, open: [], lock: false, moves: 0, misses: 0, peekSet: new Set(), peekStyle: -1 };
   $("setup").hidden = true; $("game").hidden = false; $("newBtn").hidden = false; $("msg").textContent = "";
   const grid = $("grid");
   grid.innerHTML = "";
@@ -329,7 +340,28 @@ async function flip(i) {
     return take(G.open);
   }
   await sleep(550);
-  sMiss(); a.up = b.up = false; G.open = []; G.turn = (G.turn + 1) % G.players.length; G.lock = false; render();
+  sMiss(); a.up = b.up = false; G.open = []; G.turn = (G.turn + 1) % G.players.length; render();
+  if (setup.hints && ++G.misses % HINT_EVERY === 0) { await sleep(450); await hint(); }
+  G.lock = false; render();
+}
+
+// Hint: a handful of closed cards (always including one whole pair) blink open and
+// straight back, so a sharp eye can catch them.
+async function hint() {
+  const idx = closedRegular();
+  if (idx.length < 4) return;
+  const first = idx[Math.random() * idx.length | 0];
+  const mate = idx.find(i => i !== first && G.cards[i].k === G.cards[first].k);
+  const n = Math.min(idx.length, Math.max(4, Math.min(10, Math.round(idx.length / 5))));
+  const rest = shuffle(idx.filter(i => i !== first && i !== mate)).slice(0, n - 2);
+  const show = [first, mate, ...rest].filter(i => i !== undefined);
+  beep([988, 1319], .07); say("💡 רמז! תסתכלו טוב…", 1800);
+  $("grid").classList.add("quick");
+  show.forEach(i => G.peekSet.add(i)); render();
+  await sleep(750);
+  G.peekSet.clear(); render();
+  await sleep(300);
+  $("grid").classList.remove("quick");
 }
 
 // Peek: the closed cards flip open and shut again, each one for a moment, in one of
