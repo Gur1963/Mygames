@@ -113,6 +113,7 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
 .tbl.log td b { font-size: 15px; }
 .tbl.log td { white-space: nowrap; }
 .tbl.log .kind { font: 700 13px var(--display); }
+.tbl.log .grp td { font: 800 15px var(--display); background: var(--line); padding: 6px 10px; }
 .tbl.log .why { color: var(--muted); font-size: 12px; }
 .dlg select { font: inherit; padding: 2px 6px; }
 .who { font: 800 15px var(--display); color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
@@ -518,7 +519,9 @@ function logGames(ps, solo, winners) {
 // the games table: every game, newest first, one row per player; filter by name
 function showGames(who) {
   const all = loadGames(), names = [...new Set(all.map(g => g.n))].sort((a, b) => a.localeCompare(b, "he"));
-  const rows = all.filter(g => !who || g.n === who).reverse();
+  // sorted by board size (fewest pairs first), then by score from high to low, then newest first
+  const size = g => +g.k.split("-")[0];
+  const rows = all.filter(g => !who || g.n === who).sort((a, b) => size(a) - size(b) || b.s - a.s || b.d - a.d);
   const date = t => new Date(t).toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "2-digit" });
   const hour = t => new Date(t).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
   const type = g => { const [sz, kd] = g.k.split("-");
@@ -530,7 +533,7 @@ function showGames(who) {
     <h2>📋 טבלת משחקים</h2>
     <label class="hint">שחקן: <select id="gWho"><option value="">כל השחקנים</option>${names.map(n => `<option${n === who ? " selected" : ""}>${esc(n)}</option>`).join("")}</select></label>
     ${rows.length ? `<div class="tblwrap"><table class="tbl log"><thead><tr><th>שם השחקן</th><th>תאריך</th><th>שעה</th><th>סוג משחק</th><th>הרמות</th><th>החמצות</th><th>זמן המשחק</th><th>תוצאה</th></tr></thead><tbody>
-      ${rows.map(g => `<tr><td><b class="kind">${esc(g.n)}</b></td><td>${date(g.d)}</td><td>${hour(g.d)}</td><td>${type(g)}</td><td>${g.m}</td><td>${g.x}</td><td>${fmt(g.ms)}</td>
+      ${rows.map((g, i) => `${i === 0 || size(rows[i - 1]) !== size(g) ? `<tr class="grp"><td colspan="8">${SIZES[size(g)]?.label || ""}</td></tr>` : ""}<tr><td><b class="kind">${esc(g.n)}</b></td><td>${date(g.d)}</td><td>${hour(g.d)}</td><td>${type(g)}</td><td>${g.m}</td><td>${g.x}</td><td>${fmt(g.ms)}</td>
         <td><b>${g.s}</b>${g.w ? " 🥇" : ""}<br><span class="why">${why(g)}</span></td></tr>`).join("")}
       </tbody></table></div>
       <p class="formula">תוצאה = ${PT_PAIR} לכל זוג − ${PT_MISS} לכל החמצה − ${PT_SEC} לכל שנייה (זמן נספר רק במשחק לבד). 🥇 = ניצחון במשחק קבוצתי.</p>`
