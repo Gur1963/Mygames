@@ -517,11 +517,12 @@ function logGames(ps, solo, winners) {
   try { localStorage.setItem(LS_GAMES, JSON.stringify(list)); } catch (e) {}
 }
 // the games table: every game, newest first, one row per player; filter by name
-function showGames(who) {
+function showGames(who = "", sz = "") {
   const all = loadGames(), names = [...new Set(all.map(g => g.n))].sort((a, b) => a.localeCompare(b, "he"));
   // sorted by board size (fewest pairs first), then by score from high to low, then newest first
   const size = g => +g.k.split("-")[0];
-  const rows = all.filter(g => !who || g.n === who).sort((a, b) => size(a) - size(b) || b.s - a.s || b.d - a.d);
+  const sizes = [...new Set(all.map(size))].sort((a, b) => a - b);
+  const rows = all.filter(g => (!who || g.n === who) && (sz === "" || size(g) === +sz)).sort((a, b) => size(a) - size(b) || b.s - a.s || b.d - a.d);
   const date = t => new Date(t).toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "2-digit" });
   const hour = t => new Date(t).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
   const type = g => { const [sz, kd] = g.k.split("-");
@@ -531,7 +532,8 @@ function showGames(who) {
     return `+${g.p * PT_PAIR} זוגות −${g.x * PT_MISS} החמצות${g.pl === 1 ? ` −${sec * PT_SEC} זמן` : ""}`; };
   $("dlg").innerHTML = `
     <h2>📋 טבלת משחקים</h2>
-    <label class="hint">שחקן: <select id="gWho"><option value="">כל השחקנים</option>${names.map(n => `<option${n === who ? " selected" : ""}>${esc(n)}</option>`).join("")}</select></label>
+    <div class="row"><label class="hint">שחקן: <select id="gWho"><option value="">כל השחקנים</option>${names.map(n => `<option${n === who ? " selected" : ""}>${esc(n)}</option>`).join("")}</select></label>
+    <label class="hint">משחק: <select id="gSize"><option value="">כל המשחקים</option>${sizes.map(k => `<option value="${k}"${String(k) === String(sz) ? " selected" : ""}>${SIZES[k]?.label || k}</option>`).join("")}</select></label></div>
     ${rows.length ? `<div class="tblwrap"><table class="tbl log"><thead><tr><th>שם השחקן</th><th>תאריך</th><th>שעה</th><th>סוג משחק</th><th>הרמות</th><th>החמצות</th><th>זמן המשחק</th><th>תוצאה</th></tr></thead><tbody>
       ${rows.map((g, i) => `${i === 0 || size(rows[i - 1]) !== size(g) ? `<tr class="grp"><td colspan="8">${SIZES[size(g)]?.label || ""}</td></tr>` : ""}<tr><td><b class="kind">${esc(g.n)}</b></td><td>${date(g.d)}</td><td>${hour(g.d)}</td><td>${type(g)}</td><td>${g.m}</td><td>${g.x}</td><td>${fmt(g.ms)}</td>
         <td><b>${g.s}</b>${g.w ? " 🥇" : ""}<br><span class="why">${why(g)}</span></td></tr>`).join("")}
@@ -540,7 +542,8 @@ function showGames(who) {
     : `<p class="hint">עוד אין משחקים בטבלה. מעכשיו כל משחק יירשם כאן.</p>`}
     <div class="row"><button class="btn" type="button" id="logBack">סגירה</button>${all.length ? `<button class="btn ghost" type="button" id="gReset">מחיקת הטבלה</button>` : ""}</div>`;
   $("veil").hidden = false;
-  $("gWho").onchange = e => showGames(e.target.value);
+  $("gWho").onchange = () => showGames($("gWho").value, $("gSize").value);
+  $("gSize").onchange = () => showGames($("gWho").value, $("gSize").value);
   $("logBack").onclick = () => { $("veil").hidden = true; };
   if ($("gReset")) $("gReset").onclick = () => {
     if (confirm("למחוק את כל טבלת המשחקים?")) { try { localStorage.setItem(LS_GAMES, "[]"); } catch (e) {} showGames(""); }
