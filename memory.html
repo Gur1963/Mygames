@@ -109,7 +109,6 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
 .tbl td b { font: 800 17px var(--display); }
 .tbl .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--pc); margin-inline-end: 6px; }
 .tblwrap { overflow-x: auto; }
-.rec { color: var(--good); font-weight: 800; }
 .tbl.log td { font-size: 13px; vertical-align: top; }
 .tbl.log td b { font-size: 15px; }
 .tbl.log td { white-space: nowrap; }
@@ -138,7 +137,7 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
     <div class="field">
       <span class="lbl">שמות</span>
       <div class="names" id="names"></div>
-      <p class="hint">כל שם שומר סטטיסטיקה משלו: משחקים, ניצחונות ושיאים.</p>
+      <p class="hint">כל משחק נרשם בטבלת המשחקים בשורה משלו, עם השם שכתבת.</p>
     </div>
     <div class="field">
       <span class="lbl">גודל הלוח</span>
@@ -159,7 +158,7 @@ button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px so
       <div class="seg" id="hints"></div>
       <p class="hint" id="hintsHint"></p>
     </div>
-    <div class="row"><button class="btn" id="startBtn" type="button">התחלת משחק</button><button class="btn ghost" id="statsBtn" type="button">📊 סטטיסטיקה</button><button class="btn ghost" id="gamesBtn" type="button">📋 טבלת משחקים</button></div>
+    <div class="row"><button class="btn" id="startBtn" type="button">התחלת משחק</button><button class="btn ghost" id="gamesBtn" type="button">📋 טבלת משחקים</button></div>
   </section>
 
   <section id="game" hidden style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">
@@ -477,26 +476,25 @@ function checkEnd() {
 function finish() {
   const ps = G.players.map((p, i) => ({ ...p, i, score: scoreOf(p) })).sort((a, b) => b.score - a.score || b.pairs - a.pairs);
   const solo = G.players.length === 1, winners = ps.filter(p => p.score === ps[0].score && p.pairs === ps[0].pairs);
-  const recs = saveStats(ps, solo, winners);
   logGames(ps, solo, winners);
   const title = solo ? `סיימת ב-${fmt(elapsed())} עם ${G.moves} הרמות!` : winners.length > 1 ? "תיקו!" : `${esc(winners[0].name)} ניצח/ה!`;
   $("dlg").innerHTML = `
     <div class="big">🏆</div><h2 style="text-align:center">${title}</h2>
     <div class="tblwrap"><table class="tbl"><thead><tr><th>שחקן</th><th>זוגות</th><th>הרמות</th>${solo ? "<th>זמן</th>" : ""}<th>ציון</th></tr></thead><tbody>
     ${ps.map(p => `<tr style="--pc:${COLORS[p.i]}"><td><span class="dot"></span>${esc(p.name)}</td><td>${p.pairs}</td><td>${p.moves}</td>${solo ? `<td>${fmt(p.time)}</td>` : ""}
-      <td><b>${p.score}</b>${recs.has(p.i) ? ` <span class="rec">🏅 שיא אישי!</span>` : ""}</td></tr>`).join("")}
+      <td><b>${p.score}</b></td></tr>`).join("")}
     </tbody></table></div>
     <p class="formula">ציון: ${PT_PAIR} לכל זוג, פחות ${PT_MISS} לכל הרמה שלא מצאה זוג${solo ? `, פחות ${PT_SEC} לכל שנייה` : " · בלי שעון כשמשחקים כמה שחקנים"}</p>
-    <div class="row"><button class="btn" type="button" id="again">עוד משחק</button><button class="btn ghost" type="button" id="toSetup">הגדרות</button><button class="btn ghost" type="button" id="endStats">📊 סטטיסטיקה</button></div>`;
+    <div class="row"><button class="btn" type="button" id="again">עוד משחק</button><button class="btn ghost" type="button" id="toSetup">הגדרות</button><button class="btn ghost" type="button" id="endStats">📋 טבלת משחקים</button></div>`;
   $("veil").hidden = false;
   beep([523, 659, 784, 1047], .14);
   $("again").focus();
   $("again").onclick = () => { $("veil").hidden = true; start(); };
   $("toSetup").onclick = toSetup;
-  $("endStats").onclick = showStats;
+  $("endStats").onclick = () => showGames("");
 }
 
-// ---------- stats per name (kept in this browser) ----------
+// old per-name stats (no longer shown); read once to bring earlier solo games into the games table
 function loadStats() { try { return JSON.parse(localStorage.getItem(LS_STATS) || "{}"); } catch (e) { return {}; } }
 // ---------- games table: one row per player per game, every game (named or not) ----------
 const LS_GAMES = "memory-games-v1", GAMES_MAX = 1000;
@@ -516,47 +514,6 @@ function logGames(ps, solo, winners) {
     w: !solo && winners.length === 1 && winners[0].i === p.i }));
   if (list.length > GAMES_MAX) list.splice(0, list.length - GAMES_MAX);
   try { localStorage.setItem(LS_GAMES, JSON.stringify(list)); } catch (e) {}
-}
-const boardKey = () => `${setup.size}-${setup.kind}`;
-const boardName = key => { const [s, k, g] = key.split("-"); return `${SIZES[s]?.label || s}, ${KINDS.find(x => x.id === k)?.label || k}${g ? ", קבוצתי" : ""}`; };
-// returns the set of player indexes who set a new personal best score on this board
-function saveStats(ps, solo, winners) {
-  const st = loadStats(), recs = new Set(), key = boardKey() + (solo ? "" : "-g");
-  ps.filter(p => p.named).forEach(p => {
-    const name = p.name.trim(), r = st[name] ||= { games: 0, wins: 0, pairs: 0, moves: 0, ms: 0, best: {} };
-    r.games++; r.pairs += p.pairs; r.moves += p.moves; r.ms += p.time;
-    if (!solo && winners.length === 1 && winners[0].i === p.i) r.wins++;
-    const b = r.best[key] ||= {};
-    if (b.score === undefined || p.score > b.score) { if (b.score !== undefined) recs.add(p.i); b.score = p.score; }
-    if (solo && (b.ms === undefined || p.time < b.ms)) b.ms = p.time;
-    if (solo && (b.moves === undefined || p.moves < b.moves)) b.moves = p.moves;
-  });
-  try { localStorage.setItem(LS_STATS, JSON.stringify(st)); } catch (e) {}
-  return recs;
-}
-function showStats() {
-  const games = loadGames(), st = loadStats(), names = Object.keys(st).sort((a, b) => st[b].games - st[a].games);
-  const rows = names.map(n => {
-    const r = st[n], acc = r.moves ? Math.round(100 * r.pairs / r.moves) : 0;
-    const best = Object.entries(r.best).map(([k, b]) =>
-      `<div>${esc(boardName(k))}: <b>${b.score}</b>${b.ms !== undefined ? ` · לבד ${fmt(b.ms)}, ${b.moves} הרמות` : ""}</div>`).join("");
-    const log = games.filter(g => g.n === n && g.pl === 1), avg = log.length ? Math.round(log.reduce((t, g) => t + g.s, 0) / log.length) : "–";
-    return `<tr><td><button class="who" type="button" data-n="${esc(n)}">${esc(n)}</button></td><td>${r.games}</td><td>${r.wins}</td><td>${acc}%</td><td>${log.length ? log[log.length - 1].s : "–"}</td><td>${avg}</td><td>${fmt(r.ms)}</td><td style="font-size:13px">${best}</td></tr>`;
-  }).join("");
-  $("dlg").innerHTML = `
-    <h2>📊 סטטיסטיקה לפי שם</h2>
-    ${names.length ? `<div class="tblwrap"><table class="tbl"><thead><tr><th>שם</th><th>משחקים</th><th>ניצחונות</th><th>דיוק</th><th>ציון אחרון (לבד)</th><th>ממוצע (לבד)</th><th>זמן משחק</th><th>שיאים (ציון)</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="hint">לחיצה על שם פותחת את טבלת המשחקים שלו. דיוק = כמה מההרמות מצאו זוג. נשמר בדפדפן הזה בלבד. משחק בלי שם לא נספר.</p>`
-    : `<p class="hint">עוד אין נתונים. כתבו שם לפני המשחק, והתוצאות יישמרו כאן.</p>`}
-    <div class="row"><button class="btn" type="button" id="statsClose">סגירה</button><button class="btn ghost" type="button" id="statsGames">📋 טבלת משחקים</button>${names.length ? `<button class="btn ghost" type="button" id="statsReset">מחיקת הכול</button>` : ""}</div>`;
-  $("veil").hidden = false;
-  $("statsClose").onclick = () => { $("veil").hidden = true; };
-  if ($("statsReset")) $("statsReset").onclick = () => {
-    if (confirm("למחוק את כל הסטטיסטיקה?")) { try { localStorage.removeItem(LS_STATS); localStorage.setItem(LS_GAMES, "[]"); } catch (e) {} showStats(); }
-  };
-  document.querySelectorAll(".who").forEach(b => b.onclick = () => showGames(b.dataset.n));
-  $("statsGames").onclick = () => showGames("");
-  $("statsClose").focus();
 }
 // the games table: every game, newest first, one row per player; filter by name
 function showGames(who) {
@@ -578,12 +535,15 @@ function showGames(who) {
       </tbody></table></div>
       <p class="formula">תוצאה = ${PT_PAIR} לכל זוג − ${PT_MISS} לכל החמצה − ${PT_SEC} לכל שנייה (זמן נספר רק במשחק לבד). 🥇 = ניצחון במשחק קבוצתי.</p>`
     : `<p class="hint">עוד אין משחקים בטבלה. מעכשיו כל משחק יירשם כאן.</p>`}
-    <div class="row"><button class="btn" type="button" id="logBack">חזרה לסטטיסטיקה</button></div>`;
+    <div class="row"><button class="btn" type="button" id="logBack">סגירה</button>${all.length ? `<button class="btn ghost" type="button" id="gReset">מחיקת הטבלה</button>` : ""}</div>`;
   $("veil").hidden = false;
   $("gWho").onchange = e => showGames(e.target.value);
-  $("logBack").onclick = showStats; $("logBack").focus();
+  $("logBack").onclick = () => { $("veil").hidden = true; };
+  if ($("gReset")) $("gReset").onclick = () => {
+    if (confirm("למחוק את כל טבלת המשחקים?")) { try { localStorage.setItem(LS_GAMES, "[]"); } catch (e) {} showGames(""); }
+  };
+  $("logBack").focus();
 }
-$("statsBtn").onclick = showStats;
 $("gamesBtn").onclick = () => showGames("");
 
 function toSetup() { clearInterval(clockTimer); $("veil").hidden = true; $("game").hidden = true; $("setup").hidden = false; $("newBtn").hidden = true; G = null; renderSetup(); }
