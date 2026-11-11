@@ -148,6 +148,7 @@ a.lk { color: #8fe0ff; font-weight: 700; overflow-wrap: anywhere; }
   background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.28);
 }
 .team:enabled { cursor: pointer; }
+.team.turn { border-color: var(--ev); box-shadow: 0 0 0 2px var(--ev); }
 .team[aria-pressed="true"] { background: #1d7a46; border-color: #7be3a6; }
 .rank { display: flex; flex-direction: column; gap: 8px; width: min(760px, 100%); margin: 0 auto; }
 .rank div { display: flex; justify-content: space-between; gap: 12px; padding: .35em .8em; border-radius: 10px; background: rgba(255,255,255,.08); font: 700 clamp(18px, 2.6vw, 38px) var(--body); overflow-wrap: anywhere; }
@@ -595,6 +596,8 @@ $("startShow").onclick = () => {
 let S = null;       // { quiz, teams, i, phase: intro|question|reveal|final, marks: per question, the teams that were right, picks: per question, the answer chosen on screen }
 let countdown = null, pulse = null;
 const score = t => S.marks.reduce((n, m) => n + (m.includes(t) ? 1 : 0), 0);
+// the players take the questions in turn: question 1 to the first, question 2 to the second, and round again
+const turnOf = i => S.teams.length ? i % S.teams.length : -1;
 function stopClock() { clearInterval(countdown); clearInterval(pulse); countdown = pulse = null; }
 function persist() {
   try { if (S.phase === "final") localStorage.removeItem(SAVED_SHOW); else localStorage.setItem(SAVED_SHOW, JSON.stringify(S)); } catch (e) {}
@@ -640,11 +643,13 @@ function next() {
 function choose(oi) {
   if (S.phase !== "question" || !S.quiz.questions[S.i].options[oi]) return;
   (S.picks = S.picks || [])[S.i] = oi; S.phase = "reveal";
+  // the first click decides: a right answer gives the player whose turn it is one point, a wrong one gives nothing
+  if (S.teams.length) S.marks[S.i] = oi === S.quiz.questions[S.i].answer ? [turnOf(S.i)] : [];
   enter(false);
   sfx(S.quiz.pack, oi === S.quiz.questions[S.i].answer ? "right" : "wrong");
 }
 function back() {
-  if (S.phase === "reveal") { S.phase = "question"; if (S.picks) S.picks[S.i] = null; }
+  if (S.phase === "reveal") { S.phase = "question"; if (S.picks && S.picks[S.i] != null) { S.picks[S.i] = null; S.marks[S.i] = []; } }
   else if (S.phase === "question") { if (S.i > 0) { S.i--; S.phase = "reveal"; } else S.phase = "intro"; }
   else if (S.phase === "final") S.phase = "reveal";
   else return;
@@ -682,7 +687,7 @@ function renderShow() {
   const { quiz, phase, i, teams } = S, ev = EVENTS[quiz.event], q = quiz.questions[i], total = quiz.questions.length, stage = $("show");
   stage.style.setProperty("--ev", ev.color);
   const top = el("div", { class: "bar" },
-    el("span", {}, phase === "question" || phase === "reveal" ? `שאלה ${i + 1} מתוך ${total}` : quiz.title),
+    el("span", {}, phase === "question" || phase === "reveal" ? `שאלה ${i + 1} מתוך ${total}` + (teams.length ? ` · התור של ${teams[turnOf(i)]}` : "") : quiz.title),
     phase === "question" && quiz.timer ? el("span", { class: "clockn", id: "clockN", ariaLive: "off" }, String(quiz.timer)) : null,
     el("span", { class: "row" },
       el("button", { id: "muteBtn", type: "button", ariaLabel: soundOn ? "השתקה" : "הפעלת קול", onclick: toggleSound }, soundOn ? "🔊" : "🔇"),
@@ -699,7 +704,7 @@ function renderShow() {
       ? el("div", { class: "ans" + (oi === q.answer ? " yes" : oi === chosen ? " bad" : " no") }, el("b", {}, LETTERS[oi]), el("span", {}, o))
       : el("button", { class: "ans", type: "button", onclick: () => choose(oi) }, el("b", {}, LETTERS[oi]), el("span", {}, o)))));
     if (shown && chosen != null) mid.append(chosen === q.answer
-      ? el("p", { class: "verdict good" }, "נכון!")
+      ? el("p", { class: "verdict good" }, teams.length ? `נכון! נקודה ל${teams[turnOf(i)]}` : "נכון!")
       : el("p", { class: "verdict miss" }, `לא נכון. התשובה הנכונה: ${q.options[q.answer]}`));
     if (shown && q.note) {
       const long = q.note.length > 160;
@@ -722,7 +727,7 @@ function renderShow() {
   }
   const reveal = phase === "reveal";
   const chips = teams.length && (reveal || phase === "question") ? el("div", { class: "teams" }, ...teams.map((name, t) =>
-    el("button", { class: "team", type: "button", disabled: !reveal, ariaPressed: String(reveal && S.marks[i].includes(t)), onclick: () => toggleTeam(t) }, `${name}: ${score(t)}`))) : el("span");
+    el("button", { class: "team" + (t === turnOf(i) ? " turn" : ""), type: "button", disabled: !reveal, ariaPressed: String(reveal && S.marks[i].includes(t)), onclick: () => toggleTeam(t) }, `${name}: ${score(t)}`))) : el("span");
   const acts = el("div", { class: "row" });
   if (reveal && teams.length) acts.append(el("button", { class: "act", type: "button", onclick: nobody }, "אף אחד לא צדק"));
   if (reveal && !teams.length && chosen == null) acts.append(
@@ -732,7 +737,7 @@ function renderShow() {
   if (phase === "final") acts.append(el("button", { class: "act main", type: "button", onclick: () => { S = null; try { localStorage.removeItem(SAVED_SHOW); } catch (e) {} exitShow(); } }, "סיום"));
   else acts.append(el("button", { class: "act main", type: "button", id: "nextBtn", onclick: next },
     phase === "intro" ? "מתחילים" : phase === "question" ? "חשיפת התשובה" : i + 1 < total ? "השאלה הבאה" : "לתוצאות"));
-  const keys = reveal && teams.length ? "ספרות 1–" + teams.length + ": מי צדק · 0: אף אחד · רווח: הלאה · F: מסך מלא · M: השתקה"
+  const keys = reveal && teams.length ? "ספרות 1–" + teams.length + ": תיקון ניקוד · 0: אף אחד · רווח: הלאה · F: מסך מלא · M: השתקה"
     : phase === "question" ? "ספרות 1–" + q.options.length + ": בחירת תשובה · רווח: חשיפה · F: מסך מלא · M: השתקה"
     : "רווח או PageDown: הלאה · PageUp: חזרה · F: מסך מלא · M: השתקה";
   stage.replaceChildren(top, mid, el("div", { class: "foot" }, chips, acts, el("div", { class: "keys" }, keys)));
