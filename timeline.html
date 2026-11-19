@@ -111,6 +111,8 @@ body.placing .ins { display: flex; }
 .rcard.open small { color: var(--muted); font-size: 12px; }
 .rcard.open.choose { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
 .rcard.used { opacity: .45; cursor: default; }
+.rcard:not(.open) small { font: 700 13px var(--display); opacity: .9; }
+.rescue .bankline { font: 700 16px var(--display); color: inherit; }
 @keyframes flip { 0% { transform: rotateY(90deg); } 100% { transform: none; } }
 @media (max-width: 600px) { .rgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rcard { height: 96px; font-size: 15px; } }
 .hand .lifeline { color: var(--accent); font: 800 17px var(--display); }
@@ -149,9 +151,9 @@ body.placing .ins { display: flex; }
       <li>אפשר להכניס אירוע גם בין קלפים שכבר בלוח: כשמזיזים אירוע, מופיע סימן + בין כל שני קלפים ובקצוות. משחררים על ה-+, והקלפים זזים לבד כדי לפנות מקום.</li>
       <li>כשכל 10 התיבות מלאות, עוברים אוטומטית לסיבוב הבא עם לוח ריק.</li>
       <li>5 סיבובים: בראשון האירועים מכל התקופות, ובכל סיבוב טווח השנים מצטמצם (1000, 500, 250), עד 100 שנה בסיבוב האחרון.</li>
-      <li>💰 כל סיבוב שווה כסף: 1,000 ₪, ואחר כך עוד 4,000, 10,000, 15,000 ו-30,000. מי שמסיים את כל הסיבובים זוכה ב-60,000 ₪.</li>
+      <li>💰 כל הנחה נכונה מכניסה כסף לקופה, שמתחילה מאפס: 100 ₪ בסיבוב 1, ואחר כך 400, 1,000, 1,500 ו-3,000. מי שמסיים את כל הסיבובים צובר עד 60,000 ₪.</li>
       <li>בכל סיבוב מותר מספר מוגבל של טעויות: 3, 5, 7, 10 ו-15. טעות אחת יותר מזה, והולכים הביתה בידיים ריקות.</li>
-      <li>🛟 גלגל הצלה: כשהטעות שולחת אתכם הביתה, מופיעים 9 קלפים הפוכים ועל כל אחד נושא. הופכים שניים, בוחרים אירוע אחד ומניחים אותו על הלוח. הנחה נכונה מצילה אתכם, וממשיכים. טעות, והולכים הביתה.</li>
+      <li>🛟 גלגל הצלה: כשהטעות שולחת אתכם הביתה, מופיעים 9 קלפים הפוכים ועל כל אחד נושא. הקלף הראשון חינם, וכל קלף נוסף עולה את ערך ההנחה של הסיבוב (100 ₪ בסיבוב 1 ... 3,000 בסיבוב 5), כל עוד יש מספיק כסף בקופה. בוחרים אירוע אחד מהקלפים שנפתחו ומניחים אותו על הלוח. הנחה נכונה מצילה, וממשיכים. טעות, והולכים הביתה.</li>
       <li>אחרי סיבוב 3 (15,000 ₪) ואחרי סיבוב 4 (30,000 ₪) אפשר לפרוש עם הכסף, או להמשיך ולהסתכן בכול.</li>
     </ol>
     <h2>בחרו רמת קושי: כמה מוכרים האירועים</h2>
@@ -243,6 +245,7 @@ const ROUNDS = WIDTHS.length;
 // money: what each round adds, the total after it, and how many mistakes it allows; you may stop after round 3
 const PRIZE = [1000, 4000, 10000, 15000, 30000];
 const TOTAL = PRIZE.map((_, i) => PRIZE.slice(0, i + 1).reduce((a, b) => a + b));
+const PER = PRIZE.map(v => v / N);   // each right placement pays this; a lifeline card past the first costs the same
 const ALLOW = [3, 5, 7, 10, 15];
 const CAN_STOP = 3;
 const money = n => n.toLocaleString("he-IL") + " ₪";
@@ -353,7 +356,8 @@ function drop(from, to) {
       to = test.indexOf(e);
       G.slots = test; G.hand = null;
       G.used.add(e);
-      sGood(); say((G.rescue ? "🛟 ניצלתם! " : "") + `נכון! ${fmt(e)}`, "good"); G.rescue = false;
+      G.bank += PER[G.round - 1];
+      sGood(); say((G.rescue ? "🛟 ניצלתם! " : "") + `נכון! ${fmt(e)} · +${money(PER[G.round - 1])}`, "good"); G.rescue = false;
       draw(); render({ good: to });
       if (G.slots.every(Boolean)) roundDone();
     } else {
@@ -377,11 +381,10 @@ function drop(from, to) {
 }
 function roundDone() {
   sWin();
-  G.bank = TOTAL[G.round - 1];
   render();
   const d = $("done"); d.classList.remove("lost");
   if (G.round === ROUNDS) return finish(`🏆 סיימתם את כל 5 הסיבובים! זכיתם ב-${money(G.bank)}`);
-  const r = G.round + 1, next = `סיבוב ${r}: עוד ${money(PRIZE[r - 1])}, עד ${ALLOW[r - 1]} טעויות, אירועים מ${rangeText(G.wins[r - 1])}`;
+  const r = G.round + 1, next = `סיבוב ${r}: ${money(PER[r - 1])} לכל הנחה נכונה, עד ${ALLOW[r - 1]} טעויות, אירועים מ${rangeText(G.wins[r - 1])}`;
   if (G.round < CAN_STOP) {
     d.innerHTML = `<h2>✔ סיבוב ${G.round} הושלם! בקופה ${money(G.bank)}</h2>
       <div>עוד רגע ${next}</div>
@@ -395,7 +398,7 @@ function roundDone() {
     <div>לפרוש עכשיו עם הכסף, או להמשיך? אם תיכשלו בסיבוב הבא, תלכו הביתה בידיים ריקות.</div>
     <div>${next}</div>
     <div class="row"><button class="btn" type="button" id="stopBtn">💰 לפרוש עם ${money(G.bank)}</button>
-    <button class="btn ghost" type="button" id="goBtn">להמשיך ל-${money(TOTAL[r - 1])}</button></div>`;
+    <button class="btn ghost" type="button" id="goBtn">להמשיך (עד ${money(G.bank + PRIZE[r - 1])})</button></div>`;
   d.hidden = false;
   $("stopBtn").onclick = () => finish(`💰 פרשתם עם ${money(G.bank)}`);
   $("goBtn").onclick = () => startRound(r);
@@ -440,25 +443,33 @@ function offerRescue() {
   G.inRescue = { cards, open: [] };
   setTimeout(showRescue, 900);
 }
+// the first card is free; every other card costs a placement's worth, only while the bank can pay
 function showRescue() {
   const R = G.inRescue; if (!R) return;
-  const box = $("rescue");
-  const two = R.open.length === 2;
+  const box = $("rescue"), price = PER[G.round - 1], n = R.open.length;
+  const cost = n === 0 ? 0 : price, canBuy = G.bank >= cost;
   box.innerHTML = `<h2>🛟 גלגל הצלה!</h2>
-    <p>${two ? "בחרו אחד מהשניים והניחו אותו על הלוח. הנחה נכונה = ממשיכים, טעות = הביתה." : `עברתם את ${ALLOW[G.round - 1]} הטעויות. הפכו שני קלפים לפי הנושא (${R.open.length}/2).`}</p>
+    <p></p><p class="bankline"></p>
     <div class="rgrid"></div>`;
+  const [p1, p2] = box.querySelectorAll("p");
+  p1.textContent = n === 0
+    ? `עברתם את ${ALLOW[G.round - 1]} הטעויות. הפכו קלף לפי הנושא: הראשון חינם, כל קלף נוסף עולה ${money(price)}.`
+    : "לחצו על אירוע פתוח כדי להניח אותו על הלוח (נכון = ממשיכים, טעות = הביתה), או קנו עוד קלף.";
+  p2.textContent = `בקופה: ${money(G.bank)}` + (n && !canBuy ? " · אין מספיק כסף לעוד קלף" : "");
   R.cards.forEach((c, i) => {
     const b = document.createElement("button");
     b.type = "button"; b.className = "rcard";
     if (R.open.includes(i)) {
-      b.classList.add("open"); if (two) b.classList.add("choose");
+      b.classList.add("open", "choose");
       b.innerHTML = "<small></small><span></span>";
       b.querySelector("small").textContent = c.cat; b.querySelector("span").textContent = c.e.t;
-      b.onclick = () => two && chooseRescue(c.e);
+      b.onclick = () => chooseRescue(c.e);
     } else {
-      b.textContent = c.cat;
-      if (two) b.classList.add("used");
-      else b.onclick = () => { R.open.push(i); showRescue(); };
+      b.innerHTML = "<span></span><small></small>";
+      b.querySelector("span").textContent = c.cat;
+      b.querySelector("small").textContent = cost ? money(cost) : "חינם";
+      if (!canBuy) b.classList.add("used");
+      else b.onclick = () => { G.bank -= cost; R.open.push(i); render(); showRescue(); };
     }
     box.querySelector(".rgrid").appendChild(b);
   });
@@ -544,7 +555,7 @@ function render(fx = {}) {
   }
   h.hidden = full || !!G.end || !!G.inRescue;
   if (G.rescue && G.hand) { const l = document.createElement("div"); l.className = "lifeline"; l.textContent = "🛟 גלגל הצלה"; h.prepend(l); }
-  $("ladder").innerHTML = PRIZE.map((v, i) => `<div class="rung${i + 1 === G.round ? " now" : i + 1 < G.round ? " past" : ""}">+${money(v)}<small>סיבוב ${i + 1} · עד ${ALLOW[i]} טעויות${i + 1 >= CAN_STOP && i + 1 < ROUNDS ? " · 🏁" : ""}</small></div>`).join("");
+  $("ladder").innerHTML = PER.map((v, i) => `<div class="rung${i + 1 === G.round ? " now" : i + 1 < G.round ? " past" : ""}">${money(v)} להנחה<small>סיבוב ${i + 1} · עד ${ALLOW[i]} טעויות${i + 1 >= CAN_STOP && i + 1 < ROUNDS ? " · 🏁" : ""}</small></div>`).join("");
   $("bank").textContent = money(G.bank);
   $("placed").textContent = G.slots.filter(Boolean).length;
   $("round").textContent = G.round;
