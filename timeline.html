@@ -85,6 +85,8 @@ body.placing .ins { display: flex; }
 }
 .ev .cat { font: 500 12px var(--display); color: var(--muted); }
 .ev .date { margin-top: auto; font: 800 15px var(--display); color: var(--accent); }
+.ev.anchor { border-style: dashed; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--card)); }
+.ev.anchor .tag { align-self: flex-start; font: 800 11px var(--display); color: #fff; background: var(--accent); border-radius: 6px; padding: 1px 6px; }
 .ev.picked { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
 .ev.ghosting { opacity: .3; }
 .ev.good { animation: good .7s; }
@@ -146,6 +148,7 @@ body.placing .ins { display: flex; }
   <section class="setup" id="setup">
     <h2>איך משחקים</h2>
     <ol>
+      <li>כל סיבוב מתחיל עם קלף פתיחה גלוי באמצע הלוח, עם התאריך שלו. את האירוע הראשון מניחים לפניו או אחריו, ואחרי ההנחה הנכונה הראשונה קלף הפתיחה יורד מהלוח.</li>
       <li>אירוע מוגרל מופיע לבד מתחת ללוח.</li>
       <li>גוררים אותו לאחת מ-10 התיבות. התיבה הימנית היא הכי ישנה, השמאלית הכי חדשה.</li>
       <li>אם המקום נכון, האירוע נשאר ותאריכו נחשף. אם טעיתם, הוא חוזר לקופה. בשני המקרים מיד מגיע האירוע הבא.</li>
@@ -321,10 +324,27 @@ function startRound(r) {
   clearTimeout(nextT); clearTimeout(drawT);
   G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
   G.round = r; G.rm = 0; G.slots = Array(N).fill(null); G.pool = roundPool(r - 1); G.hand = null; G.last = null;
+  // an opening card with its date in the middle; the first event is placed against it, then it leaves the board
+  G.anchor = anchorFor(r - 1);
+  if (G.anchor) { G.slots[4] = G.anchor; G.used.add(G.anchor); markSeen(G.anchor); }
   $("done").hidden = true;
   say(r === 1 ? "" : `סיבוב ${r}: אירועים מ${rangeText(G.wins[r - 1])}`, "good");
   draw(); render();
 }
+// the opening card: an event of this round's years that is not in the pool, from the middle of the pool's years
+// (so the first event is as likely to go before it as after it), closest level first, unseen first
+function anchorFor(r) {
+  const w = G.wins[r], inPool = new Set(G.pool);
+  const ys = G.pool.map(e => e.y).sort((a, b) => a - b), mid = ys[Math.floor(ys.length / 2)] ?? 1900;
+  const ok = bank.filter(e => inWin(w, e) && !inPool.has(e) && !G.used.has(e));
+  for (const d of [0, 1, 2, 3, 4]) {
+    const near = ok.filter(e => Math.abs(e.f - G.level) === d), fresh = near.filter(e => !SEEN.has(e.t));
+    const from = (fresh.length ? fresh : near).sort((a, b) => Math.abs(a.y - mid) - Math.abs(b.y - mid)).slice(0, 8);
+    if (from.length) return from[Math.floor(Math.random() * from.length)];
+  }
+  return null;
+}
+const placedCount = () => G.slots.filter(e => e && e !== G.anchor).length;
 let drawT = null;
 function draw() {
   const now = G.pool;
@@ -357,8 +377,10 @@ function drop(from, to) {
       to = test.indexOf(e);
       G.slots = test; G.hand = null;
       G.used.add(e);
+      const hadAnchor = !!G.anchor;
+      if (G.anchor) { const a = G.slots.indexOf(G.anchor); if (a >= 0) G.slots[a] = null; G.anchor = null; }
       if (!G.rescue) G.bank += PER[G.round - 1];
-      sGood(); say(G.rescue ? `🛟 ניצלתם! נכון! ${fmt(e)} (בלי כסף על הנחה בגלגל)` : `נכון! ${fmt(e)} · +${money(PER[G.round - 1])}`, "good"); G.rescue = false;
+      sGood(); say((G.rescue ? `🛟 ניצלתם! נכון! ${fmt(e)} (בלי כסף על הנחה בגלגל)` : `נכון! ${fmt(e)} · +${money(PER[G.round - 1])}`) + (hadAnchor ? " · קלף הפתיחה ירד מהלוח" : ""), "good"); G.rescue = false;
       draw(); render({ good: to });
       if (G.slots.every(Boolean)) roundDone();
     } else {
@@ -541,7 +563,11 @@ function render(fx = {}) {
     if (e) {
       const c = card(e, true);
       if (fx.good === i) c.classList.add("good");
-      hook(c, i); s.appendChild(c);
+      if (e === G.anchor) {   // the opening card stays put
+        c.classList.add("anchor"); c.style.cursor = "default";
+        const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = "קלף פתיחה"; c.prepend(tag);
+      } else hook(c, i);
+      s.appendChild(c);
       for (const [cls, g] of [["r", i], ["l", i + 1]]) {   // right side = earlier than this card, left side = later
         const z = document.createElement("div");
         z.className = "ins " + cls; z.dataset.g = g; z.textContent = "+";
@@ -575,7 +601,7 @@ function render(fx = {}) {
   if (G.rescue && G.hand) { const l = document.createElement("div"); l.className = "lifeline"; l.textContent = "🛟 גלגל הצלה"; h.prepend(l); }
   $("ladder").innerHTML = PER.map((v, i) => `<div class="rung${i + 1 === G.round ? " now" : i + 1 < G.round ? " past" : ""}">${money(v)} להנחה<small>סיבוב ${i + 1} · עד ${ALLOW[i]} טעויות${i + 1 >= CAN_STOP && i + 1 < ROUNDS ? " · 🏁" : ""}</small></div>`).join("");
   $("bank").textContent = money(G.bank);
-  $("placed").textContent = G.slots.filter(Boolean).length;
+  $("placed").textContent = placedCount();
   $("round").textContent = G.round;
   $("era").textContent = "· " + rangeText(G.wins[G.round - 1]);
   $("misses").textContent = `${G.rm}/${ALLOW[G.round - 1]}`;
