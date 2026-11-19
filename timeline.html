@@ -96,6 +96,14 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
 .pool:disabled { cursor: default; opacity: .45; }
 
 .done { background: var(--panel); border: 2px solid var(--good); border-radius: 12px; padding: 18px; text-align: center; display: grid; gap: 10px; justify-items: center; }
+.done.lost { border-color: var(--bad); }
+.done .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.ladder { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.rung { border: 2px solid var(--line); border-radius: 8px; padding: 4px 6px; text-align: center; font: 800 16px var(--display); }
+.rung small { display: block; color: var(--muted); font: 500 12px var(--display); }
+.rung.now { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.rung.past { opacity: .5; }
+.bar .warn { color: var(--bad); }
 .done h2 { font: 800 26px var(--display); margin: 0; }
 
 /* narrow windows: two rows of five, the box numbers keep the order clear */
@@ -123,7 +131,9 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
       <li>אפשר להניח גם על קלף שכבר בלוח: בצד הימני שלו (מוקדם ממנו) או בצד השמאלי (מאוחר ממנו), והקלפים זזים לבד כדי לפנות מקום.</li>
       <li>כשכל 10 התיבות מלאות, עוברים אוטומטית לסיבוב הבא עם לוח ריק.</li>
       <li>5 סיבובים: בראשון האירועים מכל התקופות, ובכל סיבוב טווח השנים מצטמצם (1000, 500, 250), עד 100 שנה בסיבוב האחרון.</li>
-      <li>המטרה: לסיים את 5 הסיבובים בכמה שפחות טעויות.</li>
+      <li>💰 כל סיבוב שווה כסף: 1,000 ₪, ואחר כך עוד 4,000, 10,000, 15,000 ו-30,000. מי שמסיים את כל הסיבובים זוכה ב-60,000 ₪.</li>
+      <li>בכל סיבוב מותר מספר מוגבל של טעויות: 3, 5, 7, 10 ו-15. טעות אחת יותר מזה, והולכים הביתה בידיים ריקות.</li>
+      <li>אחרי סיבוב 3 (15,000 ₪) ואחרי סיבוב 4 (30,000 ₪) אפשר לפרוש עם הכסף, או להמשיך ולהסתכן בכול.</li>
     </ol>
     <h2>בחרו רמת קושי: כמה מוכרים האירועים</h2>
     <div class="levels" id="levels"></div>
@@ -137,10 +147,12 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
         <div><span>רמה</span> <b id="lvl">1</b></div>
         <div><span>סיבוב</span> <b id="round">1</b>/5 <span id="era"></span></div>
         <div><span>על הלוח:</span> <b id="placed">0</b>/10</div>
-        <div><span>טעויות:</span> <b id="misses">0</b></div>
+        <div><span>טעויות בסיבוב:</span> <b id="misses">0</b></div>
+        <div><span>בקופה:</span> <b id="bank">0 ₪</b></div>
         <div><span>זמן:</span> <b id="clock">0:00</b></div>
         <button class="btn ghost" id="restartBtn" type="button">משחק חדש</button>
       </div>
+      <div class="ladder" id="ladder"></div>
       <div class="ends"><span>→ הכי ישן</span><span>הכי חדש ←</span></div>
       <div class="slots" id="slots"></div>
       <p class="msg" id="msg" aria-live="polite"></p>
@@ -212,6 +224,12 @@ const LEVELS = [
 // years the events come from, by round (a round is a full board); the last round is 100 years
 const WIDTHS = [0, 1000, 500, 250, 100];
 const ROUNDS = WIDTHS.length;
+// money: what each round adds, the total after it, and how many mistakes it allows; you may stop after round 3
+const PRIZE = [1000, 4000, 10000, 15000, 30000];
+const TOTAL = PRIZE.map((_, i) => PRIZE.slice(0, i + 1).reduce((a, b) => a + b));
+const ALLOW = [3, 5, 7, 10, 15];
+const CAN_STOP = 3;
+const money = n => n.toLocaleString("he-IL") + " ₪";
 const THIS_YEAR = new Date().getFullYear();
 let level = 1;
 try { level = Math.min(5, Math.max(1, +localStorage.getItem("timeline-level") || 1)); } catch (e) {}
@@ -255,7 +273,7 @@ function roundPool(r) {
 // ---------- game ----------
 function newGame() {
   const list = bank.filter(e => e.f === level);
-  G = { level, list, wins: windows(list), used: new Set(), round: 0, slots: [], pool: [], hand: null, misses: 0, t0: null, last: null, end: null };
+  G = { level, list, wins: windows(list), used: new Set(), round: 0, rm: 0, bank: 0, slots: [], pool: [], hand: null, misses: 0, t0: null, last: null, end: null };
   $("lvl").textContent = level;
   $("setup").hidden = true; $("game").hidden = false;
   clearInterval(tick); tick = setInterval(showClock, 500);
@@ -264,7 +282,7 @@ function newGame() {
 let nextT = null;
 function startRound(r) {
   clearTimeout(nextT); clearTimeout(drawT);
-  G.round = r; G.slots = Array(N).fill(null); G.pool = roundPool(r - 1); G.hand = null; G.last = null;
+  G.round = r; G.rm = 0; G.slots = Array(N).fill(null); G.pool = roundPool(r - 1); G.hand = null; G.last = null;
   $("done").hidden = true;
   say(r === 1 ? "" : `סיבוב ${r}: אירועים מ${rangeText(G.wins[r - 1])}`, "good");
   draw(); render();
@@ -272,7 +290,7 @@ function startRound(r) {
 let drawT = null;
 function draw() {
   const now = G.pool;
-  if (G.hand || !now.length || G.slots.every(Boolean)) return;
+  if (G.end || G.hand || !now.length || G.slots.every(Boolean)) return;
   let choices = now.length > 1 ? now.filter(e => e !== G.last) : now;
   const e = choices[Math.floor(Math.random() * choices.length)];
   G.pool.splice(G.pool.indexOf(e), 1);
@@ -298,6 +316,7 @@ function gapAt(s, x) {
 }
 // from = "hand" (to = a gap, see insertAt) or a box index (to = an empty box)
 function drop(from, to) {
+  if (G.end) return;
   if (from !== "hand" && G.slots[to]) return render();
   if (from === "hand") {
     const e = G.hand, test = insertAt(G.slots, e, to);
@@ -309,8 +328,11 @@ function drop(from, to) {
       draw(); render({ good: to });
       if (G.slots.every(Boolean)) roundDone();
     } else {
-      G.misses++; G.hand = null; G.pool.push(e); G.last = e;
-      sBad(); say(`טעות. "${e.t}" חוזר לקופה.`, "bad");
+      G.misses++; G.rm++; G.hand = null; G.pool.push(e); G.last = e;
+      sBad();
+      if (G.rm > ALLOW[G.round - 1]) { say(`טעות. "${e.t}" היה ב${fmt(e)}.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e }); return lose(); }
+      const left = ALLOW[G.round - 1] - G.rm;
+      say(`טעות. "${e.t}" חוזר לקופה. ` + (left ? `נשארו עוד ${left} טעויות בסיבוב.` : "⚠ עוד טעות אחת והכול הולך!"), "bad");
       render({ bad: Math.min(to, N - 1), badEv: e });
       clearTimeout(drawT); drawT = setTimeout(() => { draw(); render(); }, 1300);
     }
@@ -324,21 +346,45 @@ function drop(from, to) {
 }
 function roundDone() {
   sWin();
-  const d = $("done");
-  if (G.round < ROUNDS) {
-    const r = G.round + 1;
-    d.innerHTML = `<h2>✔ סיבוב ${G.round} הושלם!</h2>
-      <div>עוד רגע סיבוב ${r} מתוך ${ROUNDS}: אירועים מ${rangeText(G.wins[r - 1])}</div>
+  G.bank = TOTAL[G.round - 1];
+  render();
+  const d = $("done"); d.classList.remove("lost");
+  if (G.round === ROUNDS) return finish(`🏆 סיימתם את כל 5 הסיבובים! זכיתם ב-${money(G.bank)}`);
+  const r = G.round + 1, next = `סיבוב ${r}: עוד ${money(PRIZE[r - 1])}, עד ${ALLOW[r - 1]} טעויות, אירועים מ${rangeText(G.wins[r - 1])}`;
+  if (G.round < CAN_STOP) {
+    d.innerHTML = `<h2>✔ סיבוב ${G.round} הושלם! בקופה ${money(G.bank)}</h2>
+      <div>עוד רגע ${next}</div>
       <button class="btn" type="button" id="againBtn">לסיבוב ${r} עכשיו</button>`;
     d.hidden = false;
     $("againBtn").onclick = () => startRound(r);
     nextT = setTimeout(() => startRound(r), 3500);
     return;
   }
-  G.end = Date.now();
-  d.innerHTML = `<h2>🎉 סיימתם את כל 5 הסיבובים!</h2>
-    <div>רמה <b>${G.level}</b> · טעויות: <b>${G.misses}</b> · זמן: <b>${clockText()}</b></div>
+  d.innerHTML = `<h2>✔ סיבוב ${G.round} הושלם! בקופה ${money(G.bank)}</h2>
+    <div>לפרוש עכשיו עם הכסף, או להמשיך? אם תיכשלו בסיבוב הבא, תלכו הביתה בידיים ריקות.</div>
+    <div>${next}</div>
+    <div class="row"><button class="btn" type="button" id="stopBtn">💰 לפרוש עם ${money(G.bank)}</button>
+    <button class="btn ghost" type="button" id="goBtn">להמשיך ל-${money(TOTAL[r - 1])}</button></div>`;
+  d.hidden = false;
+  $("stopBtn").onclick = () => finish(`💰 פרשתם עם ${money(G.bank)}`);
+  $("goBtn").onclick = () => startRound(r);
+}
+function lose() {
+  clearTimeout(drawT);
+  const had = G.bank;
+  G.bank = 0;
+  finish(`😬 יותר מ-${ALLOW[G.round - 1]} טעויות בסיבוב ${G.round}. הולכים הביתה בידיים ריקות` + (had ? ` (היו בקופה ${money(had)})` : ""), true);
+}
+function finish(title, lost) {
+  G.end = Date.now(); G.hand = null;
+  if (lost) setTimeout(sBad, 400);
+  render();
+  const d = $("done");
+  d.classList.toggle("lost", !!lost);
+  d.innerHTML = `<h2></h2>
+    <div>רמה <b>${G.level}</b> · סיבוב <b>${G.round}</b> · כל הטעויות: <b>${G.misses}</b> · זמן: <b>${clockText()}</b></div>
     <button class="btn" type="button" id="againBtn">עוד משחק</button>`;
+  d.querySelector("h2").textContent = title;
   d.hidden = false;
   $("againBtn").onclick = newGame;
 }
@@ -393,11 +439,14 @@ function render(fx = {}) {
     p.className = "pool"; p.innerHTML = `האירוע<br>הבא…<br><small>${G.pool.length} בקופה</small>`;
     h.appendChild(p);
   }
-  h.hidden = full;
+  h.hidden = full || !!G.end;
+  $("ladder").innerHTML = PRIZE.map((v, i) => `<div class="rung${i + 1 === G.round ? " now" : i + 1 < G.round ? " past" : ""}">+${money(v)}<small>סיבוב ${i + 1} · עד ${ALLOW[i]} טעויות${i + 1 >= CAN_STOP && i + 1 < ROUNDS ? " · 🏁" : ""}</small></div>`).join("");
+  $("bank").textContent = money(G.bank);
   $("placed").textContent = G.slots.filter(Boolean).length;
   $("round").textContent = G.round;
   $("era").textContent = "· " + rangeText(G.wins[G.round - 1]);
-  $("misses").textContent = G.misses;
+  $("misses").textContent = `${G.rm}/${ALLOW[G.round - 1]}`;
+  $("misses").classList.toggle("warn", G.rm >= ALLOW[G.round - 1]);
   showClock();
 }
 function markOpen(on) {
