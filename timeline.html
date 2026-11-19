@@ -89,7 +89,7 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
 .hand .ev { width: 230px; min-height: 120px; font-size: 18px; }
 .msg { font: 700 17px var(--display); min-height: 26px; text-align: center; margin: 0; }
 .msg.good { color: var(--good); } .msg.bad { color: var(--bad); }
-.pool { width: 120px; height: 130px; border-radius: 10px; border: 0; cursor: pointer; background: repeating-linear-gradient(45deg, var(--accent) 0 12px, color-mix(in srgb, var(--accent) 75%, #fff) 0 24px); color: #fff; font: 800 18px var(--display); text-shadow: 0 1px 3px rgb(0 0 0 / .4); }
+.pool { width: 120px; height: 130px; border-radius: 10px; border: 0; display: grid; place-content: center; text-align: center; opacity: .6; background: repeating-linear-gradient(45deg, var(--accent) 0 12px, color-mix(in srgb, var(--accent) 75%, #fff) 0 24px); color: #fff; font: 800 18px var(--display); text-shadow: 0 1px 3px rgb(0 0 0 / .4); }
 .pool:disabled { cursor: default; opacity: .45; }
 
 .done { background: var(--panel); border: 2px solid var(--good); border-radius: 12px; padding: 18px; text-align: center; display: grid; gap: 10px; justify-items: center; }
@@ -114,9 +114,9 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
   <section class="setup" id="setup">
     <h2>איך משחקים</h2>
     <ol>
-      <li>לוחצים על הקופה ומגרילים אירוע.</li>
+      <li>אירוע מוגרל מופיע לבד מתחת ללוח.</li>
       <li>גוררים אותו לאחת מ-10 התיבות. התיבה הימנית היא הכי ישנה, השמאלית הכי חדשה.</li>
-      <li>אם המקום נכון, האירוע נשאר ותאריכו נחשף. אם טעיתם, הוא חוזר לקופה.</li>
+      <li>אם המקום נכון, האירוע נשאר ותאריכו נחשף. אם טעיתם, הוא חוזר לקופה. בשני המקרים מיד מגיע האירוע הבא.</li>
       <li>אירוע שכבר על הלוח אפשר לגרור לתיבה ריקה אחרת, כדי לפנות מקום.</li>
       <li>כשכל 10 התיבות מלאות, עוברים אוטומטית לסיבוב הבא עם לוח ריק.</li>
       <li>5 סיבובים: בראשון האירועים מכל התקופות, ובכל סיבוב טווח השנים מצטמצם (1000, 500, 250), עד 100 שנה בסיבוב האחרון.</li>
@@ -260,22 +260,21 @@ function newGame() {
 }
 let nextT = null;
 function startRound(r) {
-  clearTimeout(nextT);
+  clearTimeout(nextT); clearTimeout(drawT);
   G.round = r; G.slots = Array(N).fill(null); G.pool = roundPool(r - 1); G.hand = null; G.last = null;
   $("done").hidden = true;
   say(r === 1 ? "" : `סיבוב ${r}: אירועים מ${rangeText(G.wins[r - 1])}`, "good");
-  render();
+  draw(); render();
 }
+let drawT = null;
 function draw() {
   const now = G.pool;
-  if (G.hand || !now.length) return;
+  if (G.hand || !now.length || G.slots.every(Boolean)) return;
   let choices = now.length > 1 ? now.filter(e => e !== G.last) : now;
   const e = choices[Math.floor(Math.random() * choices.length)];
   G.pool.splice(G.pool.indexOf(e), 1);
   G.hand = e;
   if (!G.t0) G.t0 = Date.now();
-  say("");
-  render();
 }
 // from = "hand" or a box index; to = a box index
 function drop(from, to) {
@@ -286,12 +285,13 @@ function drop(from, to) {
       G.slots = test; G.hand = null;
       G.used.add(e);
       sGood(); say(`נכון! ${fmt(e)}`, "good");
-      render({ good: to });
+      draw(); render({ good: to });
       if (G.slots.every(Boolean)) roundDone();
     } else {
       G.misses++; G.hand = null; G.pool.push(e); G.last = e;
       sBad(); say(`טעות. "${e.t}" חוזר לקופה.`, "bad");
       render({ bad: to, badEv: e });
+      clearTimeout(drawT); drawT = setTimeout(() => { draw(); render(); }, 1300);
     }
   } else {
     if (from === to) return render();
@@ -366,9 +366,9 @@ function render(fx = {}) {
     tip.textContent = "גררו לתיבה, או לחצו על האירוע ואז על תיבה ריקה";
     h.appendChild(tip);
   } else if (!full) {
-    const p = document.createElement("button");
-    p.className = "pool"; p.type = "button"; p.innerHTML = `הגרילו<br>אירוע<br><small>${G.pool.length} בקופה</small>`;
-    p.onclick = draw; h.appendChild(p);
+    const p = document.createElement("div");
+    p.className = "pool"; p.innerHTML = `האירוע<br>הבא…<br><small>${G.pool.length} בקופה</small>`;
+    h.appendChild(p);
   }
   h.hidden = full;
   $("placed").textContent = G.slots.filter(Boolean).length;
@@ -427,7 +427,7 @@ function slotAt(x, y) {
 $("startBtn").onclick = newGame;
 $("restartBtn").onclick = () => {
   if (!G.end && !confirm("להתחיל משחק חדש? המשחק הנוכחי יימחק.")) return;
-  clearInterval(tick); clearTimeout(nextT); renderLevels(); $("game").hidden = true; $("setup").hidden = false;
+  clearInterval(tick); clearTimeout(nextT); clearTimeout(drawT); renderLevels(); $("game").hidden = true; $("setup").hidden = false;
 };
 renderLevels();
 fetch("questions/events.json", { cache: "no-cache" })
