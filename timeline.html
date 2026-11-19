@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ציר הזמן</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Timeline game: draw an event and place it in one of 10 boxes, oldest on the right.
+   Placed events can be dragged to another empty box. A wrong placement sends the event back to the pool. */
+:root {
+  --bg: #f3f1ec; --panel: #fdfcf9; --ink: #1f1c17; --muted: #6a6457; --line: #dcd6c8;
+  --accent: #b5541c; --accent-ink: #ffffff; --slot: #ebe6da; --card: #ffffff;
+  --good: #1d7a46; --good-soft: #def2e5; --bad: #b3261e; --bad-soft: #f8e2df;
+  --display: "Rubik", "Segoe UI", Arial, sans-serif;
+  --body: "Assistant", "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17150f; --panel: #211e17; --ink: #ece7dc; --muted: #a9a190; --line: #3a352a;
+    --accent: #e98a4f; --accent-ink: #1a120b; --slot: #29251c; --card: #2e2a21;
+    --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17150f; --panel: #211e17; --ink: #ece7dc; --muted: #a9a190; --line: #3a352a;
+  --accent: #e98a4f; --accent-ink: #1a120b; --slot: #29251c; --card: #2e2a21;
+  --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.45; direction: rtl; }
+.wrap {
+  max-width: 1400px; margin: 0 auto; padding-block: 12px 24px; min-height: 100%;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 14px;
+}
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(22px, 4vw, 32px); margin: 0; }
+.back { color: var(--accent); font-weight: 700; text-decoration: none; }
+button { font: inherit; color: inherit; }
+button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn { font: 700 17px var(--body); padding: 10px 22px; border-radius: 8px; cursor: pointer; border: 2px solid var(--accent); background: var(--accent); color: var(--accent-ink); }
+.btn.ghost { background: transparent; color: var(--accent); }
+
+/* opening screen */
+.setup { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; display: grid; gap: 14px; max-width: 680px; width: 100%; align-self: center; }
+.setup h2 { font: 800 22px var(--display); margin: 0; }
+.setup ol { margin: 0; padding-inline-start: 22px; display: grid; gap: 6px; }
+
+/* game */
+.bar { display: flex; gap: 10px 22px; flex-wrap: wrap; align-items: center; font: 700 17px var(--display); }
+.bar span { color: var(--muted); font-weight: 500; }
+.bar b { font-variant-numeric: tabular-nums; }
+.bar .btn { margin-inline-start: auto; font-size: 15px; padding: 6px 14px; }
+.ends { display: flex; justify-content: space-between; color: var(--muted); font: 700 15px var(--display); }
+.slots { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 8px; }
+.slot {
+  position: relative; min-height: 190px; border-radius: 10px; background: var(--slot);
+  border: 2px dashed var(--line); display: flex; padding: 22px 5px 5px;
+}
+.slot::before { content: attr(data-n); position: absolute; top: 3px; inset-inline-start: 8px; font: 700 13px var(--display); color: var(--muted); }
+.slot.target { border-color: var(--accent); border-style: solid; background: color-mix(in srgb, var(--accent) 12%, var(--slot)); }
+.slot.open-pick { cursor: pointer; border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.ev {
+  width: 100%; border-radius: 8px; background: var(--card); border: 2px solid var(--line); padding: 8px 7px;
+  display: flex; flex-direction: column; gap: 6px; cursor: grab; touch-action: none; user-select: none;
+  box-shadow: 0 2px 5px rgb(0 0 0 / .1); font-size: 15px; font-weight: 600; line-height: 1.3;
+}
+.ev .cat { font: 500 12px var(--display); color: var(--muted); }
+.ev .date { margin-top: auto; font: 800 15px var(--display); color: var(--accent); }
+.ev.picked { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+.ev.ghosting { opacity: .3; }
+.ev.good { animation: good .7s; }
+.ev.bad { border-color: var(--bad); background: var(--bad-soft); animation: shake .45s; }
+@keyframes good { 0% { background: var(--good-soft); border-color: var(--good); } 100% { } }
+@keyframes shake { 0%,100% { transform: none; } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
+.drag { position: fixed; z-index: 50; pointer-events: none; transform: rotate(-3deg); box-shadow: 0 10px 24px rgb(0 0 0 / .25); }
+
+.hand { display: flex; gap: 18px; align-items: center; justify-content: center; flex-wrap: wrap; min-height: 150px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.hand .ev { width: 230px; min-height: 120px; font-size: 18px; }
+.msg { font: 700 17px var(--display); min-height: 26px; text-align: center; margin: 0; }
+.msg.good { color: var(--good); } .msg.bad { color: var(--bad); }
+.pool { width: 120px; height: 130px; border-radius: 10px; border: 0; cursor: pointer; background: repeating-linear-gradient(45deg, var(--accent) 0 12px, color-mix(in srgb, var(--accent) 75%, #fff) 0 24px); color: #fff; font: 800 18px var(--display); text-shadow: 0 1px 3px rgb(0 0 0 / .4); }
+.pool:disabled { cursor: default; opacity: .45; }
+
+.done { background: var(--panel); border: 2px solid var(--good); border-radius: 12px; padding: 18px; text-align: center; display: grid; gap: 10px; justify-items: center; }
+.done h2 { font: 800 26px var(--display); margin: 0; }
+
+/* narrow windows: two rows of five, the box numbers keep the order clear */
+@media (max-width: 860px) {
+  .slots { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .slot { min-height: 160px; }
+  .ev { font-size: 14px; }
+  .hand .ev { width: 190px; font-size: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>⏳ ציר הזמן</h1>
+    <a class="back" href="index.html" target="_top">← לתפריט</a>
+  </div>
+
+  <section class="setup" id="setup">
+    <h2>איך משחקים</h2>
+    <ol>
+      <li>לוחצים על הקופה ומגרילים אירוע.</li>
+      <li>גוררים אותו לאחת מ-10 התיבות. התיבה הימנית היא הכי ישנה, השמאלית הכי חדשה.</li>
+      <li>אם המקום נכון, האירוע נשאר ותאריכו נחשף. אם טעיתם, הוא חוזר לקופה.</li>
+      <li>אירוע שכבר על הלוח אפשר לגרור לתיבה ריקה אחרת, כדי לפנות מקום.</li>
+      <li>ממלאים את כל 10 התיבות, בכמה שפחות טעויות.</li>
+    </ol>
+    <p id="loadNote" style="margin:0;color:var(--muted)"></p>
+    <div><button class="btn" id="startBtn" type="button" disabled>מתחילים</button></div>
+  </section>
+
+  <section id="game" hidden>
+    <div style="display:grid;gap:12px">
+      <div class="bar">
+        <div><span>על הלוח:</span> <b id="placed">0</b>/10</div>
+        <div><span>טעויות:</span> <b id="misses">0</b></div>
+        <div><span>זמן:</span> <b id="clock">0:00</b></div>
+        <button class="btn ghost" id="restartBtn" type="button">משחק חדש</button>
+      </div>
+      <div class="ends"><span>→ הכי ישן</span><span>הכי חדש ←</span></div>
+      <div class="slots" id="slots"></div>
+      <p class="msg" id="msg" aria-live="polite"></p>
+      <div class="hand" id="hand"></div>
+      <div class="done" id="done" hidden></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const N = 10;
+const MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+let bank = [];
+let G = null;     // { slots: [event|null], pool: [event], hand: event|null, misses, t0, last }
+let tick = null;
+
+// ---------- dates ----------
+function fmt(e) {
+  const yr = e.y < 0 ? `${-e.y} לפנה״ס` : String(e.y);
+  let s = e.d ? `${e.d} ב${MONTHS[e.m - 1]} ${yr}` : e.m ? `${MONTHS[e.m - 1]} ${yr}` : yr;
+  return e.approx ? "בערך " + s : s;
+}
+// negative = a before b; 0 = can't tell apart (same year and one lacks a month, etc.)
+function cmp(a, b) {
+  if (a.y !== b.y) return a.y - b.y;
+  if (!a.m || !b.m) return 0;
+  if (a.m !== b.m) return a.m - b.m;
+  if (!a.d || !b.d) return 0;
+  return a.d - b.d;
+}
+// every filled box must be no later than every filled box to its left (higher index)
+function inOrder(slots) {
+  const f = slots.map((e, i) => [e, i]).filter(x => x[0]);
+  for (let i = 0; i < f.length; i++) for (let j = i + 1; j < f.length; j++) if (cmp(f[i][0], f[j][0]) > 0) return false;
+  return true;
+}
+
+// ---------- sound ----------
+let ac = null;
+function tone(notes) {
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    let t = ac.currentTime;
+    for (const [f, d] of notes) {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = "triangle"; o.frequency.value = f; o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(.18, t); g.gain.exponentialRampToValueAtTime(.001, t + d);
+      o.start(t); o.stop(t + d); t += d * .8;
+    }
+  } catch (e) {}
+}
+const sGood = () => tone([[523, .12], [784, .2]]);
+const sBad = () => tone([[220, .18], [165, .3]]);
+const sWin = () => tone([[523, .14], [659, .14], [784, .14], [1047, .4]]);
+
+// ---------- game ----------
+function newGame() {
+  G = { slots: Array(N).fill(null), pool: bank.slice(), hand: null, misses: 0, t0: null, last: null, end: null };
+  $("setup").hidden = true; $("game").hidden = false; $("done").hidden = true;
+  say("");
+  clearInterval(tick); tick = setInterval(showClock, 500);
+  render();
+}
+function draw() {
+  if (G.hand || !G.pool.length) return;
+  let choices = G.pool.length > 1 ? G.pool.filter(e => e !== G.last) : G.pool;
+  const e = choices[Math.floor(Math.random() * choices.length)];
+  G.pool.splice(G.pool.indexOf(e), 1);
+  G.hand = e;
+  if (!G.t0) G.t0 = Date.now();
+  say("");
+  render();
+}
+// from = "hand" or a box index; to = a box index
+function drop(from, to) {
+  if (G.slots[to]) return render();
+  if (from === "hand") {
+    const e = G.hand, test = G.slots.slice(); test[to] = e;
+    if (inOrder(test)) {
+      G.slots = test; G.hand = null;
+      sGood(); say(`נכון! ${fmt(e)}`, "good");
+      render({ good: to });
+      if (G.slots.every(Boolean)) win();
+    } else {
+      G.misses++; G.hand = null; G.pool.push(e); G.last = e;
+      sBad(); say(`טעות. "${e.t}" חוזר לקופה.`, "bad");
+      render({ bad: to, badEv: e });
+    }
+  } else {
+    if (from === to) return render();
+    const test = G.slots.slice(); test[to] = test[from]; test[from] = null;
+    if (!inOrder(test)) { say("שם הוא שובר את הסדר, אז הוא חזר למקומו.", "bad"); return render(); }
+    G.slots = test; say("");
+    render();
+  }
+}
+function win() {
+  G.end = Date.now();
+  sWin();
+  const d = $("done");
+  d.innerHTML = `<h2>🎉 הלוח מלא!</h2>
+    <div>טעויות: <b>${G.misses}</b> · זמן: <b>${clockText()}</b></div>
+    <button class="btn" type="button" id="againBtn">עוד משחק</button>`;
+  d.hidden = false;
+  $("againBtn").onclick = newGame;
+}
+function clockText() {
+  if (!G.t0) return "0:00";
+  const s = Math.floor(((G.end || Date.now()) - G.t0) / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+function showClock() { if (G) $("clock").textContent = clockText(); }
+function say(t, kind) { const m = $("msg"); m.textContent = t; m.className = "msg" + (kind ? " " + kind : ""); }
+
+// ---------- drawing the screen ----------
+let picked = null;   // click-to-move: "hand" or a box index
+function card(e, showDate) {
+  const c = document.createElement("div");
+  c.className = "ev"; c.tabIndex = 0;
+  c.innerHTML = `<span class="cat"></span><span class="t"></span>${showDate ? '<span class="date"></span>' : ""}`;
+  c.querySelector(".cat").textContent = e.cat || "";
+  c.querySelector(".t").textContent = e.t;
+  if (showDate) c.querySelector(".date").textContent = fmt(e);
+  return c;
+}
+function render(fx = {}) {
+  picked = null;
+  const box = $("slots"); box.innerHTML = "";
+  G.slots.forEach((e, i) => {
+    const s = document.createElement("div");
+    s.className = "slot"; s.dataset.i = i; s.dataset.n = i + 1;
+    if (e) {
+      const c = card(e, true);
+      if (fx.good === i) c.classList.add("good");
+      hook(c, i); s.appendChild(c);
+    } else if (fx.bad === i) {
+      const c = card(fx.badEv, false); c.classList.add("bad"); c.style.cursor = "default"; s.appendChild(c);
+      setTimeout(() => c.remove(), 900);
+    }
+    s.onclick = () => { if (picked !== null && !G.slots[i]) drop(picked, i); };
+    if (!e) { s.tabIndex = 0; s.onkeydown = k => { if (k.key === "Enter" || k.key === " ") { k.preventDefault(); s.onclick(); } }; }
+    box.appendChild(s);
+  });
+  const h = $("hand"); h.innerHTML = "";
+  const full = G.slots.every(Boolean);
+  if (G.hand) {
+    const c = card(G.hand, false); hook(c, "hand"); h.appendChild(c);
+    const tip = document.createElement("div"); tip.style.color = "var(--muted)";
+    tip.textContent = "גררו לתיבה, או לחצו על האירוע ואז על תיבה ריקה";
+    h.appendChild(tip);
+  } else if (!full) {
+    const p = document.createElement("button");
+    p.className = "pool"; p.type = "button"; p.innerHTML = `הגרילו<br>אירוע<br><small>${G.pool.length} בקופה</small>`;
+    p.onclick = draw; h.appendChild(p);
+  }
+  h.hidden = full;
+  $("placed").textContent = G.slots.filter(Boolean).length;
+  $("misses").textContent = G.misses;
+  showClock();
+}
+function markOpen(on) {
+  document.querySelectorAll(".slot").forEach(s => s.classList.toggle("open-pick", on && !G.slots[s.dataset.i]));
+}
+
+// ---------- dragging (mouse and touch), plus click-then-click ----------
+function hook(c, from) {
+  c.addEventListener("pointerdown", ev => {
+    if (ev.button !== 0) return;
+    const sx = ev.clientX, sy = ev.clientY, r = c.getBoundingClientRect();
+    let ghost = null, over = null;
+    c.setPointerCapture(ev.pointerId);
+    const move = m => {
+      if (!ghost && Math.hypot(m.clientX - sx, m.clientY - sy) < 6) return;
+      if (!ghost) {
+        ghost = c.cloneNode(true); ghost.classList.add("drag");
+        ghost.style.width = r.width + "px"; ghost.style.height = r.height + "px";
+        document.body.appendChild(ghost); c.classList.add("ghosting");
+      }
+      ghost.style.left = (m.clientX - (sx - r.left)) + "px";
+      ghost.style.top = (m.clientY - (sy - r.top)) + "px";
+      const s = slotAt(m.clientX, m.clientY);
+      if (over !== s) { over?.classList.remove("target"); over = s; if (s && !G.slots[s.dataset.i]) s.classList.add("target"); }
+    };
+    const up = u => {
+      c.removeEventListener("pointermove", move); c.removeEventListener("pointerup", up); c.removeEventListener("pointercancel", up);
+      if (!ghost) return pick(c, from);   // a plain click: pick it up, then click an empty box
+      ghost.remove(); c.classList.remove("ghosting"); over?.classList.remove("target");
+      const s = u.type === "pointerup" ? slotAt(u.clientX, u.clientY) : null;
+      if (s && !G.slots[s.dataset.i]) drop(from, +s.dataset.i);
+    };
+    c.addEventListener("pointermove", move); c.addEventListener("pointerup", up); c.addEventListener("pointercancel", up);
+  });
+  c.addEventListener("keydown", k => { if (k.key === "Enter" || k.key === " ") { k.preventDefault(); k.stopPropagation(); pick(c, from); } });
+}
+function pick(c, from) {
+  const was = picked === from;
+  document.querySelectorAll(".ev.picked").forEach(x => x.classList.remove("picked"));
+  picked = was ? null : from;
+  if (!was) c.classList.add("picked");
+  markOpen(picked !== null);
+}
+function slotAt(x, y) {
+  for (const el of document.elementsFromPoint(x, y)) { const s = el.closest?.(".slot"); if (s) return s; }
+  return null;
+}
+
+// ---------- boot ----------
+$("startBtn").onclick = newGame;
+$("restartBtn").onclick = () => { if (G.slots.every(Boolean) || confirm("להתחיל משחק חדש? הלוח הנוכחי יימחק.")) newGame(); };
+fetch("questions/events.json", { cache: "no-cache" })
+  .then(r => { if (!r.ok) throw 0; return r.json(); })
+  .then(d => { bank = d.events; $("loadNote").textContent = `במאגר ${bank.length} אירועים מההיסטוריה, המדע, התרבות והגאוגרפיה.`; $("startBtn").disabled = false; })
+  .catch(() => { $("loadNote").textContent = "לא הצלחתי לטעון את מאגר האירועים. נסו לרענן את הדף."; });
+</script>
+</body>
+</html>
