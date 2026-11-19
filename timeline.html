@@ -69,6 +69,9 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
 }
 .slot::before { content: attr(data-n); position: absolute; top: 3px; inset-inline-start: 8px; font: 700 13px var(--display); color: var(--muted); }
 .slot.target { border-color: var(--accent); border-style: solid; background: color-mix(in srgb, var(--accent) 12%, var(--slot)); }
+.slot.ins-old::after, .slot.ins-new::after { content: ""; position: absolute; top: 6px; bottom: 6px; width: 6px; border-radius: 3px; background: var(--accent); }
+.slot.ins-old::after { right: -7px; } .slot.ins-new::after { left: -7px; }
+.slot.bad-slot { border-color: var(--bad); border-style: solid; animation: shake .45s; }
 .slot.open-pick { cursor: pointer; border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .ev {
   width: 100%; border-radius: 8px; background: var(--card); border: 2px solid var(--line); padding: 8px 7px;
@@ -117,7 +120,7 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
       <li>אירוע מוגרל מופיע לבד מתחת ללוח.</li>
       <li>גוררים אותו לאחת מ-10 התיבות. התיבה הימנית היא הכי ישנה, השמאלית הכי חדשה.</li>
       <li>אם המקום נכון, האירוע נשאר ותאריכו נחשף. אם טעיתם, הוא חוזר לקופה. בשני המקרים מיד מגיע האירוע הבא.</li>
-      <li>אירוע שכבר על הלוח אפשר לגרור לתיבה ריקה אחרת, כדי לפנות מקום.</li>
+      <li>אפשר להניח גם על קלף שכבר בלוח: בצד הימני שלו (מוקדם ממנו) או בצד השמאלי (מאוחר ממנו), והקלפים זזים לבד כדי לפנות מקום.</li>
       <li>כשכל 10 התיבות מלאות, עוברים אוטומטית לסיבוב הבא עם לוח ריק.</li>
       <li>5 סיבובים: בראשון האירועים מכל התקופות, ובכל סיבוב טווח השנים מצטמצם (1000, 500, 250), עד 100 שנה בסיבוב האחרון.</li>
       <li>המטרה: לסיים את 5 הסיבובים בכמה שפחות טעויות.</li>
@@ -276,12 +279,30 @@ function draw() {
   G.hand = e;
   if (!G.t0) G.t0 = Date.now();
 }
-// from = "hand" or a box index; to = a box index
+// put e before the card now at box g (g = 0..10); cards slide toward the nearest empty box
+function insertAt(slots, e, g) {
+  const t = slots.slice();
+  if (g < N && !t[g]) { t[g] = e; return t; }
+  let best = -1, cost = k => k >= g ? k - g : g - 1 - k;
+  for (let k = 0; k < N; k++) if (!t[k] && (best < 0 || cost(k) < cost(best))) best = k;
+  if (best >= g) { for (let k = best; k > g; k--) t[k] = t[k - 1]; t[g] = e; }
+  else { for (let k = best; k < g - 1; k++) t[k] = t[k + 1]; t[g - 1] = e; }
+  return t;
+}
+// which gap a drop at x on box s means: an empty box is itself; on a card, its right half = older side
+function gapAt(s, x) {
+  const i = +s.dataset.i;
+  if (!G.slots[i]) return i;
+  const r = s.getBoundingClientRect();
+  return x > r.left + r.width / 2 ? i : i + 1;
+}
+// from = "hand" (to = a gap, see insertAt) or a box index (to = an empty box)
 function drop(from, to) {
-  if (G.slots[to]) return render();
+  if (from !== "hand" && G.slots[to]) return render();
   if (from === "hand") {
-    const e = G.hand, test = G.slots.slice(); test[to] = e;
+    const e = G.hand, test = insertAt(G.slots, e, to);
     if (inOrder(test)) {
+      to = test.indexOf(e);
       G.slots = test; G.hand = null;
       G.used.add(e);
       sGood(); say(`נכון! ${fmt(e)}`, "good");
@@ -290,7 +311,7 @@ function drop(from, to) {
     } else {
       G.misses++; G.hand = null; G.pool.push(e); G.last = e;
       sBad(); say(`טעות. "${e.t}" חוזר לקופה.`, "bad");
-      render({ bad: to, badEv: e });
+      render({ bad: Math.min(to, N - 1), badEv: e });
       clearTimeout(drawT); drawT = setTimeout(() => { draw(); render(); }, 1300);
     }
   } else {
@@ -350,11 +371,13 @@ function render(fx = {}) {
       const c = card(e, true);
       if (fx.good === i) c.classList.add("good");
       hook(c, i); s.appendChild(c);
-    } else if (fx.bad === i) {
+    }
+    if (e && fx.bad === i) s.classList.add("bad-slot");
+    else if (fx.bad === i) {
       const c = card(fx.badEv, false); c.classList.add("bad"); c.style.cursor = "default"; s.appendChild(c);
       setTimeout(() => c.remove(), 900);
     }
-    s.onclick = () => { if (picked !== null && !G.slots[i]) drop(picked, i); };
+    s.onclick = ev => { if (picked !== null && !G.slots[i]) drop(picked, i); };
     if (!e) { s.tabIndex = 0; s.onkeydown = k => { if (k.key === "Enter" || k.key === " ") { k.preventDefault(); s.onclick(); } }; }
     box.appendChild(s);
   });
@@ -363,7 +386,7 @@ function render(fx = {}) {
   if (G.hand) {
     const c = card(G.hand, false); hook(c, "hand"); h.appendChild(c);
     const tip = document.createElement("div"); tip.style.color = "var(--muted)";
-    tip.textContent = "גררו לתיבה, או לחצו על האירוע ואז על תיבה ריקה";
+    tip.textContent = "גררו לתיבה ריקה, או ישר על קלף: לצד הימני שלו אם מוקדם ממנו, לשמאלי אם מאוחר";
     h.appendChild(tip);
   } else if (!full) {
     const p = document.createElement("div");
@@ -378,7 +401,7 @@ function render(fx = {}) {
   showClock();
 }
 function markOpen(on) {
-  document.querySelectorAll(".slot").forEach(s => s.classList.toggle("open-pick", on && !G.slots[s.dataset.i]));
+  document.querySelectorAll(".slot").forEach(s => s.classList.toggle("open-pick", on && (picked === "hand" || !G.slots[s.dataset.i])));
 }
 
 // ---------- dragging (mouse and touch), plus click-then-click ----------
@@ -398,14 +421,20 @@ function hook(c, from) {
       ghost.style.left = (m.clientX - (sx - r.left)) + "px";
       ghost.style.top = (m.clientY - (sy - r.top)) + "px";
       const s = slotAt(m.clientX, m.clientY);
-      if (over !== s) { over?.classList.remove("target"); over = s; if (s && !G.slots[s.dataset.i]) s.classList.add("target"); }
+      over?.classList.remove("target", "ins-old", "ins-new"); over = s;
+      if (s && !G.slots[s.dataset.i]) s.classList.add("target");
+      else if (s && from === "hand") s.classList.add(gapAt(s, m.clientX) === +s.dataset.i ? "ins-old" : "ins-new");
     };
     const up = u => {
       c.removeEventListener("pointermove", move); c.removeEventListener("pointerup", up); c.removeEventListener("pointercancel", up);
-      if (!ghost) return pick(c, from);   // a plain click: pick it up, then click an empty box
-      ghost.remove(); c.classList.remove("ghosting"); over?.classList.remove("target");
+      if (!ghost) {   // a plain click: pick it up, then click an empty box or a card's side
+        if (picked === "hand" && from !== "hand" && u.type === "pointerup") return drop("hand", gapAt(c.closest(".slot"), u.clientX));
+        return pick(c, from);
+      }
+      ghost.remove(); c.classList.remove("ghosting"); over?.classList.remove("target", "ins-old", "ins-new");
       const s = u.type === "pointerup" ? slotAt(u.clientX, u.clientY) : null;
-      if (s && !G.slots[s.dataset.i]) drop(from, +s.dataset.i);
+      if (s && from === "hand") drop("hand", gapAt(s, u.clientX));
+      else if (s && !G.slots[s.dataset.i]) drop(from, +s.dataset.i);
     };
     c.addEventListener("pointermove", move); c.addEventListener("pointerup", up); c.addEventListener("pointercancel", up);
   });
