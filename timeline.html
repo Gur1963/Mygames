@@ -118,9 +118,10 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
       <li>גוררים אותו לאחת מ-10 התיבות. התיבה הימנית היא הכי ישנה, השמאלית הכי חדשה.</li>
       <li>אם המקום נכון, האירוע נשאר ותאריכו נחשף. אם טעיתם, הוא חוזר לקופה.</li>
       <li>אירוע שכבר על הלוח אפשר לגרור לתיבה ריקה אחרת, כדי לפנות מקום.</li>
+      <li>בהתחלה האירועים מכל התקופות. כל שתי תיבות שמתמלאות, טווח השנים של האירועים הבאים מצטמצם, עד 100 שנה בסיבוב האחרון.</li>
       <li>ממלאים את כל 10 התיבות, בכמה שפחות טעויות.</li>
     </ol>
-    <h2>בחרו רמה</h2>
+    <h2>בחרו רמת קושי: כמה מוכרים האירועים</h2>
     <div class="levels" id="levels"></div>
     <p id="loadNote" style="margin:0;color:var(--muted)"></p>
     <div><button class="btn" id="startBtn" type="button" disabled>מתחילים</button></div>
@@ -129,7 +130,8 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
   <section id="game" hidden>
     <div style="display:grid;gap:12px">
       <div class="bar">
-        <div><span>רמה</span> <b id="lvl">1</b> <span id="era"></span></div>
+        <div><span>רמה</span> <b id="lvl">1</b></div>
+        <div><span>סיבוב</span> <b id="round">1</b>/5 <span id="era"></span></div>
         <div><span>על הלוח:</span> <b id="placed">0</b>/10</div>
         <div><span>טעויות:</span> <b id="misses">0</b></div>
         <div><span>זמן:</span> <b id="clock">0:00</b></div>
@@ -197,12 +199,15 @@ const sWin = () => tone([[523, .14], [659, .14], [784, .14], [1047, .4]]);
 
 // ---------- levels ----------
 const LEVELS = [
-  { n: 1, span: 0, hide: false, txt: "כל התקופות, מהפירמידות ועד היום. התאריכים נחשפים על הלוח." },
-  { n: 2, span: 0, from: 1800, hide: false, txt: "רק מ-1800 והלאה. האירועים קרובים יותר זה לזה." },
-  { n: 3, span: 100, hide: false, txt: "כל האירועים מתוך מאה שנה אחת." },
-  { n: 4, span: 40, hide: false, txt: "כל האירועים מתוך 40 שנה בלבד. צריך לדעת גם חודשים." },
-  { n: 5, span: 40, hide: true, txt: "40 שנה, והתאריכים לא נחשפים על הלוח. רק הסדר נשאר בזיכרון." },
+  { n: 1, txt: "אירועים שכולם מכירים" },
+  { n: 2, txt: "אירועים מוכרים" },
+  { n: 3, txt: "לחובבי היסטוריה וטריוויה" },
+  { n: 4, txt: "קשה: אירועים פחות מוכרים" },
+  { n: 5, txt: "קשה מאוד: אירועים נדירים" },
 ];
+// years the next events come from, by round (two boxes per round); the last round is 100 years
+const WIDTHS = [0, 1000, 500, 250, 100];
+const THIS_YEAR = new Date().getFullYear();
 let level = 1;
 try { level = Math.min(5, Math.max(1, +localStorage.getItem("timeline-level") || 1)); } catch (e) {}
 function renderLevels() {
@@ -215,33 +220,47 @@ function renderLevels() {
     box.appendChild(b);
   }
 }
-// the events for one game: a random era wide enough to hold plenty of events
-function deck(L) {
-  let list = bank.filter(e => !L.from || e.y >= L.from);
-  if (!L.span) return { list, era: L.from ? `(מ-${L.from})` : "" };
-  const need = 25, starts = [];
-  for (const e of list) {
-    const n = list.filter(x => x.y >= e.y && x.y < e.y + L.span).length;
-    if (n >= need) starts.push(e.y);
+// nested windows for one game, chosen from the narrowest out, so every round still has events to draw
+function windows(list) {
+  const inW = (w, e) => e.y >= w.a && e.y < w.a + w.w;
+  const starts = list.filter(e => list.filter(x => x.y >= e.y && x.y < e.y + 100).length >= 8).map(e => e.y);
+  const out = Array(5);
+  out[4] = { a: starts[Math.floor(Math.random() * starts.length)], w: 100 };
+  for (let r = 3; r >= 1; r--) {
+    const inner = out[r + 1], w = WIDTHS[r];
+    let lo = inner.a + inner.w - w, hi = inner.a;
+    hi = Math.max(lo, Math.min(hi, THIS_YEAR - w + 1));   // don't reach far into the future when there's room
+    out[r] = { a: lo + Math.floor(Math.random() * (hi - lo + 1)), w };
   }
-  const a = starts[Math.floor(Math.random() * starts.length)];
-  list = list.filter(x => x.y >= a && x.y < a + L.span);
-  return { list, era: `(${a} עד ${Math.max(...list.map(x => x.y))})` };
+  out[0] = null;
+  return out;
+}
+const yr = y => y < 0 ? `${-y} לפנה״ס` : String(y);
+function rangeText(w) { return w ? `${yr(w.a)} עד ${yr(Math.min(w.a + w.w - 1, THIS_YEAR))}` : "כל התקופות"; }
+function roundNo() { return Math.min(5, Math.floor(G.slots.filter(Boolean).length / 2) + 1); }
+// events that can be drawn now: the current round's window, or the next wider one if it ran dry
+function drawable() {
+  for (let r = roundNo() - 1; r >= 0; r--) {
+    const w = G.wins[r], list = G.pool.filter(e => !w || (e.y >= w.a && e.y < w.a + w.w));
+    if (list.length) return list;
+  }
+  return [];
 }
 
 // ---------- game ----------
 function newGame() {
-  const L = LEVELS[level - 1], d = deck(L);
-  G = { level, hide: L.hide, era: d.era, slots: Array(N).fill(null), pool: d.list, hand: null, misses: 0, t0: null, last: null, end: null };
-  $("lvl").textContent = level; $("era").textContent = d.era;
+  const list = bank.filter(e => e.f === level);
+  G = { level, wins: windows(list), slots: Array(N).fill(null), pool: list.slice(), hand: null, misses: 0, t0: null, last: null, end: null };
+  $("lvl").textContent = level;
   $("setup").hidden = true; $("game").hidden = false; $("done").hidden = true;
   say("");
   clearInterval(tick); tick = setInterval(showClock, 500);
   render();
 }
 function draw() {
-  if (G.hand || !G.pool.length) return;
-  let choices = G.pool.length > 1 ? G.pool.filter(e => e !== G.last) : G.pool;
+  const now = drawable();
+  if (G.hand || !now.length) return;
+  let choices = now.length > 1 ? now.filter(e => e !== G.last) : now;
   const e = choices[Math.floor(Math.random() * choices.length)];
   G.pool.splice(G.pool.indexOf(e), 1);
   G.hand = e;
@@ -256,7 +275,8 @@ function drop(from, to) {
     const e = G.hand, test = G.slots.slice(); test[to] = e;
     if (inOrder(test)) {
       G.slots = test; G.hand = null;
-      sGood(); say(G.hide ? "נכון!" : `נכון! ${fmt(e)}`, "good");
+      const n = G.slots.filter(Boolean).length;
+      sGood(); say(`נכון! ${fmt(e)}` + (n % 2 === 0 && n < N ? ` · הטווח הצטמצם: ${rangeText(G.wins[roundNo() - 1])}` : ""), "good");
       render({ good: to });
       if (G.slots.every(Boolean)) win();
     } else {
@@ -308,7 +328,7 @@ function render(fx = {}) {
     const s = document.createElement("div");
     s.className = "slot"; s.dataset.i = i; s.dataset.n = i + 1;
     if (e) {
-      const c = card(e, !G.hide || G.slots.every(Boolean));
+      const c = card(e, true);
       if (fx.good === i) c.classList.add("good");
       hook(c, i); s.appendChild(c);
     } else if (fx.bad === i) {
@@ -328,11 +348,13 @@ function render(fx = {}) {
     h.appendChild(tip);
   } else if (!full) {
     const p = document.createElement("button");
-    p.className = "pool"; p.type = "button"; p.innerHTML = `הגרילו<br>אירוע<br><small>${G.pool.length} בקופה</small>`;
+    p.className = "pool"; p.type = "button"; p.innerHTML = `הגרילו<br>אירוע<br><small>${drawable().length} בקופה</small>`;
     p.onclick = draw; h.appendChild(p);
   }
   h.hidden = full;
   $("placed").textContent = G.slots.filter(Boolean).length;
+  $("round").textContent = roundNo();
+  $("era").textContent = "· " + rangeText(G.wins[roundNo() - 1]);
   $("misses").textContent = G.misses;
   showClock();
 }
