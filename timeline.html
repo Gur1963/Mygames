@@ -69,8 +69,13 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
 }
 .slot::before { content: attr(data-n); position: absolute; top: 3px; inset-inline-start: 8px; font: 700 13px var(--display); color: var(--muted); }
 .slot.target { border-color: var(--accent); border-style: solid; background: color-mix(in srgb, var(--accent) 12%, var(--slot)); }
-.slot.ins-old::after, .slot.ins-new::after { content: ""; position: absolute; top: 6px; bottom: 6px; width: 6px; border-radius: 3px; background: var(--accent); }
-.slot.ins-old::after { right: -7px; } .slot.ins-new::after { left: -7px; }
+/* insert points: a ➕ strip on each side of every placed card, shown while an event is being placed */
+.slots { padding-inline: 18px; }
+.ins { position: absolute; top: 18px; bottom: 6px; width: 28px; z-index: 3; display: none; align-items: center; justify-content: center;
+  border-radius: 8px; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--bg, #fff)); color: var(--accent); font: 800 26px var(--display); cursor: pointer; }
+.ins.r { right: -18px; } .ins.l { left: -18px; }
+body.placing .ins { display: flex; }
+.ins.hot { background: var(--accent); color: #fff; border-style: solid; transform: scaleX(1.15); }
 .slot.bad-slot { border-color: var(--bad); border-style: solid; animation: shake .45s; }
 .slot.open-pick { cursor: pointer; border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .ev {
@@ -128,7 +133,7 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
       <li>אירוע מוגרל מופיע לבד מתחת ללוח.</li>
       <li>גוררים אותו לאחת מ-10 התיבות. התיבה הימנית היא הכי ישנה, השמאלית הכי חדשה.</li>
       <li>אם המקום נכון, האירוע נשאר ותאריכו נחשף. אם טעיתם, הוא חוזר לקופה. בשני המקרים מיד מגיע האירוע הבא.</li>
-      <li>אפשר להניח גם על קלף שכבר בלוח: בצד הימני שלו (מוקדם ממנו) או בצד השמאלי (מאוחר ממנו), והקלפים זזים לבד כדי לפנות מקום.</li>
+      <li>אפשר להכניס אירוע גם בין קלפים שכבר בלוח: כשמזיזים אירוע, מופיע סימן + בין כל שני קלפים ובקצוות. משחררים על ה-+, והקלפים זזים לבד כדי לפנות מקום.</li>
       <li>כשכל 10 התיבות מלאות, עוברים אוטומטית לסיבוב הבא עם לוח ריק.</li>
       <li>5 סיבובים: בראשון האירועים מכל התקופות, ובכל סיבוב טווח השנים מצטמצם (1000, 500, 250), עד 100 שנה בסיבוב האחרון.</li>
       <li>💰 כל סיבוב שווה כסף: 1,000 ₪, ואחר כך עוד 4,000, 10,000, 15,000 ו-30,000. מי שמסיים את כל הסיבובים זוכה ב-60,000 ₪.</li>
@@ -303,13 +308,6 @@ function insertAt(slots, e, g) {
   else { for (let k = best; k < g - 1; k++) t[k] = t[k + 1]; t[g - 1] = e; }
   return t;
 }
-// which gap a drop at x on box s means: an empty box is itself; on a card, its right half = older side
-function gapAt(s, x) {
-  const i = +s.dataset.i;
-  if (!G.slots[i]) return i;
-  const r = s.getBoundingClientRect();
-  return x > r.left + r.width / 2 ? i : i + 1;
-}
 // from = "hand" (to = a gap, see insertAt) or a box index (to = an empty box)
 function drop(from, to) {
   if (G.end) return;
@@ -404,7 +402,7 @@ function card(e, showDate) {
   return c;
 }
 function render(fx = {}) {
-  picked = null;
+  picked = null; document.body.classList.remove("placing");
   const box = $("slots"); box.innerHTML = "";
   G.slots.forEach((e, i) => {
     const s = document.createElement("div");
@@ -413,6 +411,13 @@ function render(fx = {}) {
       const c = card(e, true);
       if (fx.good === i) c.classList.add("good");
       hook(c, i); s.appendChild(c);
+      for (const [cls, g] of [["r", i], ["l", i + 1]]) {   // right side = earlier than this card, left side = later
+        const z = document.createElement("div");
+        z.className = "ins " + cls; z.dataset.g = g; z.textContent = "+";
+        z.title = cls === "r" ? "מוקדם מהקלף הזה" : "מאוחר מהקלף הזה";
+        z.onclick = ev => { ev.stopPropagation(); if (picked === "hand") drop("hand", g); };
+        s.appendChild(z);
+      }
     }
     if (e && fx.bad === i) s.classList.add("bad-slot");
     else if (fx.bad === i) {
@@ -428,7 +433,7 @@ function render(fx = {}) {
   if (G.hand) {
     const c = card(G.hand, false); hook(c, "hand"); h.appendChild(c);
     const tip = document.createElement("div"); tip.style.color = "var(--muted)";
-    tip.textContent = "גררו לתיבה ריקה, או ישר על קלף: לצד הימני שלו אם מוקדם ממנו, לשמאלי אם מאוחר";
+    tip.textContent = "גררו לתיבה ריקה, או לסימן + שבין שני קלפים";
     h.appendChild(tip);
   } else if (!full) {
     const p = document.createElement("div");
@@ -446,7 +451,8 @@ function render(fx = {}) {
   showClock();
 }
 function markOpen(on) {
-  document.querySelectorAll(".slot").forEach(s => s.classList.toggle("open-pick", on && (picked === "hand" || !G.slots[s.dataset.i])));
+  document.querySelectorAll(".slot").forEach(s => s.classList.toggle("open-pick", on && !G.slots[s.dataset.i]));
+  document.body.classList.toggle("placing", on && picked === "hand");
 }
 
 // ---------- dragging (mouse and touch), plus click-then-click ----------
@@ -462,24 +468,21 @@ function hook(c, from) {
         ghost = c.cloneNode(true); ghost.classList.add("drag");
         ghost.style.width = r.width + "px"; ghost.style.height = r.height + "px";
         document.body.appendChild(ghost); c.classList.add("ghosting");
+        if (from === "hand") document.body.classList.add("placing");
       }
       ghost.style.left = (m.clientX - (sx - r.left)) + "px";
       ghost.style.top = (m.clientY - (sy - r.top)) + "px";
-      const s = slotAt(m.clientX, m.clientY);
-      over?.classList.remove("target", "ins-old", "ins-new"); over = s;
-      if (s && !G.slots[s.dataset.i]) s.classList.add("target");
-      else if (s && from === "hand") s.classList.add(gapAt(s, m.clientX) === +s.dataset.i ? "ins-old" : "ins-new");
+      const t = targetAt(m.clientX, m.clientY, from);
+      over?.classList.remove("target", "hot"); over = t?.el;
+      over?.classList.add(t.g === undefined ? "target" : "hot");
     };
     const up = u => {
       c.removeEventListener("pointermove", move); c.removeEventListener("pointerup", up); c.removeEventListener("pointercancel", up);
-      if (!ghost) {   // a plain click: pick it up, then click an empty box or a card's side
-        if (picked === "hand" && from !== "hand" && u.type === "pointerup") return drop("hand", gapAt(c.closest(".slot"), u.clientX));
-        return pick(c, from);
-      }
-      ghost.remove(); c.classList.remove("ghosting"); over?.classList.remove("target", "ins-old", "ins-new");
-      const s = u.type === "pointerup" ? slotAt(u.clientX, u.clientY) : null;
-      if (s && from === "hand") drop("hand", gapAt(s, u.clientX));
-      else if (s && !G.slots[s.dataset.i]) drop(from, +s.dataset.i);
+      if (!ghost) return pick(c, from);   // a plain click: pick it up, then click an empty box or a ➕
+      ghost.remove(); c.classList.remove("ghosting"); over?.classList.remove("target", "hot");
+      const t = u.type === "pointerup" ? targetAt(u.clientX, u.clientY, from) : null;
+      document.body.classList.remove("placing");
+      if (t) drop(from, t.g === undefined ? +t.el.dataset.i : t.g);
     };
     c.addEventListener("pointermove", move); c.addEventListener("pointerup", up); c.addEventListener("pointercancel", up);
   });
@@ -492,8 +495,13 @@ function pick(c, from) {
   if (!was) c.classList.add("picked");
   markOpen(picked !== null);
 }
-function slotAt(x, y) {
-  for (const el of document.elementsFromPoint(x, y)) { const s = el.closest?.(".slot"); if (s) return s; }
+// where a drop at (x, y) goes: a ➕ (g = the gap) or an empty box; a placed card itself is not a target
+function targetAt(x, y, from) {
+  for (const el of document.elementsFromPoint(x, y)) {
+    if (from === "hand" && el.classList?.contains("ins")) return { el, g: +el.dataset.g };
+    const s = el.closest?.(".slot");
+    if (s) return G.slots[s.dataset.i] ? null : { el: s };
+  }
   return null;
 }
 
