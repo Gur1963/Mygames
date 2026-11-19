@@ -263,18 +263,35 @@ const yr = y => y < 0 ? `${-y} לפנה״ס` : String(y);
 function rangeText(w) { return w ? `${yr(w.a)} עד ${yr(Math.min(w.a + w.w - 1, THIS_YEAR))}` : "כל התקופות"; }
 const inWin = (w, e) => !w || (e.y >= w.a && e.y < w.a + w.w);
 // the events for round r: prefer ones not used yet and not needed by the narrower rounds after it
+// events shown in recent games (titles, newest last), so the next games bring new ones
+const SEEN_MAX = 150;   // about the last two games
+let seenList = [];
+try { seenList = JSON.parse(localStorage.getItem("timeline-seen") || "[]"); } catch (e) {}
+let SEEN = new Set(seenList);
+function markSeen(e) {
+  seenList = seenList.filter(t => t !== e.t); seenList.push(e.t);
+  if (seenList.length > SEEN_MAX) seenList = seenList.slice(-SEEN_MAX);
+  SEEN = new Set(seenList);
+  try { localStorage.setItem("timeline-seen", JSON.stringify(seenList)); } catch (err) {}
+}
+// the events for round r: not used earlier in this game, not shown in recent games, and not needed by the narrower rounds after it;
+// each condition is dropped (least important first) only when it would leave fewer than a board's worth
 function roundPool(r) {
   const w = G.wins[r], all = G.list.filter(e => inWin(w, e));
   const later = e => G.wins.slice(r + 1).some(x => inWin(x, e));
   const fresh = all.filter(e => !G.used.has(e));
-  const best = fresh.filter(e => !later(e));
-  return best.length >= N ? best : fresh.length >= N ? fresh : all;
+  const unseen = fresh.filter(e => !SEEN.has(e.t));
+  const extra = G.extra.filter(e => inWin(w, e) && !G.used.has(e) && !SEEN.has(e.t));
+  const tiers = [unseen.filter(e => !later(e)), unseen, unseen.concat(extra.filter(e => !later(e))), unseen.concat(extra), fresh.filter(e => !later(e)), fresh, all];
+  return tiers.find(t => t.length >= N) || all;
 }
 
 // ---------- game ----------
 function newGame() {
   const list = bank.filter(e => e.f === level);
-  G = { level, list, wins: windows(list), used: new Set(), round: 0, rm: 0, bank: 0, slots: [], pool: [], hand: null, misses: 0, t0: null, last: null, end: null };
+  // the nearest other level tops up when this level's unseen events run out
+  const extra = bank.filter(e => e.f === (level < 5 ? level + 1 : 4));
+  G = { level, list, extra, wins: windows(list), used: new Set(), round: 0, rm: 0, bank: 0, slots: [], pool: [], hand: null, misses: 0, t0: null, last: null, end: null };
   $("lvl").textContent = level;
   $("setup").hidden = true; $("game").hidden = false;
   clearInterval(tick); tick = setInterval(showClock, 500);
@@ -293,9 +310,11 @@ function draw() {
   const now = G.pool;
   if (G.end || G.hand || !now.length || G.slots.every(Boolean)) return;
   let choices = now.length > 1 ? now.filter(e => e !== G.last) : now;
+  const unseen = choices.filter(e => !SEEN.has(e.t));   // new ones first; a missed one waits in the pool
+  if (unseen.length) choices = unseen;
   const e = choices[Math.floor(Math.random() * choices.length)];
   G.pool.splice(G.pool.indexOf(e), 1);
-  G.hand = e;
+  G.hand = e; G.used.add(e); markSeen(e);
   if (!G.t0) G.t0 = Date.now();
 }
 // put e before the card now at box g (g = 0..10); cards slide toward the nearest empty box
