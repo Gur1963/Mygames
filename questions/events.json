@@ -1,5 +1,5 @@
 {
-  "about": "Events for the timeline game (timeline.html). y = year (negative = BCE), m = month 1-12, d = day; leave out m/d when only the year is known. approx: true marks a rough date (shown as 'בערך') and ties with events a few years either side. Events with only a year tie with any event of the same year, so either order counts as right. f = how well known the event is, 1 (everyone knows it) to 5 (rare); the difficulty level picks events by f.",
+  "about": "Events for the timeline game (timeline.html). y = year (negative = BCE), m = month 1-12, d = day; leave out m/d when only the year is known. approx: true marks a rough date (shown as 'בערך'); it is still ordered by its year, so the board never shows a later year before an earlier one. Events with only a year tie with any event of the same year, so either order counts as right. f = how well known the event is, 1 (everyone knows it) to 5 (rare); the difficulty level picks events by f.",
   "events": [
     {"t":"ציורי המערות בלאסקו שבצרפת","y":-17000,"approx":true,"cat":"אמנות","f":4},
     {"t":"המצאת הכתב בשומר","y":-3200,"approx":true,"cat":"היסטוריה","f":3},

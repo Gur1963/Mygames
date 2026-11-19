@@ -178,10 +178,6 @@ function fmt(e) {
 }
 // negative = a before b; 0 = can't tell apart (same year and one lacks a month, etc.)
 function cmp(a, b) {
-  if (a.approx || b.approx) {
-    const y = Math.min(a.y, b.y), tol = y < 0 ? 25 : y < 1500 ? 20 : 2;
-    if (Math.abs(a.y - b.y) <= tol) return 0;
-  }
   if (a.y !== b.y) return a.y - b.y;
   if (!a.m || !b.m) return 0;
   if (a.m !== b.m) return a.m - b.m;
