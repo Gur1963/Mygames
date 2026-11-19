@@ -48,6 +48,12 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
 /* opening screen */
 .setup { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; display: grid; gap: 14px; max-width: 680px; width: 100%; align-self: center; }
 .setup h2 { font: 800 22px var(--display); margin: 0; }
+.levels { display: grid; gap: 8px; }
+.levels button { display: flex; gap: 14px; align-items: center; text-align: start; padding: 10px 14px; border-radius: 10px; border: 2px solid var(--line); background: transparent; cursor: pointer; }
+.levels button b { font: 800 22px var(--display); min-width: 26px; text-align: center; }
+.levels button span { color: var(--muted); }
+.levels button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.levels button[aria-pressed="true"] b { color: var(--accent); }
 .setup ol { margin: 0; padding-inline-start: 22px; display: grid; gap: 6px; }
 
 /* game */
@@ -114,6 +120,8 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
       <li>אירוע שכבר על הלוח אפשר לגרור לתיבה ריקה אחרת, כדי לפנות מקום.</li>
       <li>ממלאים את כל 10 התיבות, בכמה שפחות טעויות.</li>
     </ol>
+    <h2>בחרו רמה</h2>
+    <div class="levels" id="levels"></div>
     <p id="loadNote" style="margin:0;color:var(--muted)"></p>
     <div><button class="btn" id="startBtn" type="button" disabled>מתחילים</button></div>
   </section>
@@ -121,6 +129,7 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
   <section id="game" hidden>
     <div style="display:grid;gap:12px">
       <div class="bar">
+        <div><span>רמה</span> <b id="lvl">1</b> <span id="era"></span></div>
         <div><span>על הלוח:</span> <b id="placed">0</b>/10</div>
         <div><span>טעויות:</span> <b id="misses">0</b></div>
         <div><span>זמן:</span> <b id="clock">0:00</b></div>
@@ -151,6 +160,10 @@ function fmt(e) {
 }
 // negative = a before b; 0 = can't tell apart (same year and one lacks a month, etc.)
 function cmp(a, b) {
+  if (a.approx || b.approx) {
+    const y = Math.min(a.y, b.y), tol = y < 0 ? 25 : y < 1500 ? 20 : 2;
+    if (Math.abs(a.y - b.y) <= tol) return 0;
+  }
   if (a.y !== b.y) return a.y - b.y;
   if (!a.m || !b.m) return 0;
   if (a.m !== b.m) return a.m - b.m;
@@ -182,9 +195,45 @@ const sGood = () => tone([[523, .12], [784, .2]]);
 const sBad = () => tone([[220, .18], [165, .3]]);
 const sWin = () => tone([[523, .14], [659, .14], [784, .14], [1047, .4]]);
 
+// ---------- levels ----------
+const LEVELS = [
+  { n: 1, span: 0, hide: false, txt: "כל התקופות, מהפירמידות ועד היום. התאריכים נחשפים על הלוח." },
+  { n: 2, span: 0, from: 1800, hide: false, txt: "רק מ-1800 והלאה. האירועים קרובים יותר זה לזה." },
+  { n: 3, span: 100, hide: false, txt: "כל האירועים מתוך מאה שנה אחת." },
+  { n: 4, span: 40, hide: false, txt: "כל האירועים מתוך 40 שנה בלבד. צריך לדעת גם חודשים." },
+  { n: 5, span: 40, hide: true, txt: "40 שנה, והתאריכים לא נחשפים על הלוח. רק הסדר נשאר בזיכרון." },
+];
+let level = 1;
+try { level = Math.min(5, Math.max(1, +localStorage.getItem("timeline-level") || 1)); } catch (e) {}
+function renderLevels() {
+  const box = $("levels"); box.innerHTML = "";
+  for (const L of LEVELS) {
+    const b = document.createElement("button");
+    b.type = "button"; b.setAttribute("aria-pressed", L.n === level);
+    b.innerHTML = `<b>${L.n}</b><span></span>`; b.querySelector("span").textContent = L.txt;
+    b.onclick = () => { level = L.n; try { localStorage.setItem("timeline-level", level); } catch (e) {} renderLevels(); };
+    box.appendChild(b);
+  }
+}
+// the events for one game: a random era wide enough to hold plenty of events
+function deck(L) {
+  let list = bank.filter(e => !L.from || e.y >= L.from);
+  if (!L.span) return { list, era: L.from ? `(מ-${L.from})` : "" };
+  const need = 25, starts = [];
+  for (const e of list) {
+    const n = list.filter(x => x.y >= e.y && x.y < e.y + L.span).length;
+    if (n >= need) starts.push(e.y);
+  }
+  const a = starts[Math.floor(Math.random() * starts.length)];
+  list = list.filter(x => x.y >= a && x.y < a + L.span);
+  return { list, era: `(${a} עד ${Math.max(...list.map(x => x.y))})` };
+}
+
 // ---------- game ----------
 function newGame() {
-  G = { slots: Array(N).fill(null), pool: bank.slice(), hand: null, misses: 0, t0: null, last: null, end: null };
+  const L = LEVELS[level - 1], d = deck(L);
+  G = { level, hide: L.hide, era: d.era, slots: Array(N).fill(null), pool: d.list, hand: null, misses: 0, t0: null, last: null, end: null };
+  $("lvl").textContent = level; $("era").textContent = d.era;
   $("setup").hidden = true; $("game").hidden = false; $("done").hidden = true;
   say("");
   clearInterval(tick); tick = setInterval(showClock, 500);
@@ -207,7 +256,7 @@ function drop(from, to) {
     const e = G.hand, test = G.slots.slice(); test[to] = e;
     if (inOrder(test)) {
       G.slots = test; G.hand = null;
-      sGood(); say(`נכון! ${fmt(e)}`, "good");
+      sGood(); say(G.hide ? "נכון!" : `נכון! ${fmt(e)}`, "good");
       render({ good: to });
       if (G.slots.every(Boolean)) win();
     } else {
@@ -228,7 +277,7 @@ function win() {
   sWin();
   const d = $("done");
   d.innerHTML = `<h2>🎉 הלוח מלא!</h2>
-    <div>טעויות: <b>${G.misses}</b> · זמן: <b>${clockText()}</b></div>
+    <div>רמה <b>${G.level}</b> · טעויות: <b>${G.misses}</b> · זמן: <b>${clockText()}</b></div>
     <button class="btn" type="button" id="againBtn">עוד משחק</button>`;
   d.hidden = false;
   $("againBtn").onclick = newGame;
@@ -259,7 +308,7 @@ function render(fx = {}) {
     const s = document.createElement("div");
     s.className = "slot"; s.dataset.i = i; s.dataset.n = i + 1;
     if (e) {
-      const c = card(e, true);
+      const c = card(e, !G.hide || G.slots.every(Boolean));
       if (fx.good === i) c.classList.add("good");
       hook(c, i); s.appendChild(c);
     } else if (fx.bad === i) {
@@ -335,10 +384,14 @@ function slotAt(x, y) {
 
 // ---------- boot ----------
 $("startBtn").onclick = newGame;
-$("restartBtn").onclick = () => { if (G.slots.every(Boolean) || confirm("להתחיל משחק חדש? הלוח הנוכחי יימחק.")) newGame(); };
+$("restartBtn").onclick = () => {
+  if (!G.slots.every(Boolean) && !confirm("להתחיל משחק חדש? הלוח הנוכחי יימחק.")) return;
+  clearInterval(tick); renderLevels(); $("game").hidden = true; $("setup").hidden = false;
+};
+renderLevels();
 fetch("questions/events.json", { cache: "no-cache" })
   .then(r => { if (!r.ok) throw 0; return r.json(); })
-  .then(d => { bank = d.events; $("loadNote").textContent = `במאגר ${bank.length} אירועים מההיסטוריה, המדע, התרבות והגאוגרפיה.`; $("startBtn").disabled = false; })
+  .then(d => { bank = d.events; $("loadNote").textContent = `במאגר ${bank.length} אירועים: היסטוריה, ישראל, מדע, ספורט, ספרות, קולנוע, מוזיקה, אמנות, גאוגרפיה, לידות ופטירות.`; $("startBtn").disabled = false; })
   .catch(() => { $("loadNote").textContent = "לא הצלחתי לטעון את מאגר האירועים. נסו לרענן את הדף."; });
 </script>
 </body>
