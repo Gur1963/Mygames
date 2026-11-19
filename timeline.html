@@ -434,29 +434,30 @@ function lose(why = "") {
 }
 // ---------- lifeline: 9 face-down cards, each with a topic; flip two, place one of them right to stay in the game ----------
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// lifeline cards are hard on purpose: events from inside the years already on the board (and just around them),
+// as close as possible to a card on the board without tying with it; a topic gets a card only if it has such an event
 function rescueCards() {
-  const w = G.wins[G.round - 1], onBoard = new Set(G.slots.filter(Boolean));
-  const ok = e => inWin(w, e) && !G.used.has(e) && !onBoard.has(e) && !G.pool.includes(e);
-  // per topic, the best event: this level first, then the nearest levels, unseen before seen
-  const pickFor = cat => {
-    const all = bank.filter(e => e.cat === cat && ok(e));
-    for (const d of [0, 1, 2, 3, 4]) {
-      const near = all.filter(e => Math.abs(e.f - G.level) === d);
-      const fresh = near.filter(e => !SEEN.has(e.t));
-      const from = fresh.length ? fresh : near;
-      if (from.length) return from[Math.floor(Math.random() * from.length)];
-    }
-    return null;
-  };
-  const cats = shuffle([...new Set(bank.map(e => e.cat))]);
-  const cards = [];
-  for (const c of cats) { const e = pickFor(c); if (e) cards.push({ cat: c, e }); if (cards.length === 9) break; }
-  // few topics in a narrow range: more cards for the topics that have more events
-  for (let k = 0; cards.length < 9 && k < 40; k++) {
-    const c = cats[k % cats.length], used = new Set(cards.map(x => x.e));
-    const more = bank.filter(e => e.cat === c && ok(e) && !used.has(e)).sort((a, b) => Math.abs(a.f - G.level) - Math.abs(b.f - G.level));
-    if (more.length) cards.push({ cat: c, e: more[0] });
+  const w = G.wins[G.round - 1], board = G.slots.filter(Boolean), onBoard = new Set(board);
+  const ok = e => inWin(w, e) && !G.used.has(e) && !onBoard.has(e) && !G.pool.includes(e) && board.every(b => cmp(b, e) !== 0);
+  const ys = board.map(e => e.y), lo = Math.min(...ys), hi = Math.max(...ys);
+  const near = e => Math.min(...ys.map(y => Math.abs(y - e.y)));   // years to the closest card on the board
+  // the board's years, widened step by step until there are enough events for 9 cards
+  let list = [];
+  for (const [m, least] of [[0.1, 5], [0.25, 10], [0.5, 25], [1, 50], [2, 100], [4, 250], [0, Infinity]]) {
+    const pad = Math.max(least, (hi - lo) * m);
+    list = bank.filter(e => ok(e) && e.y >= lo - pad && e.y <= hi + pad);
+    if (new Set(list.map(e => e.cat)).size >= 6 && list.length >= 12) break;
   }
+  // within a topic: inside the board's years first, then the closest levels, then the closest to a board card; unseen first
+  const rank = e => [(e.y >= lo && e.y <= hi) ? 0 : 1, Math.abs(e.f - G.level) > 1 ? 1 : 0, SEEN.has(e.t) ? 1 : 0, near(e)];
+  const better = (a, b) => { const x = rank(a), y = rank(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i]; return 0; };
+  const byCat = {};
+  for (const e of list) (byCat[e.cat] = byCat[e.cat] || []).push(e);
+  for (const c in byCat) byCat[c] = shuffle(byCat[c]).sort(better);   // shuffle first so equal ranks vary between games
+  const cats = shuffle(Object.keys(byCat)), cards = [];
+  // one card per topic, then more from the topics that have more, until 9
+  for (let round = 0; cards.length < 9 && round < 9; round++)
+    for (const c of cats) { const e = byCat[c][round]; if (e && cards.length < 9) cards.push({ cat: c, e }); }
   return shuffle(cards);
 }
 function offerRescue() {
