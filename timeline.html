@@ -159,7 +159,7 @@ body.placing .ins { display: flex; }
       <li>בכל סיבוב מותרות עד 2 טעויות. בטעות השלישית מופיע גלגל ההצלה: טעות בו, והולכים הביתה בידיים ריקות; הצלחה, ויש לכם עוד גלגל הצלה אחד לטעות הבאה בסיבוב. אחרי שני גלגלים, הטעות הבאה מסיימת את המשחק.</li>
       <li>🛟 גלגל הצלה: כשהטעות שולחת אתכם הביתה, מופיעים 9 קלפים הפוכים ועל כל אחד נושא. הקלף הראשון חינם, וכל קלף נוסף עולה כמו קלף נכון בסיבוב (100 ₪ בסיבוב 1 ... 3,000 בסיבוב 5), כל עוד יש מספיק כסף בקופה. לוחצים "סיימתי לבחור", הקלפים שנבחרו נחשפים, בוחרים אירוע אחד ומניחים אותו על הלוח. קלף נכון מציל וממשיכים, אבל לא מכניס כסף. טעות, והולכים הביתה.</li>
       <li>אחרי סיבוב 3 (15,000 ₪) ואחרי סיבוב 4 (30,000 ₪) אפשר לפרוש עם הכסף, או להמשיך ולהסתכן בכול.</li>
-      <li>✖2 סיבוב בונוס: מי שמסיים את 5 הסיבובים יכול לקחת את הכסף וללכת, או לבחור נושא מיוחד (סרטי ג'יימס בונד, המונדיאלים ועוד) ולשחק לוח אחד, כפול או כלום. בלי אף טעות ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל. טעות אחת, והולכים הביתה בידיים ריקות.</li>
+      <li>✖2 סיבוב בונוס: מי שמסיים את 5 הסיבובים יכול לקחת את הכסף וללכת, או לבחור נושא מיוחד (סרטי ג'יימס בונד, המונדיאלים ועוד) ולשחק לוח אחד, כפול או כלום. גם בו יש קלף פתיחה עם תאריך באמצע הלוח. בלי אף טעות ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל. טעות אחת, והולכים הביתה בידיים ריקות.</li>
       <li>⚡ משחק קצר: רק שני סיבובים. סיבוב קל עם אירועים שכולם מכירים (רמה 1, מכל התקופות, 500 ₪ לקלף נכון), ואחריו סיבוב קשה יותר (רמה 2, גם הוא מכל התקופות, 1,500 ₪ לקלף נכון). מי שמסיים את שניהם, עד 20,000 ₪, יכול לשחק סיבוב בונוס כפול או כלום בנושא מיוחד. אותם כללים של טעויות וגלגלי הצלה.</li>
     </ol>
     <h2>איזה משחק?</h2>
@@ -418,7 +418,7 @@ function drop(from, to) {
       const hadAnchor = !!G.anchor;
       if (G.anchor) { const a = G.slots.indexOf(G.anchor); if (a >= 0) G.slots[a] = null; G.anchor = null; }
       if (!G.rescue) G.bank += per();
-      if (G.bonus) { sGood(); say(`נכון! ${fmt(e)} · עוד ${N - placedCount()} להכפלה`, "good"); draw(); render({ good: to }); if (G.slots.every(Boolean)) roundDone(); return; }
+      if (G.bonus) { sGood(); say(`נכון! ${fmt(e)} · עוד ${N - placedCount()} להכפלה` + (hadAnchor ? " · קלף הפתיחה ירד מהלוח" : ""), "good"); draw(); render({ good: to }); if (G.slots.every(Boolean)) roundDone(); return; }
       sGood(); say((G.rescue ? `🛟 ניצלתם! נכון! ${fmt(e)} (בלי כסף על קלף בגלגל) · ` + (G.ru < RESCUES ? `נשאר לכם עוד גלגל הצלה ${RESCUES - G.ru === 1 ? "אחד" : RESCUES - G.ru} בסיבוב` : "זה היה גלגל ההצלה האחרון בסיבוב") : `נכון! ${fmt(e)} · +${money(per())}`) + (hadAnchor ? " · קלף הפתיחה ירד מהלוח" : ""), "good"); G.rescue = false;
       draw(); render({ good: to });
       if (G.slots.every(Boolean)) roundDone();
@@ -498,7 +498,12 @@ function startBonus(s) {
   G.bonus = s; G.round = C().rounds + 1; G.rm = 0; G.ru = 0; G.anchor = null; G.hand = null; G.last = null;
   G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
   G.slots = Array(N).fill(null);
-  G.pool = s.events.slice().sort(() => Math.random() - .5).slice(0, N + 5);
+  // an opening card from the middle of the topic's years (one of the 3 closest), then the events from the rest
+  const ys = s.events.map(e => e.y).sort((a, b) => a - b), mid = ys[Math.floor(ys.length / 2)];
+  const near = shuffle(s.events.slice()).sort((a, b) => Math.abs(a.y - mid) - Math.abs(b.y - mid));
+  G.anchor = s.events.length > N ? near[Math.floor(Math.random() * Math.min(3, near.length))] : null;
+  G.pool = shuffle(s.events.filter(e => e !== G.anchor)).slice(0, N + 5);
+  if (G.anchor) G.slots[4] = G.anchor;
   $("done").hidden = true;
   say(`סיבוב בונוס: ${s.icon} ${s.name}. כפול או כלום, בלי טעויות!`, "good");
   draw(); render();
