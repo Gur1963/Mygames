@@ -97,6 +97,7 @@ body.placing .ins { display: flex; }
 
 .hand { display: flex; gap: 18px; align-items: center; justify-content: center; flex-wrap: wrap; min-height: 150px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
 .hand .ev { width: 230px; min-height: 120px; font-size: 18px; }
+.round-title { font: 800 clamp(28px, 5vw, 44px) var(--display); text-align: center; color: var(--accent); margin: 0; }
 .msg { font: 700 17px var(--display); min-height: 26px; text-align: center; margin: 0; }
 .msg.good { color: var(--good); } .msg.bad { color: var(--bad); }
 .pool { width: 120px; height: 130px; border-radius: 10px; border: 0; display: grid; place-content: center; text-align: center; opacity: .6; background: repeating-linear-gradient(45deg, var(--accent) 0 12px, color-mix(in srgb, var(--accent) 75%, #fff) 0 24px); color: #fff; font: 800 18px var(--display); text-shadow: 0 1px 3px rgb(0 0 0 / .4); }
@@ -160,7 +161,7 @@ body.placing .ins { display: flex; }
       <li>🛟 גלגל הצלה: כשהטעות שולחת אתכם הביתה, מופיעים 9 קלפים הפוכים ועל כל אחד נושא. הקלף הראשון חינם, וכל קלף נוסף עולה כמו קלף נכון בסיבוב (100 ₪ בסיבוב 1 ... 3,000 בסיבוב 5), כל עוד יש מספיק כסף בקופה. לוחצים "סיימתי לבחור", הקלפים שנבחרו נחשפים, בוחרים אירוע אחד ומניחים אותו על הלוח. קלף נכון מציל וממשיכים, אבל לא מכניס כסף. טעות, והולכים הביתה.</li>
       <li>אחרי סיבוב 3 (15,000 ₪) ואחרי סיבוב 4 (30,000 ₪) אפשר לפרוש עם הכסף, או להמשיך ולהסתכן בכול.</li>
       <li>✖2 סיבוב בונוס: מי שמסיים את 5 הסיבובים יכול לקחת את הכסף וללכת, או לבחור 3 נושאים מיוחדים (סרטי ג'יימס בונד, המונדיאלים, הארי פוטר ועוד) שהאירועים שלהם מתערבבים ולשחק לוח אחד, כפול או כלום. גם בו יש קלף פתיחה עם תאריך באמצע הלוח. בלי אף טעות ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל. טעות אחת, והולכים הביתה בידיים ריקות.</li>
-      <li>⚡ משחק קצר: רק שני סיבובים. סיבוב קל עם אירועים שכולם מכירים (רמה 1, מכל התקופות, 500 ₪ לקלף נכון), ואחריו סיבוב קשה יותר (רמה 2, גם הוא מכל התקופות, 1,500 ₪ לקלף נכון). מי שמסיים את שניהם, עד 20,000 ₪, יכול לשחק סיבוב בונוס כפול או כלום על 3 נושאים מיוחדים. אותם כללים של טעויות וגלגלי הצלה.</li>
+      <li>⚡ משחק קצר: רק שני סיבובים. "סיבוב חימום" עם אירועים שכולם מכירים (רמה 1, מכל התקופות, 500 ₪ לקלף נכון), ואחריו "שוברים את הראש" (רמה 2, גם הוא מכל התקופות, 1,500 ₪ לקלף נכון). מי שמסיים את שניהם, עד 20,000 ₪, יכול לשחק "כפול או כלום" על 3 נושאים מיוחדים, ובו מותרת טעות אחת. בשני הסיבובים הראשונים, אותם כללים של טעויות וגלגלי הצלה.</li>
     </ol>
     <h2>איזה משחק?</h2>
     <div class="levels" id="modes"></div>
@@ -172,6 +173,7 @@ body.placing .ins { display: flex; }
 
   <section id="game" hidden>
     <div style="display:grid;gap:12px">
+      <h2 class="round-title" id="roundTitle" hidden></h2>
       <div class="bar">
         <div><span>רמה</span> <b id="lvl">1</b></div>
         <div><span>סיבוב</span> <b id="round">1</b><span id="of">/5</span> <span id="era"></span></div>
@@ -254,8 +256,9 @@ const WIDTHS = [0, 1000, 500, 250, 100];
 // prize = what each round adds; per = what each right placement pays (a lifeline card past the first costs the same);
 // allow = mistakes per round before the lifeline; canStop = the first round after which you may leave with the money
 const MODES = {
-  full: { rounds: 5, prize: [1000, 4000, 10000, 15000, 30000], allow: [2, 2, 2, 2, 2], canStop: 3 },
-  short: { rounds: 2, prize: [5000, 15000], allow: [2, 2], canStop: 99, levels: [1, 2], width: 0 },   // width 0 = all eras
+  full: { rounds: 5, prize: [1000, 4000, 10000, 15000, 30000], allow: [2, 2, 2, 2, 2], canStop: 3, bonusAllow: 0 },
+  short: { rounds: 2, prize: [5000, 15000], allow: [2, 2], canStop: 99, levels: [1, 2], width: 0, bonusAllow: 1,
+    names: ["🔥 סיבוב חימום", "🧠 שוברים את הראש"], bonusName: "✖2 כפול או כלום" },   // width 0 = all eras
 };
 for (const k in MODES) MODES[k].per = MODES[k].prize.map(v => v / N);
 const C = () => G.cfg;
@@ -264,12 +267,14 @@ const RESCUES = 2;   // lifelines per round: a right lifeline placement earns on
 let SETS = [];
 const PICK = 3;   // topics the player picks for the bonus board
 const per = () => G.bonus ? 0 : C().per[G.round - 1];
-const allow = () => G.bonus ? 0 : C().allow[G.round - 1];
+const allow = () => G.bonus ? (C().bonusAllow || 0) : C().allow[G.round - 1];
+const rname = r => C().names ? C().names[r - 1] : `סיבוב ${r}`;
+const noMiss = () => C().bonusAllow ? `טעות אחת מותרת, ובלי גלגל הצלה` : "בלי אף טעות, ובלי גלגל הצלה";
 let mode = "full";
 try { if (localStorage.getItem("timeline-mode") === "short") mode = "short"; } catch (e) {}
 function renderModes() {
   const box = $("modes"); box.innerHTML = "";
-  for (const [k, n, txt] of [["full", "מלא", "5 סיבובים, הטווח מצטמצם בכל סיבוב, ברמה שתבחרו"], ["short", "קצר", "סיבוב קל (רמה 1), סיבוב קשה יותר (רמה 2), ואז כפול או כלום על 3 נושאים מיוחדים"]]) {
+  for (const [k, n, txt] of [["full", "מלא", "5 סיבובים, הטווח מצטמצם בכל סיבוב, ברמה שתבחרו"], ["short", "קצר", "סיבוב חימום (רמה 1), שוברים את הראש (רמה 2), ואז כפול או כלום על 3 נושאים, עם טעות אחת מותרת"]]) {
     const b = document.createElement("button");
     b.type = "button"; b.setAttribute("aria-pressed", k === mode);
     b.innerHTML = `<b></b><span></span>`; b.querySelector("b").textContent = n; b.querySelector("span").textContent = txt;
@@ -367,7 +372,7 @@ function startRound(r) {
   G.anchor = anchorFor(r - 1);
   if (G.anchor) { G.slots[4] = G.anchor; G.used.add(G.anchor); markSeen(G.anchor); }
   $("done").hidden = true;
-  say(r === 1 ? "" : `סיבוב ${r}: ${C().levels ? `קשה יותר, רמה ${G.level}, ` : ""}אירועים מ${rangeText(G.wins[r - 1])}`, "good");
+  say(r === 1 ? "" : C().names ? `${rname(r)}: רמה ${G.level}, אירועים מ${rangeText(G.wins[r - 1])}` : `סיבוב ${r}: אירועים מ${rangeText(G.wins[r - 1])}`, "good");
   draw(); render();
 }
 // the opening card: an event of this round's years that is not in the pool, from the middle of the pool's years
@@ -426,6 +431,13 @@ function drop(from, to) {
     } else {
       G.misses++; G.hand = null;
       sBad();
+      if (G.bonus && G.rm < allow()) {   // the one mistake the bonus allows: the event goes back to the pool
+        G.rm++; G.pool.push(e); G.last = e;
+        say(`טעות. "${e.t}" חוזר לקופה. זו הייתה הטעות היחידה שמותרת: מעכשיו, טעות אחת והכול הולך.`, "bad");
+        render({ bad: Math.min(to, N - 1), badEv: e });
+        clearTimeout(drawT); drawT = setTimeout(() => { draw(); render(); }, 1300);
+        return;
+      }
       if (G.bonus) {
         say(`טעות. "${e.t}" היה ב${fmt(e)}.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e });
         const had = G.bank; G.bank = 0;
@@ -457,11 +469,11 @@ function roundDone() {
   const d = $("done"); d.classList.remove("lost");
   if (G.bonus) { G.bank *= 2; return finish(`🏆🏆 סיבוב הבונוס הושלם, הכסף הוכפל! זכיתם ב-${money(G.bank)}`); }
   if (G.round === C().rounds) return offerBonus();
-  const r = G.round + 1, next = `סיבוב ${r}: ${C().levels ? `רמה ${C().levels[r - 1]}, ` : ""}${money(C().per[r - 1])} לכל קלף נכון, עד ${C().allow[r - 1]} טעויות, אירועים מ${rangeText(G.wins[r - 1])}`;
+  const r = G.round + 1, next = `${rname(r)}: ${C().levels ? `רמה ${C().levels[r - 1]}, ` : ""}${money(C().per[r - 1])} לכל קלף נכון, עד ${C().allow[r - 1]} טעויות, אירועים מ${rangeText(G.wins[r - 1])}`;
   if (G.round < C().canStop) {
-    d.innerHTML = `<h2>✔ סיבוב ${G.round} הושלם! בקופה ${money(G.bank)}</h2>
+    d.innerHTML = `<h2>✔ ${rname(G.round)} הושלם! בקופה ${money(G.bank)}</h2>
       <div>עוד רגע ${next}</div>
-      <button class="btn" type="button" id="againBtn">לסיבוב ${r} עכשיו</button>`;
+      <button class="btn" type="button" id="againBtn">ל${C().names ? "סיבוב הבא" : `סיבוב ${r}`} עכשיו</button>`;
     d.hidden = false;
     $("againBtn").onclick = () => startRound(r);
     nextT = setTimeout(() => startRound(r), 3500);
@@ -483,7 +495,7 @@ function offerBonus() {
   if (!sets.length) return finish(`🏆 סיימתם ${all}! זכיתם ב-${money(G.bank)}`);
   const d = $("done"); d.classList.remove("lost");
   d.innerHTML = `<h2>🏆 סיימתם ${all}! בקופה ${money(G.bank)}</h2>
-    <div><b>סיבוב בונוס: כפול או כלום.</b> בחרו ${PICK} נושאים, והאירועים בלוח יגיעו משלושתם, מעורבבים. בלי אף טעות, ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל ל-${money(G.bank * 2)}. טעות אחת, והולכים הביתה בידיים ריקות.</div>
+    <div><b>${C().bonusName || "סיבוב בונוס: כפול או כלום"}.</b> בחרו ${PICK} נושאים, והאירועים בלוח יגיעו משלושתם, מעורבבים. ${noMiss()}: מסיימים את הלוח, והכסף מוכפל ל-${money(G.bank * 2)}. ${C().bonusAllow ? "טעות שנייה" : "טעות אחת"}, והולכים הביתה בידיים ריקות.</div>
     <div class="row" id="setBtns"></div>
     <div class="row"><button class="btn" type="button" id="goBonus" disabled></button>
     <button class="btn ghost" type="button" id="stopBtn">💰 לקחת ${money(G.bank)} וללכת</button></div>`;
@@ -520,7 +532,7 @@ function startBonus(picked) {
   G.pool = shuffle(picked.flatMap(x => shuffle(x.events.filter(e => e !== G.anchor)).slice(0, each)));
   if (G.anchor) G.slots[4] = G.anchor;
   $("done").hidden = true;
-  say(`סיבוב בונוס: ${s.icon} ${s.name}. כפול או כלום, בלי טעויות!`, "good");
+  say(`סיבוב בונוס: ${s.icon} ${s.name}. כפול או כלום, ${C().bonusAllow ? "טעות אחת מותרת" : "בלי טעויות"}!`, "good");
   draw(); render();
 }
 function lose(why = "") {
@@ -702,11 +714,12 @@ function render(fx = {}) {
   $("of").textContent = "/" + c.rounds;
   $("bank").textContent = money(G.bank);
   $("placed").textContent = placedCount();
-  if (G.bonus) $("ladder").innerHTML += `<div class="rung now">✖2 או כלום<small>בונוס · ${G.bonus.icon} ${G.bonus.name} · בלי טעויות</small></div>`;
+  if (G.bonus) $("ladder").innerHTML += `<div class="rung now">✖2 או כלום<small>בונוס · ${G.bonus.icon} ${G.bonus.name} · ${C().bonusAllow ? "טעות אחת מותרת" : "בלי טעויות"}</small></div>`;
   $("round").textContent = G.bonus ? "בונוס" : G.round;
   $("of").hidden = !!G.bonus;
   $("era").textContent = "· " + (G.bonus ? G.bonus.name : rangeText(G.wins[G.round - 1]));
-  $("misses").textContent = G.bonus ? "אסור לטעות" : `${G.rm}/${allow()}`;
+  $("misses").textContent = G.bonus && !allow() ? "אסור לטעות" : `${G.rm}/${allow()}`;
+  const tt = $("roundTitle"); tt.hidden = !c.names; if (c.names) tt.textContent = G.bonus ? c.bonusName : c.names[G.round - 1];
   $("misses").classList.toggle("warn", G.rm >= allow());
   showClock();
 }
