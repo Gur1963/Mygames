@@ -159,11 +159,11 @@ body.placing .ins { display: flex; }
       <li>כשכל 10 התיבות מלאות, עוברים אוטומטית לסיבוב הבא עם לוח ריק.</li>
       <li>5 סיבובים: בראשון האירועים מכל התקופות, ובכל סיבוב טווח השנים מצטמצם (1000, 500, 250), עד 100 שנה בסיבוב האחרון.</li>
       <li>💰 כל קלף נכון מכניס כסף לקופה, שמתחילה מאפס: 100 ₪ בסיבוב 1, ואחר כך 400, 1,000, 1,500 ו-3,000. מי שמסיים את כל הסיבובים צובר עד 60,000 ₪.</li>
-      <li>בכל סיבוב מותרות עד 2 טעויות. בטעות השלישית מופיע גלגל ההצלה: טעות בו, והולכים הביתה בידיים ריקות; הצלחה, ויש לכם עוד גלגל הצלה אחד לטעות הבאה בסיבוב. אחרי שני גלגלים, הטעות הבאה מסיימת את המשחק.</li>
+      <li>בכל סיבוב מותרות עד 2 טעויות, וכל טעות מורידה מהקופה כמו שקלף נכון מכניס. בטעות השלישית מופיע גלגל ההצלה: טעות בו, והולכים הביתה בידיים ריקות; הצלחה, ויש לכם עוד גלגל הצלה אחד לטעות הבאה בסיבוב. אחרי שני גלגלים, הטעות הבאה מסיימת את המשחק.</li>
       <li>🛟 גלגל הצלה: כשהטעות שולחת אתכם הביתה, מופיעים 9 קלפים הפוכים ועל כל אחד נושא. הקלף הראשון חינם, וכל קלף נוסף עולה כמו קלף נכון בסיבוב (100 ₪ בסיבוב 1 ... 3,000 בסיבוב 5), כל עוד יש מספיק כסף בקופה. לוחצים "סיימתי לבחור", הקלפים שנבחרו נחשפים, בוחרים אירוע אחד ומניחים אותו על הלוח. קלף נכון מציל וממשיכים, אבל לא מכניס כסף. טעות, והולכים הביתה.</li>
       <li>אחרי סיבוב 3 (15,000 ₪) ואחרי סיבוב 4 (30,000 ₪) אפשר לפרוש עם הכסף, או להמשיך ולהסתכן בכול.</li>
       <li>✖2 סיבוב בונוס: מי שמסיים את 5 הסיבובים יכול לקחת את הכסף וללכת, או לבחור 3 נושאים מיוחדים (סרטי ג'יימס בונד, המונדיאלים, הארי פוטר ועוד) שהאירועים שלהם מתערבבים ולשחק לוח אחד, כפול או כלום. גם בו יש קלף פתיחה עם תאריך באמצע הלוח. בלי אף טעות ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל. טעות אחת, והולכים הביתה בידיים ריקות.</li>
-      <li>⚡ משחק קצר: רק שני סיבובים. "סיבוב חימום" עם אירועים שכולם מכירים (רמה 1, מכל התקופות, 500 ₪ לקלף נכון), ואחריו "שוברים את הראש" (רמה 2, גם הוא מכל התקופות, 1,500 ₪ לקלף נכון). מי שמסיים את שניהם, עד 20,000 ₪, יכול לשחק "כפול או כלום" על 3 נושאים מיוחדים, ובו מותרת טעות אחת. בשני הסיבובים הראשונים, אותם כללים של טעויות וגלגלי הצלה.</li>
+      <li>⚡ משחק קצר: רק שני סיבובים. "סיבוב חימום" עם אירועים שכולם מכירים (רמה 1, מכל התקופות, 500 ₪ לקלף נכון), ואחריו "שוברים את הראש" (רמה 2, גם הוא מכל התקופות, 1,500 ₪ לקלף נכון). מי שמסיים את שניהם, עד 20,000 ₪, יכול לשחק "כפול או כלום" על 3 נושאים מיוחדים, ובו מותרת טעות אחת. בשני הסיבובים הראשונים, אותם כללים של טעויות וגלגלי הצלה. כל טעות מורידה מהקופה כמו קלף נכון. ⭐ סיבוב מושלם בלי אף טעות: עוד 3,000 ₪ בחימום, 5,000 ₪ ב"שוברים את הראש" ו-10,000 ₪ ב"כפול או כלום".</li>
     </ol>
     <h2>איזה משחק?</h2>
     <div class="levels" id="modes"></div>
@@ -287,7 +287,8 @@ const WIDTHS = [0, 1000, 500, 250, 100];
 const MODES = {
   full: { rounds: 5, prize: [1000, 4000, 10000, 15000, 30000], allow: [2, 2, 2, 2, 2], canStop: 3, bonusAllow: 0 },
   short: { rounds: 2, prize: [5000, 15000], allow: [2, 2], canStop: 99, levels: [1, 2], width: 0, bonusAllow: 1,
-    names: ["🔥 סיבוב חימום", "🧠 שוברים את הראש"], bonusName: "✖2 כפול או כלום" },
+    names: ["🔥 סיבוב חימום", "🧠 שוברים את הראש"], bonusName: "✖2 כפול או כלום",
+    perfect: [3000, 5000], bonusPerfect: 10000 },   // extra money for a round with no mistakes
   // last year's events, one from each month: in 2027 it becomes 2026 by itself
   year: { rounds: 1, prize: [10000], allow: [2], canStop: 99, bonusAllow: 0, noBonus: true, year: new Date().getFullYear() - 1,
     names: [`📅 השנה שהייתה בישראל: ${new Date().getFullYear() - 1}`] },   // width 0 = all eras
@@ -399,7 +400,7 @@ function startRound(r) {
   G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
   if (C().levels) { G.level = C().levels[r - 1]; G.list = levelList(G.level); G.extra = extraList(G.level); }
   $("lvl").textContent = lvlText();
-  G.round = r; G.rm = 0; G.ru = 0; G.slots = Array(N).fill(null); G.pool = roundPool(r - 1); G.hand = null; G.last = null;
+  G.round = r; G.rm = 0; G.ru = 0; G.flaw = false; G.slots = Array(N).fill(null); G.pool = roundPool(r - 1); G.hand = null; G.last = null;
   // an opening card with its date in the middle; the first event is placed against it, then it leaves the board
   if (C().year) yearBoard(); else G.anchor = anchorFor(r - 1);
   if (G.anchor) { G.slots[4] = G.anchor; G.used.add(G.anchor); markSeen(G.anchor); }
@@ -475,7 +476,7 @@ function drop(from, to) {
       draw(); render({ good: to });
       if (G.slots.every(Boolean)) roundDone();
     } else {
-      G.misses++; G.hand = null;
+      G.misses++; G.hand = null; G.flaw = true;
       sBad();
       if (G.bonus && G.rm < allow()) {   // the one mistake the bonus allows: the event goes back to the pool
         G.rm++; G.pool.push(e); G.last = e;
@@ -491,13 +492,15 @@ function drop(from, to) {
       }
       if (G.rescue) { G.rescue = false; say(`טעות. "${e.t}" היה ב${fmt(e)}.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e }); return lose(" גלגל ההצלה לא עזר."); }
       G.rm++; G.pool.push(e); G.last = e;
+      const fine = Math.min(G.bank, per()); G.bank -= fine;
+      const minus = fine ? ` −${money(fine)}.` : "";
       if (G.rm > allow()) {
-        G.rm = allow(); say(`טעות. "${e.t}" חוזר לקופה.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e });
+        G.rm = allow(); say(`טעות.${minus} "${e.t}" חוזר לקופה.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e });
         if (G.ru >= RESCUES) return lose(" גם גלגלי ההצלה נגמרו.");
         G.ru++; return offerRescue();
       }
       const left = allow() - G.rm;
-      say(`טעות. "${e.t}" חוזר לקופה. ` + (left ? (left === 1 ? "נשארה עוד טעות אחת בסיבוב." : `נשארו עוד ${left} טעויות בסיבוב.`) : G.ru < RESCUES ? `⚠ הטעות הבאה: גלגל הצלה (נשארו ${RESCUES - G.ru}).` : "⚠ גלגלי ההצלה נגמרו: הטעות הבאה מסיימת את המשחק."), "bad");
+      say(`טעות.${minus} "${e.t}" חוזר לקופה. ` + (left ? (left === 1 ? "נשארה עוד טעות אחת בסיבוב." : `נשארו עוד ${left} טעויות בסיבוב.`) : G.ru < RESCUES ? `⚠ הטעות הבאה: גלגל הצלה (נשארו ${RESCUES - G.ru}).` : "⚠ גלגלי ההצלה נגמרו: הטעות הבאה מסיימת את המשחק."), "bad");
       render({ bad: Math.min(to, N - 1), badEv: e });
       clearTimeout(drawT); drawT = setTimeout(() => { draw(); render(); }, 1300);
     }
@@ -513,11 +516,17 @@ function roundDone() {
   if (!G.bonus) sWin();   // the bonus ends in finish(), which plays the fanfare
   render();
   const d = $("done"); d.classList.remove("lost");
-  if (G.bonus) { G.bank *= 2; return finish(`🏆🏆 סיבוב הבונוס הושלם, הכסף הוכפל! זכיתם ב-${money(G.bank)}`); }
+  if (G.bonus) {
+    G.bank *= 2;
+    const bp = !G.flaw && C().bonusPerfect ? C().bonusPerfect : 0; G.bank += bp;
+    return finish(`🏆🏆 סיבוב הבונוס הושלם, הכסף הוכפל!${bp ? ` ⭐ סיבוב מושלם בלי טעויות: עוד ${money(bp)}!` : ""} זכיתם ב-${money(G.bank)}`);
+  }
+  const pf = !G.flaw && C().perfect ? C().perfect[G.round - 1] || 0 : 0;
+  G.pf = pf; if (pf) { G.bank += pf; say(`⭐ סיבוב מושלם בלי טעויות! עוד ${money(pf)} לקופה`, "good"); render(); }
   if (G.round === C().rounds) return C().noBonus ? finish(`🏆 סידרתם את כל השנה! זכיתם ב-${money(G.bank)}`) : offerBonus();
   const r = G.round + 1, next = `${rname(r)}: ${C().levels ? `רמה ${C().levels[r - 1]}, ` : ""}${money(C().per[r - 1])} לכל קלף נכון, עד ${C().allow[r - 1]} טעויות, אירועים מ${rangeText(G.wins[r - 1])}`;
   if (G.round < C().canStop) {
-    d.innerHTML = `<h2>✔ ${rname(G.round)} הושלם! בקופה ${money(G.bank)}</h2>
+    d.innerHTML = `<h2>✔ ${rname(G.round)} הושלם!${pf ? ` ⭐ מושלם: +${money(pf)}!` : ""} בקופה ${money(G.bank)}</h2>
       <div>עוד רגע ${next}</div>
       <button class="btn" type="button" id="againBtn">ל${C().names ? "סיבוב הבא" : `סיבוב ${r}`} עכשיו</button>`;
     d.hidden = false;
@@ -540,7 +549,7 @@ function offerBonus() {
   const all = C().rounds === 2 ? "את שני הסיבובים" : `את כל ${C().rounds} הסיבובים`;
   if (!sets.length) return finish(`🏆 סיימתם ${all}! זכיתם ב-${money(G.bank)}`);
   const d = $("done"); d.classList.remove("lost");
-  d.innerHTML = `<h2>🏆 סיימתם ${all}! בקופה ${money(G.bank)}</h2>
+  d.innerHTML = `<h2>🏆 סיימתם ${all}!${G.pf ? ` ⭐ מושלם: +${money(G.pf)}!` : ""} בקופה ${money(G.bank)}</h2>
     <div><b>${C().bonusName || "סיבוב בונוס: כפול או כלום"}.</b> בחרו ${PICK} נושאים, והאירועים בלוח יגיעו משלושתם, מעורבבים. ${noMiss()}: מסיימים את הלוח, והכסף מוכפל ל-${money(G.bank * 2)}. ${C().bonusAllow ? "טעות שנייה" : "טעות אחת"}, והולכים הביתה בידיים ריקות.</div>
     <div class="row" id="setBtns"></div>
     <div class="row"><button class="btn" type="button" id="goBonus" disabled></button>
@@ -567,7 +576,7 @@ function offerBonus() {
 function startBonus(picked) {
   clearTimeout(nextT); clearTimeout(drawT);
   const s = { name: picked.map(x => x.name).join(" · "), icon: picked.map(x => x.icon).join(""), events: picked.flatMap(x => x.events) };
-  G.bonus = s; G.round = C().rounds + 1; G.rm = 0; G.ru = 0; G.anchor = null; G.hand = null; G.last = null;
+  G.bonus = s; G.round = C().rounds + 1; G.rm = 0; G.ru = 0; G.flaw = false; G.anchor = null; G.hand = null; G.last = null;
   G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
   G.slots = Array(N).fill(null);
   // an opening card from the middle of the topic's years (one of the 3 closest), then the events from the rest
