@@ -493,7 +493,8 @@ function drop(from, to) {
       if (G.rescue) { G.rescue = false; say(`טעות. "${e.t}" היה ב${fmt(e)}.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e }); return lose(" גלגל ההצלה לא עזר."); }
       G.rm++; G.pool.push(e); G.last = e;
       const fine = Math.min(G.bank, per()); G.bank -= fine;
-      const minus = fine ? ` −${money(fine)}.` : "";
+      const lostPf = G.rm === 1 && C().perfect && C().perfect[G.round - 1] ? ` (בונוס הסיבוב המושלם ירד)` : "";
+      const minus = (fine ? ` −${money(fine)}.` : "") + lostPf;
       if (G.rm > allow()) {
         G.rm = allow(); say(`טעות.${minus} "${e.t}" חוזר לקופה.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e });
         if (G.ru >= RESCUES) return lose(" גם גלגלי ההצלה נגמרו.");
@@ -522,11 +523,12 @@ function roundDone() {
     return finish(`🏆🏆 סיבוב הבונוס הושלם, הכסף הוכפל!${bp ? ` ⭐ סיבוב מושלם בלי טעויות: עוד ${money(bp)}!` : ""} זכיתם ב-${money(G.bank)}`);
   }
   const pf = !G.flaw && C().perfect ? C().perfect[G.round - 1] || 0 : 0;
-  G.pf = pf; if (pf) { G.bank += pf; say(`⭐ סיבוב מושלם בלי טעויות! עוד ${money(pf)} לקופה`, "good"); render(); }
+  const pfMiss = G.flaw && C().perfect && C().perfect[G.round - 1] ? ` (בונוס סיבוב מושלם של ${money(C().perfect[G.round - 1])} הפסדתם בגלל טעות)` : "";
+  G.pf = pf; G.pfMiss = pfMiss; if (pf) { G.bank += pf; say(`⭐ סיבוב מושלם בלי טעויות! עוד ${money(pf)} לקופה`, "good"); render(); }
   if (G.round === C().rounds) return C().noBonus ? finish(`🏆 סידרתם את כל השנה! זכיתם ב-${money(G.bank)}`) : offerBonus();
   const r = G.round + 1, next = `${rname(r)}: ${C().levels ? `רמה ${C().levels[r - 1]}, ` : ""}${money(C().per[r - 1])} לכל קלף נכון, עד ${C().allow[r - 1]} טעויות, אירועים מ${rangeText(G.wins[r - 1])}`;
   if (G.round < C().canStop) {
-    d.innerHTML = `<h2>✔ ${rname(G.round)} הושלם!${pf ? ` ⭐ מושלם: +${money(pf)}!` : ""} בקופה ${money(G.bank)}</h2>
+    d.innerHTML = `<h2>✔ ${rname(G.round)} הושלם!${pf ? ` ⭐ סיבוב מושלם: +${money(pf)}!` : ""} בקופה ${money(G.bank)}</h2>${pfMiss ? `<div>${pfMiss}</div>` : ""}
       <div>עוד רגע ${next}</div>
       <button class="btn" type="button" id="againBtn">ל${C().names ? "סיבוב הבא" : `סיבוב ${r}`} עכשיו</button>`;
     d.hidden = false;
@@ -549,7 +551,7 @@ function offerBonus() {
   const all = C().rounds === 2 ? "את שני הסיבובים" : `את כל ${C().rounds} הסיבובים`;
   if (!sets.length) return finish(`🏆 סיימתם ${all}! זכיתם ב-${money(G.bank)}`);
   const d = $("done"); d.classList.remove("lost");
-  d.innerHTML = `<h2>🏆 סיימתם ${all}!${G.pf ? ` ⭐ מושלם: +${money(G.pf)}!` : ""} בקופה ${money(G.bank)}</h2>
+  d.innerHTML = `<h2>🏆 סיימתם ${all}!${G.pf ? ` ⭐ סיבוב מושלם: +${money(G.pf)}!` : ""} בקופה ${money(G.bank)}</h2>${G.pfMiss ? `<div>${G.pfMiss}</div>` : ""}
     <div><b>${C().bonusName || "סיבוב בונוס: כפול או כלום"}.</b> בחרו ${PICK} נושאים, והאירועים בלוח יגיעו משלושתם, מעורבבים. ${noMiss()}: מסיימים את הלוח, והכסף מוכפל ל-${money(G.bank * 2)}. ${C().bonusAllow ? "טעות שנייה" : "טעות אחת"}, והולכים הביתה בידיים ריקות.</div>
     <div class="row" id="setBtns"></div>
     <div class="row"><button class="btn" type="button" id="goBonus" disabled></button>
@@ -765,11 +767,11 @@ function render(fx = {}) {
   h.hidden = full || !!G.end || !!G.inRescue;
   if (G.rescue && G.hand) { const l = document.createElement("div"); l.className = "lifeline"; l.textContent = "🛟 גלגל הצלה"; h.prepend(l); }
   const c = C();
-  $("ladder").innerHTML = c.per.map((v, i) => `<div class="rung${i + 1 === G.round ? " now" : i + 1 < G.round ? " past" : ""}">${money(v)} לקלף נכון<small>סיבוב ${i + 1}${c.levels ? ` · רמה ${c.levels[i]}` : ""} · עד ${c.allow[i]} טעויות + ${RESCUES} 🛟${i + 1 >= c.canStop && i + 1 < c.rounds ? " · 🏁" : ""}</small></div>`).join("");
+  $("ladder").innerHTML = c.per.map((v, i) => `<div class="rung${i + 1 === G.round ? " now" : i + 1 < G.round ? " past" : ""}">${money(v)} לקלף נכון<small>סיבוב ${i + 1}${c.levels ? ` · רמה ${c.levels[i]}` : ""} · עד ${c.allow[i]} טעויות + ${RESCUES} 🛟${c.perfect && c.perfect[i] ? ` · ⭐ בלי טעויות: +${money(c.perfect[i])}` : ""}${i + 1 >= c.canStop && i + 1 < c.rounds ? " · 🏁" : ""}</small></div>`).join("");
   $("of").textContent = "/" + c.rounds;
   $("bank").textContent = money(G.bank);
   $("placed").textContent = placedCount();
-  if (G.bonus) $("ladder").innerHTML += `<div class="rung now">✖2 או כלום<small>בונוס · ${G.bonus.icon} ${G.bonus.name} · ${C().bonusAllow ? "טעות אחת מותרת" : "בלי טעויות"}</small></div>`;
+  if (G.bonus) $("ladder").innerHTML += `<div class="rung now">✖2 או כלום<small>בונוס · ${G.bonus.icon} ${G.bonus.name} · ${C().bonusAllow ? "טעות אחת מותרת" : "בלי טעויות"}${C().bonusPerfect ? ` · ⭐ בלי טעויות: +${money(C().bonusPerfect)}` : ""}</small></div>`;
   $("round").textContent = G.bonus ? "בונוס" : G.round;
   $("of").hidden = !!G.bonus;
   $("era").textContent = "· " + (G.bonus ? G.bonus.name : rangeText(G.wins[G.round - 1]));
