@@ -160,7 +160,7 @@ body.placing .ins { display: flex; }
       <li>🛟 גלגל הצלה: כשהטעות שולחת אתכם הביתה, מופיעים 9 קלפים הפוכים ועל כל אחד נושא. הקלף הראשון חינם, וכל קלף נוסף עולה כמו קלף נכון בסיבוב (100 ₪ בסיבוב 1 ... 3,000 בסיבוב 5), כל עוד יש מספיק כסף בקופה. לוחצים "סיימתי לבחור", הקלפים שנבחרו נחשפים, בוחרים אירוע אחד ומניחים אותו על הלוח. קלף נכון מציל וממשיכים, אבל לא מכניס כסף. טעות, והולכים הביתה.</li>
       <li>אחרי סיבוב 3 (15,000 ₪) ואחרי סיבוב 4 (30,000 ₪) אפשר לפרוש עם הכסף, או להמשיך ולהסתכן בכול.</li>
       <li>✖2 סיבוב בונוס: מי שמסיים את 5 הסיבובים יכול לקחת את הכסף וללכת, או לבחור נושא מיוחד (סרטי ג'יימס בונד, המונדיאלים ועוד) ולשחק לוח אחד, כפול או כלום. בלי אף טעות ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל. טעות אחת, והולכים הביתה בידיים ריקות.</li>
-      <li>⚡ משחק קצר: רק שני סיבובים. סיבוב קל עם אירועים שכולם מכירים (רמה 1, מכל התקופות, 500 ₪ לקלף נכון), ואחריו סיבוב קשה יותר (רמה 3, גם הוא מכל התקופות, 1,500 ₪ לקלף נכון). מי שמסיים את שניהם, עד 20,000 ₪, יכול לשחק סיבוב בונוס כפול או כלום בנושא מיוחד. אותם כללים של טעויות וגלגלי הצלה.</li>
+      <li>⚡ משחק קצר: רק שני סיבובים. סיבוב קל עם אירועים שכולם מכירים (רמה 1, מכל התקופות, 500 ₪ לקלף נכון), ואחריו סיבוב קשה יותר (רמה 2, גם הוא מכל התקופות, 1,500 ₪ לקלף נכון). מי שמסיים את שניהם, עד 20,000 ₪, יכול לשחק סיבוב בונוס כפול או כלום בנושא מיוחד. אותם כללים של טעויות וגלגלי הצלה.</li>
     </ol>
     <h2>איזה משחק?</h2>
     <div class="levels" id="modes"></div>
@@ -250,12 +250,12 @@ const LEVELS = [
 // years the events come from, by round (a round is a full board); the last round is 100 years
 const WIDTHS = [0, 1000, 500, 250, 100];
 // two games: the full one (5 rounds, the player picks the level) and the short one
-// (an easy round at level 1, a harder round at level 3, both from all eras, then the bonus round)
+// (an easy round at level 1, a harder round at level 2, both from all eras, then the bonus round)
 // prize = what each round adds; per = what each right placement pays (a lifeline card past the first costs the same);
 // allow = mistakes per round before the lifeline; canStop = the first round after which you may leave with the money
 const MODES = {
   full: { rounds: 5, prize: [1000, 4000, 10000, 15000, 30000], allow: [2, 2, 2, 2, 2], canStop: 3 },
-  short: { rounds: 2, prize: [5000, 15000], allow: [2, 2], canStop: 99, levels: [1, 3], width: 0 },   // width 0 = all eras
+  short: { rounds: 2, prize: [5000, 15000], allow: [2, 2], canStop: 99, levels: [1, 2], width: 0 },   // width 0 = all eras
 };
 for (const k in MODES) MODES[k].per = MODES[k].prize.map(v => v / N);
 const C = () => G.cfg;
@@ -268,7 +268,7 @@ let mode = "full";
 try { if (localStorage.getItem("timeline-mode") === "short") mode = "short"; } catch (e) {}
 function renderModes() {
   const box = $("modes"); box.innerHTML = "";
-  for (const [k, n, txt] of [["full", "מלא", "5 סיבובים, הטווח מצטמצם בכל סיבוב, ברמה שתבחרו"], ["short", "קצר", "סיבוב קל (רמה 1), סיבוב קשה (רמה 3), ואז כפול או כלום בנושא מיוחד"]]) {
+  for (const [k, n, txt] of [["full", "מלא", "5 סיבובים, הטווח מצטמצם בכל סיבוב, ברמה שתבחרו"], ["short", "קצר", "סיבוב קל (רמה 1), סיבוב קשה יותר (רמה 2), ואז כפול או כלום בנושא מיוחד"]]) {
     const b = document.createElement("button");
     b.type = "button"; b.setAttribute("aria-pressed", k === mode);
     b.innerHTML = `<b></b><span></span>`; b.querySelector("b").textContent = n; b.querySelector("span").textContent = txt;
