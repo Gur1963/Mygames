@@ -160,8 +160,11 @@ body.placing .ins { display: flex; }
       <li>🛟 גלגל הצלה: כשהטעות שולחת אתכם הביתה, מופיעים 9 קלפים הפוכים ועל כל אחד נושא. הקלף הראשון חינם, וכל קלף נוסף עולה את ערך ההנחה של הסיבוב (100 ₪ בסיבוב 1 ... 3,000 בסיבוב 5), כל עוד יש מספיק כסף בקופה. לוחצים "סיימתי לבחור", הקלפים שנבחרו נחשפים, בוחרים אירוע אחד ומניחים אותו על הלוח. הנחה נכונה מצילה וממשיכים, אבל לא מכניסה כסף. טעות, והולכים הביתה.</li>
       <li>אחרי סיבוב 3 (15,000 ₪) ואחרי סיבוב 4 (30,000 ₪) אפשר לפרוש עם הכסף, או להמשיך ולהסתכן בכול.</li>
       <li>✖2 סיבוב בונוס: מי שמסיים את 5 הסיבובים יכול לקחת את הכסף וללכת, או לבחור נושא מיוחד (סרטי ג'יימס בונד, המונדיאלים ועוד) ולשחק לוח אחד, כפול או כלום. בלי אף טעות ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל. טעות אחת, והולכים הביתה בידיים ריקות.</li>
+      <li>⚡ משחק קצר: רק שני סיבובים. סיבוב קל עם אירועים שכולם מכירים (רמה 1, מכל התקופות, 500 ₪ להנחה), ואחריו סיבוב קשה (רמה 3, בטווח של 500 שנה, 1,500 ₪ להנחה). מי שמסיים את שניהם, עד 20,000 ₪, יכול לשחק סיבוב בונוס כפול או כלום בנושא מיוחד. אותם כללים של טעויות וגלגלי הצלה.</li>
     </ol>
-    <h2>בחרו רמת קושי: כמה מוכרים האירועים</h2>
+    <h2>איזה משחק?</h2>
+    <div class="levels" id="modes"></div>
+    <h2 id="lvlHead">בחרו רמת קושי: כמה מוכרים האירועים</h2>
     <div class="levels" id="levels"></div>
     <p id="loadNote" style="margin:0;color:var(--muted)"></p>
     <div><button class="btn" id="startBtn" type="button" disabled>מתחילים</button></div>
@@ -246,18 +249,43 @@ const LEVELS = [
 ];
 // years the events come from, by round (a round is a full board); the last round is 100 years
 const WIDTHS = [0, 1000, 500, 250, 100];
-const ROUNDS = WIDTHS.length;
-// money: what each round adds, the total after it, and how many mistakes it allows; you may stop after round 3
-const PRIZE = [1000, 4000, 10000, 15000, 30000];
-const TOTAL = PRIZE.map((_, i) => PRIZE.slice(0, i + 1).reduce((a, b) => a + b));
-const PER = PRIZE.map(v => v / N);   // each right placement pays this; a lifeline card past the first costs the same
-const ALLOW = [2, 2, 2, 2, 2];   // mistakes allowed per round; the lifeline covers the rest
+// two games: the full one (5 rounds, the player picks the level) and the short one
+// (an easy round at level 1, a hard round at level 3 inside 500 years, then the bonus round)
+// prize = what each round adds; per = what each right placement pays (a lifeline card past the first costs the same);
+// allow = mistakes per round before the lifeline; canStop = the first round after which you may leave with the money
+const MODES = {
+  full: { rounds: 5, prize: [1000, 4000, 10000, 15000, 30000], allow: [2, 2, 2, 2, 2], canStop: 3 },
+  short: { rounds: 2, prize: [5000, 15000], allow: [2, 2], canStop: 99, levels: [1, 3], width: 500 },
+};
+for (const k in MODES) MODES[k].per = MODES[k].prize.map(v => v / N);
+const C = () => G.cfg;
 const RESCUES = 2;   // lifelines per round: a right lifeline placement earns one more, a wrong one ends the game
-const CAN_STOP = 3;
-// bonus round after round 5: one topic from sets.json, double or nothing, no mistakes and no lifeline
+// bonus round after the last round: one topic from sets.json, double or nothing, no mistakes and no lifeline
 let SETS = [];
-const per = () => G.bonus ? 0 : PER[G.round - 1];
-const allow = () => G.bonus ? 0 : ALLOW[G.round - 1];
+const per = () => G.bonus ? 0 : C().per[G.round - 1];
+const allow = () => G.bonus ? 0 : C().allow[G.round - 1];
+let mode = "full";
+try { if (localStorage.getItem("timeline-mode") === "short") mode = "short"; } catch (e) {}
+function renderModes() {
+  const box = $("modes"); box.innerHTML = "";
+  for (const [k, n, txt] of [["full", "מלא", "5 סיבובים, הטווח מצטמצם בכל סיבוב, ברמה שתבחרו"], ["short", "קצר", "סיבוב קל (רמה 1), סיבוב קשה (רמה 3), ואז כפול או כלום בנושא מיוחד"]]) {
+    const b = document.createElement("button");
+    b.type = "button"; b.setAttribute("aria-pressed", k === mode);
+    b.innerHTML = `<b></b><span></span>`; b.querySelector("b").textContent = n; b.querySelector("span").textContent = txt;
+    b.onclick = () => { mode = k; try { localStorage.setItem("timeline-mode", mode); } catch (e) {} renderModes(); };
+    box.appendChild(b);
+  }
+  $("levels").hidden = $("lvlHead").hidden = mode === "short";
+}
+// the short game's hard round: a random 500-year window with enough level-3 events
+function shortWindow(list, w) {
+  const cnt = a => list.filter(e => e.y >= a && e.y < a + w).length;
+  // a full window (never past this year), every start equally likely, not weighted toward the crowded modern years
+  const starts = [];
+  for (let a = THIS_YEAR - w + 1; a > -3000; a -= 25) if (cnt(a) >= 25) starts.push(a);
+  const a = starts.length ? starts[Math.floor(Math.random() * starts.length)] : null;
+  return a === null ? null : { a, w };
+}
 const money = n => n.toLocaleString("he-IL") + " ₪";
 const THIS_YEAR = new Date().getFullYear();
 let level = 1;
@@ -306,7 +334,7 @@ function markSeen(e) {
 // each condition is dropped (least important first) only when it would leave fewer than a board's worth
 function roundPool(r) {
   const w = G.wins[r], all = G.list.filter(e => inWin(w, e));
-  const later = e => G.wins.slice(r + 1).some(x => inWin(x, e));
+  const later = e => !C().levels && G.wins.slice(r + 1).some(x => inWin(x, e));   // the short game's rounds use different levels
   const fresh = all.filter(e => !G.used.has(e));
   const unseen = fresh.filter(e => !SEEN.has(e.t));
   const extra = G.extra.filter(e => inWin(w, e) && !G.used.has(e) && !SEEN.has(e.t));
@@ -315,12 +343,14 @@ function roundPool(r) {
 }
 
 // ---------- game ----------
+const levelList = L => bank.filter(e => e.f === L);
+// the nearest other level tops up when this level's unseen events run out
+const extraList = L => bank.filter(e => e.f === (L < 5 ? L + 1 : 4));
 function newGame() {
-  const list = bank.filter(e => e.f === level);
-  // the nearest other level tops up when this level's unseen events run out
-  const extra = bank.filter(e => e.f === (level < 5 ? level + 1 : 4));
-  G = { level, list, extra, wins: windows(list), used: new Set(), round: 0, rm: 0, bank: 0, slots: [], pool: [], hand: null, misses: 0, t0: null, last: null, end: null };
-  $("lvl").textContent = level;
+  const cfg = MODES[mode];
+  const L = cfg.levels ? cfg.levels[0] : level, list = levelList(L);
+  const wins = cfg.levels ? [null, shortWindow(levelList(cfg.levels[1]), cfg.width)] : windows(list);
+  G = { cfg, level: L, list, extra: extraList(L), wins, used: new Set(), round: 0, rm: 0, bank: 0, slots: [], pool: [], hand: null, misses: 0, t0: null, last: null, end: null };
   $("setup").hidden = true; $("game").hidden = false;
   clearInterval(tick); tick = setInterval(showClock, 500);
   startRound(1);
@@ -329,12 +359,14 @@ let nextT = null;
 function startRound(r) {
   clearTimeout(nextT); clearTimeout(drawT);
   G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
+  if (C().levels) { G.level = C().levels[r - 1]; G.list = levelList(G.level); G.extra = extraList(G.level); }
+  $("lvl").textContent = G.level;
   G.round = r; G.rm = 0; G.ru = 0; G.slots = Array(N).fill(null); G.pool = roundPool(r - 1); G.hand = null; G.last = null;
   // an opening card with its date in the middle; the first event is placed against it, then it leaves the board
   G.anchor = anchorFor(r - 1);
   if (G.anchor) { G.slots[4] = G.anchor; G.used.add(G.anchor); markSeen(G.anchor); }
   $("done").hidden = true;
-  say(r === 1 ? "" : `סיבוב ${r}: אירועים מ${rangeText(G.wins[r - 1])}`, "good");
+  say(r === 1 ? "" : `סיבוב ${r}: ${C().levels ? `קשה יותר, רמה ${G.level}, ` : ""}אירועים מ${rangeText(G.wins[r - 1])}`, "good");
   draw(); render();
 }
 // the opening card: an event of this round's years that is not in the pool, from the middle of the pool's years
@@ -423,9 +455,9 @@ function roundDone() {
   render();
   const d = $("done"); d.classList.remove("lost");
   if (G.bonus) { G.bank *= 2; return finish(`🏆🏆 סיבוב הבונוס הושלם, הכסף הוכפל! זכיתם ב-${money(G.bank)}`); }
-  if (G.round === ROUNDS) return offerBonus();
-  const r = G.round + 1, next = `סיבוב ${r}: ${money(PER[r - 1])} לכל הנחה נכונה, עד ${ALLOW[r - 1]} טעויות, אירועים מ${rangeText(G.wins[r - 1])}`;
-  if (G.round < CAN_STOP) {
+  if (G.round === C().rounds) return offerBonus();
+  const r = G.round + 1, next = `סיבוב ${r}: ${C().levels ? `רמה ${C().levels[r - 1]}, ` : ""}${money(C().per[r - 1])} לכל הנחה נכונה, עד ${C().allow[r - 1]} טעויות, אירועים מ${rangeText(G.wins[r - 1])}`;
+  if (G.round < C().canStop) {
     d.innerHTML = `<h2>✔ סיבוב ${G.round} הושלם! בקופה ${money(G.bank)}</h2>
       <div>עוד רגע ${next}</div>
       <button class="btn" type="button" id="againBtn">לסיבוב ${r} עכשיו</button>`;
@@ -438,7 +470,7 @@ function roundDone() {
     <div>לפרוש עכשיו עם הכסף, או להמשיך? אם תיכשלו בסיבוב הבא, תלכו הביתה בידיים ריקות.</div>
     <div>${next}</div>
     <div class="row"><button class="btn" type="button" id="stopBtn">💰 לפרוש עם ${money(G.bank)}</button>
-    <button class="btn ghost" type="button" id="goBtn">להמשיך (עד ${money(G.bank + PRIZE[r - 1])})</button></div>`;
+    <button class="btn ghost" type="button" id="goBtn">להמשיך (עד ${money(G.bank + C().prize[r - 1])})</button></div>`;
   d.hidden = false;
   $("stopBtn").onclick = () => finish(`💰 פרשתם עם ${money(G.bank)}`);
   $("goBtn").onclick = () => startRound(r);
@@ -446,9 +478,10 @@ function roundDone() {
 // after round 5: take the money, or pick a topic and play one more board, double or nothing
 function offerBonus() {
   const sets = SETS.filter(s => s.events.length >= N);
-  if (!sets.length) return finish(`🏆 סיימתם את כל 5 הסיבובים! זכיתם ב-${money(G.bank)}`);
+  const all = C().rounds === 2 ? "את שני הסיבובים" : `את כל ${C().rounds} הסיבובים`;
+  if (!sets.length) return finish(`🏆 סיימתם ${all}! זכיתם ב-${money(G.bank)}`);
   const d = $("done"); d.classList.remove("lost");
-  d.innerHTML = `<h2>🏆 סיימתם את כל 5 הסיבובים! בקופה ${money(G.bank)}</h2>
+  d.innerHTML = `<h2>🏆 סיימתם ${all}! בקופה ${money(G.bank)}</h2>
     <div><b>סיבוב בונוס: כפול או כלום.</b> לוח אחד בנושא שתבחרו. בלי אף טעות, ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל ל-${money(G.bank * 2)}. טעות אחת, והולכים הביתה בידיים ריקות.</div>
     <div class="row" id="setBtns"></div>
     <div class="row"><button class="btn ghost" type="button" id="stopBtn">💰 לקחת ${money(G.bank)} וללכת</button></div>`;
@@ -462,7 +495,7 @@ function offerBonus() {
 }
 function startBonus(s) {
   clearTimeout(nextT); clearTimeout(drawT);
-  G.bonus = s; G.round = ROUNDS + 1; G.rm = 0; G.ru = 0; G.anchor = null; G.hand = null; G.last = null;
+  G.bonus = s; G.round = C().rounds + 1; G.rm = 0; G.ru = 0; G.anchor = null; G.hand = null; G.last = null;
   G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
   G.slots = Array(N).fill(null);
   G.pool = s.events.slice().sort(() => Math.random() - .5).slice(0, N + 5);
@@ -644,7 +677,9 @@ function render(fx = {}) {
   }
   h.hidden = full || !!G.end || !!G.inRescue;
   if (G.rescue && G.hand) { const l = document.createElement("div"); l.className = "lifeline"; l.textContent = "🛟 גלגל הצלה"; h.prepend(l); }
-  $("ladder").innerHTML = PER.map((v, i) => `<div class="rung${i + 1 === G.round ? " now" : i + 1 < G.round ? " past" : ""}">${money(v)} להנחה<small>סיבוב ${i + 1} · עד ${ALLOW[i]} טעויות + ${RESCUES} 🛟${i + 1 >= CAN_STOP && i + 1 < ROUNDS ? " · 🏁" : ""}</small></div>`).join("");
+  const c = C();
+  $("ladder").innerHTML = c.per.map((v, i) => `<div class="rung${i + 1 === G.round ? " now" : i + 1 < G.round ? " past" : ""}">${money(v)} להנחה<small>סיבוב ${i + 1}${c.levels ? ` · רמה ${c.levels[i]}` : ""} · עד ${c.allow[i]} טעויות + ${RESCUES} 🛟${i + 1 >= c.canStop && i + 1 < c.rounds ? " · 🏁" : ""}</small></div>`).join("");
+  $("of").textContent = "/" + c.rounds;
   $("bank").textContent = money(G.bank);
   $("placed").textContent = placedCount();
   if (G.bonus) $("ladder").innerHTML += `<div class="rung now">✖2 או כלום<small>בונוס · ${G.bonus.icon} ${G.bonus.name} · בלי טעויות</small></div>`;
@@ -714,9 +749,9 @@ function targetAt(x, y, from) {
 $("startBtn").onclick = newGame;
 $("restartBtn").onclick = () => {
   if (!G.end && !confirm("להתחיל משחק חדש? המשחק הנוכחי יימחק.")) return;
-  clearInterval(tick); clearTimeout(nextT); clearTimeout(drawT); renderLevels(); $("game").hidden = true; $("setup").hidden = false;
+  clearInterval(tick); clearTimeout(nextT); clearTimeout(drawT); renderLevels(); renderModes(); $("game").hidden = true; $("setup").hidden = false;
 };
-renderLevels();
+renderLevels(); renderModes();
 fetch("questions/events.json", { cache: "no-cache" })
   .then(r => { if (!r.ok) throw 0; return r.json(); })
   .then(d => { bank = d.events; $("loadNote").textContent = `במאגר ${bank.length} אירועים: היסטוריה, ישראל, מדע, ספורט, ספרות, קולנוע, מוזיקה, אמנות, גאוגרפיה, לידות ופטירות.`; $("startBtn").disabled = false; })
