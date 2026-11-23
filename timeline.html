@@ -159,8 +159,8 @@ body.placing .ins { display: flex; }
       <li>בכל סיבוב מותרות עד 2 טעויות. בטעות השלישית מופיע גלגל ההצלה: טעות בו, והולכים הביתה בידיים ריקות; הצלחה, ויש לכם עוד גלגל הצלה אחד לטעות הבאה בסיבוב. אחרי שני גלגלים, הטעות הבאה מסיימת את המשחק.</li>
       <li>🛟 גלגל הצלה: כשהטעות שולחת אתכם הביתה, מופיעים 9 קלפים הפוכים ועל כל אחד נושא. הקלף הראשון חינם, וכל קלף נוסף עולה כמו קלף נכון בסיבוב (100 ₪ בסיבוב 1 ... 3,000 בסיבוב 5), כל עוד יש מספיק כסף בקופה. לוחצים "סיימתי לבחור", הקלפים שנבחרו נחשפים, בוחרים אירוע אחד ומניחים אותו על הלוח. קלף נכון מציל וממשיכים, אבל לא מכניס כסף. טעות, והולכים הביתה.</li>
       <li>אחרי סיבוב 3 (15,000 ₪) ואחרי סיבוב 4 (30,000 ₪) אפשר לפרוש עם הכסף, או להמשיך ולהסתכן בכול.</li>
-      <li>✖2 סיבוב בונוס: מי שמסיים את 5 הסיבובים יכול לקחת את הכסף וללכת, או לבחור נושא מיוחד (סרטי ג'יימס בונד, המונדיאלים ועוד) ולשחק לוח אחד, כפול או כלום. גם בו יש קלף פתיחה עם תאריך באמצע הלוח. בלי אף טעות ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל. טעות אחת, והולכים הביתה בידיים ריקות.</li>
-      <li>⚡ משחק קצר: רק שני סיבובים. סיבוב קל עם אירועים שכולם מכירים (רמה 1, מכל התקופות, 500 ₪ לקלף נכון), ואחריו סיבוב קשה יותר (רמה 2, גם הוא מכל התקופות, 1,500 ₪ לקלף נכון). מי שמסיים את שניהם, עד 20,000 ₪, יכול לשחק סיבוב בונוס כפול או כלום בנושא מיוחד. אותם כללים של טעויות וגלגלי הצלה.</li>
+      <li>✖2 סיבוב בונוס: מי שמסיים את 5 הסיבובים יכול לקחת את הכסף וללכת, או לבחור 3 נושאים מיוחדים (סרטי ג'יימס בונד, המונדיאלים, הארי פוטר ועוד) שהאירועים שלהם מתערבבים ולשחק לוח אחד, כפול או כלום. גם בו יש קלף פתיחה עם תאריך באמצע הלוח. בלי אף טעות ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל. טעות אחת, והולכים הביתה בידיים ריקות.</li>
+      <li>⚡ משחק קצר: רק שני סיבובים. סיבוב קל עם אירועים שכולם מכירים (רמה 1, מכל התקופות, 500 ₪ לקלף נכון), ואחריו סיבוב קשה יותר (רמה 2, גם הוא מכל התקופות, 1,500 ₪ לקלף נכון). מי שמסיים את שניהם, עד 20,000 ₪, יכול לשחק סיבוב בונוס כפול או כלום על 3 נושאים מיוחדים. אותם כללים של טעויות וגלגלי הצלה.</li>
     </ol>
     <h2>איזה משחק?</h2>
     <div class="levels" id="modes"></div>
@@ -262,13 +262,14 @@ const C = () => G.cfg;
 const RESCUES = 2;   // lifelines per round: a right lifeline placement earns one more, a wrong one ends the game
 // bonus round after the last round: one topic from sets.json, double or nothing, no mistakes and no lifeline
 let SETS = [];
+const PICK = 3;   // topics the player picks for the bonus board
 const per = () => G.bonus ? 0 : C().per[G.round - 1];
 const allow = () => G.bonus ? 0 : C().allow[G.round - 1];
 let mode = "full";
 try { if (localStorage.getItem("timeline-mode") === "short") mode = "short"; } catch (e) {}
 function renderModes() {
   const box = $("modes"); box.innerHTML = "";
-  for (const [k, n, txt] of [["full", "מלא", "5 סיבובים, הטווח מצטמצם בכל סיבוב, ברמה שתבחרו"], ["short", "קצר", "סיבוב קל (רמה 1), סיבוב קשה יותר (רמה 2), ואז כפול או כלום בנושא מיוחד"]]) {
+  for (const [k, n, txt] of [["full", "מלא", "5 סיבובים, הטווח מצטמצם בכל סיבוב, ברמה שתבחרו"], ["short", "קצר", "סיבוב קל (רמה 1), סיבוב קשה יותר (רמה 2), ואז כפול או כלום על 3 נושאים מיוחדים"]]) {
     const b = document.createElement("button");
     b.type = "button"; b.setAttribute("aria-pressed", k === mode);
     b.innerHTML = `<b></b><span></span>`; b.querySelector("b").textContent = n; b.querySelector("span").textContent = txt;
@@ -482,19 +483,32 @@ function offerBonus() {
   if (!sets.length) return finish(`🏆 סיימתם ${all}! זכיתם ב-${money(G.bank)}`);
   const d = $("done"); d.classList.remove("lost");
   d.innerHTML = `<h2>🏆 סיימתם ${all}! בקופה ${money(G.bank)}</h2>
-    <div><b>סיבוב בונוס: כפול או כלום.</b> לוח אחד בנושא שתבחרו. בלי אף טעות, ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל ל-${money(G.bank * 2)}. טעות אחת, והולכים הביתה בידיים ריקות.</div>
+    <div><b>סיבוב בונוס: כפול או כלום.</b> בחרו ${PICK} נושאים, והאירועים בלוח יגיעו משלושתם, מעורבבים. בלי אף טעות, ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל ל-${money(G.bank * 2)}. טעות אחת, והולכים הביתה בידיים ריקות.</div>
     <div class="row" id="setBtns"></div>
-    <div class="row"><button class="btn ghost" type="button" id="stopBtn">💰 לקחת ${money(G.bank)} וללכת</button></div>`;
-  const row = d.querySelector("#setBtns");
+    <div class="row"><button class="btn" type="button" id="goBonus" disabled></button>
+    <button class="btn ghost" type="button" id="stopBtn">💰 לקחת ${money(G.bank)} וללכת</button></div>`;
+  const row = d.querySelector("#setBtns"), go = $("goBonus"), chosen = [];
+  const sync = () => {
+    row.querySelectorAll("button").forEach((b, i) => { const on = chosen.includes(sets[i]); b.className = on ? "btn" : "btn ghost"; b.setAttribute("aria-pressed", on); });
+    go.disabled = chosen.length !== PICK;
+    go.textContent = chosen.length === PICK ? "✖2 יוצאים לבונוס" : `בחרתם ${chosen.length} מתוך ${PICK}`;
+  };
   for (const s of sets) {
-    const b = document.createElement("button"); b.type = "button"; b.className = "btn";
-    b.textContent = `${s.icon} ${s.name}`; b.onclick = () => startBonus(s); row.appendChild(b);
+    const b = document.createElement("button"); b.type = "button";
+    b.textContent = `${s.icon} ${s.name}`;
+    b.onclick = () => { const k = chosen.indexOf(s); if (k >= 0) chosen.splice(k, 1); else if (chosen.length < PICK) chosen.push(s); sync(); };
+    row.appendChild(b);
   }
+  go.onclick = () => startBonus(chosen);
+  sync();
   d.hidden = false;
   $("stopBtn").onclick = () => finish(`💰 לקחתם ${money(G.bank)} והלכתם הביתה`);
 }
-function startBonus(s) {
+// the bonus board mixes the chosen topics: the opening card from the middle of all their years,
+// then the same number of events from each topic (the cards show which topic each event is from)
+function startBonus(picked) {
   clearTimeout(nextT); clearTimeout(drawT);
+  const s = { name: picked.map(x => x.name).join(" · "), icon: picked.map(x => x.icon).join(""), events: picked.flatMap(x => x.events) };
   G.bonus = s; G.round = C().rounds + 1; G.rm = 0; G.ru = 0; G.anchor = null; G.hand = null; G.last = null;
   G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
   G.slots = Array(N).fill(null);
@@ -502,7 +516,8 @@ function startBonus(s) {
   const ys = s.events.map(e => e.y).sort((a, b) => a - b), mid = ys[Math.floor(ys.length / 2)];
   const near = shuffle(s.events.slice()).sort((a, b) => Math.abs(a.y - mid) - Math.abs(b.y - mid));
   G.anchor = s.events.length > N ? near[Math.floor(Math.random() * Math.min(3, near.length))] : null;
-  G.pool = shuffle(s.events.filter(e => e !== G.anchor)).slice(0, N + 5);
+  const each = Math.ceil((N + 5) / picked.length);
+  G.pool = shuffle(picked.flatMap(x => shuffle(x.events.filter(e => e !== G.anchor)).slice(0, each)));
   if (G.anchor) G.slots[4] = G.anchor;
   $("done").hidden = true;
   say(`סיבוב בונוס: ${s.icon} ${s.name}. כפול או כלום, בלי טעויות!`, "good");
