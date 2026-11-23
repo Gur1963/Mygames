@@ -163,6 +163,7 @@ body.placing .ins { display: flex; }
       <li>🛟 גלגל הצלה: כשהטעות שולחת אתכם הביתה, מופיעים 9 קלפים הפוכים ועל כל אחד נושא. הקלף הראשון חינם, וכל קלף נוסף עולה כמו קלף נכון בסיבוב (100 ₪ בסיבוב 1 ... 3,000 בסיבוב 5), כל עוד יש מספיק כסף בקופה. לוחצים "סיימתי לבחור", הקלפים שנבחרו נחשפים, בוחרים אירוע אחד ומניחים אותו על הלוח. קלף נכון מציל וממשיכים, אבל לא מכניס כסף. טעות, והולכים הביתה.</li>
       <li>אחרי סיבוב 3 (15,000 ₪) ואחרי סיבוב 4 (30,000 ₪) אפשר לפרוש עם הכסף, או להמשיך ולהסתכן בכול.</li>
       <li>✖2 סיבוב בונוס: מי שמסיים את 5 הסיבובים יכול לקחת את הכסף וללכת, או לבחור 3 נושאים מיוחדים (סרטי ג'יימס בונד, המונדיאלים, הארי פוטר ועוד) שהאירועים שלהם מתערבבים ולשחק לוח אחד, כפול או כלום. גם בו יש קלף פתיחה עם תאריך באמצע הלוח. בלי אף טעות ובלי גלגל הצלה: מסיימים את הלוח, והכסף מוכפל. טעות אחת, והולכים הביתה בידיים ריקות.</li>
+      <li>📅 השנה שהייתה: לוח אחד עם 10 אירועים מהשנה שעברה, כל אחד מחודש אחר, וצריך לסדר אותם לפי החודשים. 1,000 ₪ לקלף נכון, 2 טעויות ואחריהן גלגלי הצלה. בכל שנה חדשה המשחק עובר לבד לשנה שהסתיימה.</li>
       <li>⚡ משחק קצר: רק שני סיבובים. "סיבוב חימום" עם אירועים שכולם מכירים (רמה 1, מכל התקופות, 500 ₪ לקלף נכון), ואחריו "שוברים את הראש" (רמה 2, גם הוא מכל התקופות, 1,500 ₪ לקלף נכון). מי שמסיים את שניהם, עד 20,000 ₪, יכול לשחק "כפול או כלום" על 3 נושאים מיוחדים, ובו מותרת טעות אחת. בשני הסיבובים הראשונים, אותם כללים של טעויות וגלגלי הצלה.</li>
     </ol>
     <h2>איזה משחק?</h2>
@@ -287,7 +288,10 @@ const WIDTHS = [0, 1000, 500, 250, 100];
 const MODES = {
   full: { rounds: 5, prize: [1000, 4000, 10000, 15000, 30000], allow: [2, 2, 2, 2, 2], canStop: 3, bonusAllow: 0 },
   short: { rounds: 2, prize: [5000, 15000], allow: [2, 2], canStop: 99, levels: [1, 2], width: 0, bonusAllow: 1,
-    names: ["🔥 סיבוב חימום", "🧠 שוברים את הראש"], bonusName: "✖2 כפול או כלום" },   // width 0 = all eras
+    names: ["🔥 סיבוב חימום", "🧠 שוברים את הראש"], bonusName: "✖2 כפול או כלום" },
+  // last year's events, one from each month: in 2027 it becomes 2026 by itself
+  year: { rounds: 1, prize: [10000], allow: [2], canStop: 99, bonusAllow: 0, noBonus: true, year: new Date().getFullYear() - 1,
+    names: [`📅 השנה שהייתה: ${new Date().getFullYear() - 1}`] },   // width 0 = all eras
 };
 for (const k in MODES) MODES[k].per = MODES[k].prize.map(v => v / N);
 const C = () => G.cfg;
@@ -300,17 +304,17 @@ const allow = () => G.bonus ? (C().bonusAllow || 0) : C().allow[G.round - 1];
 const rname = r => C().names ? C().names[r - 1] : `סיבוב ${r}`;
 const noMiss = () => C().bonusAllow ? `טעות אחת מותרת, ובלי גלגל הצלה` : "בלי אף טעות, ובלי גלגל הצלה";
 let mode = "full";
-try { if (localStorage.getItem("timeline-mode") === "short") mode = "short"; } catch (e) {}
+try { const m = localStorage.getItem("timeline-mode"); if (m === "short" || m === "year") mode = m; } catch (e) {}
 function renderModes() {
   const box = $("modes"); box.innerHTML = "";
-  for (const [k, n, txt] of [["full", "מלא", "5 סיבובים, הטווח מצטמצם בכל סיבוב, ברמה שתבחרו"], ["short", "קצר", "סיבוב חימום (רמה 1), שוברים את הראש (רמה 2), ואז כפול או כלום על 3 נושאים, עם טעות אחת מותרת"]]) {
+  for (const [k, n, txt] of [["full", "מלא", "5 סיבובים, הטווח מצטמצם בכל סיבוב, ברמה שתבחרו"], ["short", "קצר", "סיבוב חימום (רמה 1), שוברים את הראש (רמה 2), ואז כפול או כלום על 3 נושאים, עם טעות אחת מותרת"], ["year", "השנה שהייתה", `10 אירועים מ-${MODES.year.year}, כל אחד מחודש אחר: סדרו אותם לפי החודשים`]]) {
     const b = document.createElement("button");
     b.type = "button"; b.setAttribute("aria-pressed", k === mode);
     b.innerHTML = `<b></b><span></span>`; b.querySelector("b").textContent = n; b.querySelector("span").textContent = txt;
     b.onclick = () => { mode = k; try { localStorage.setItem("timeline-mode", mode); } catch (e) {} renderModes(); };
     box.appendChild(b);
   }
-  $("levels").hidden = $("lvlHead").hidden = mode === "short";
+  $("levels").hidden = $("lvlHead").hidden = mode !== "full";
 }
 // the short game's hard round: a random 500-year window with enough level-3 events
 function shortWindow(list, w) {
@@ -383,8 +387,8 @@ const levelList = L => bank.filter(e => e.f === L);
 const extraList = L => bank.filter(e => e.f === (L < 5 ? L + 1 : 4));
 function newGame() {
   const cfg = MODES[mode];
-  const L = cfg.levels ? cfg.levels[0] : level, list = levelList(L);
-  const wins = cfg.levels ? [null, cfg.width ? shortWindow(levelList(cfg.levels[1]), cfg.width) : null] : windows(list);
+  const L = cfg.year ? 3 : cfg.levels ? cfg.levels[0] : level, list = cfg.year ? bank.filter(e => e.y === cfg.year && e.m) : levelList(L);
+  const wins = cfg.year ? [{ a: cfg.year, w: 1 }] : cfg.levels ? [null, cfg.width ? shortWindow(levelList(cfg.levels[1]), cfg.width) : null] : windows(list);
   G = { cfg, level: L, list, extra: extraList(L), wins, used: new Set(), round: 0, rm: 0, bank: 0, slots: [], pool: [], hand: null, misses: 0, t0: null, last: null, end: null };
   $("setup").hidden = true; $("game").hidden = false;
   clearInterval(tick); tick = setInterval(showClock, 500);
@@ -395,10 +399,10 @@ function startRound(r) {
   clearTimeout(nextT); clearTimeout(drawT);
   G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
   if (C().levels) { G.level = C().levels[r - 1]; G.list = levelList(G.level); G.extra = extraList(G.level); }
-  $("lvl").textContent = G.level;
+  $("lvl").textContent = lvlText();
   G.round = r; G.rm = 0; G.ru = 0; G.slots = Array(N).fill(null); G.pool = roundPool(r - 1); G.hand = null; G.last = null;
   // an opening card with its date in the middle; the first event is placed against it, then it leaves the board
-  G.anchor = anchorFor(r - 1);
+  if (C().year) yearBoard(); else G.anchor = anchorFor(r - 1);
   if (G.anchor) { G.slots[4] = G.anchor; G.used.add(G.anchor); markSeen(G.anchor); }
   $("done").hidden = true;
   say(r === 1 ? "" : C().names ? `${rname(r)}: רמה ${G.level}, אירועים מ${rangeText(G.wins[r - 1])}` : `סיבוב ${r}: אירועים מ${rangeText(G.wins[r - 1])}`, "good");
@@ -417,6 +421,16 @@ function anchorFor(r) {
   }
   return null;
 }
+// "the year that was": one event from each month, the opening card from June or July, the pool from the other months
+function yearBoard() {
+  const byM = {};
+  for (const e of shuffle(G.list.slice())) (byM[e.m] = byM[e.m] || []).push(e);
+  const mid = shuffle([6, 7, 5, 8].filter(m => byM[m]))[0];
+  G.anchor = mid ? byM[mid][0] : null;
+  const seenLast = l => l.find(e => !SEEN.has(e.t)) || l[0];   // a fresh event of each month when there is one
+  G.pool = shuffle(Object.keys(byM).filter(m => +m !== mid).map(m => seenLast(byM[m])));
+}
+const lvlText = () => C().year ? "כל הרמות" : G.level;
 const placedCount = () => G.slots.filter(e => e && e !== G.anchor).length;
 let drawT = null;
 function draw() {
@@ -497,7 +511,7 @@ function roundDone() {
   render();
   const d = $("done"); d.classList.remove("lost");
   if (G.bonus) { G.bank *= 2; return finish(`🏆🏆 סיבוב הבונוס הושלם, הכסף הוכפל! זכיתם ב-${money(G.bank)}`); }
-  if (G.round === C().rounds) return offerBonus();
+  if (G.round === C().rounds) return C().noBonus ? finish(`🏆 סידרתם את כל השנה! זכיתם ב-${money(G.bank)}`) : offerBonus();
   const r = G.round + 1, next = `${rname(r)}: ${C().levels ? `רמה ${C().levels[r - 1]}, ` : ""}${money(C().per[r - 1])} לכל קלף נכון, עד ${C().allow[r - 1]} טעויות, אירועים מ${rangeText(G.wins[r - 1])}`;
   if (G.round < C().canStop) {
     d.innerHTML = `<h2>✔ ${rname(G.round)} הושלם! בקופה ${money(G.bank)}</h2>
@@ -668,7 +682,7 @@ function finish(title, lost) {
   const d = $("done");
   d.classList.toggle("lost", !!lost);
   d.innerHTML = `<h2></h2>
-    <div>רמה <b>${G.level}</b> · סיבוב <b>${G.bonus ? "בונוס" : G.round}</b> · כל הטעויות: <b>${G.misses}</b> · זמן: <b>${clockText()}</b></div>
+    <div>רמה <b>${lvlText()}</b> · סיבוב <b>${G.bonus ? "בונוס" : G.round}</b> · כל הטעויות: <b>${G.misses}</b> · זמן: <b>${clockText()}</b></div>
     <button class="btn" type="button" id="againBtn">עוד משחק</button>`;
   d.querySelector("h2").textContent = title;
   d.hidden = false;
