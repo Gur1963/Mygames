@@ -425,6 +425,8 @@ function anchorFor(r) {
 function yearBoard() {
   const byM = {};
   for (const e of shuffle(G.list.slice())) (byM[e.m] = byM[e.m] || []).push(e);
+  // only well-known events: levels 1-3 (or a month's best level when it has none of those)
+  for (const m in byM) { const best = Math.max(3, Math.min(...byM[m].map(e => e.f))); byM[m] = byM[m].filter(e => e.f <= best); }
   const mid = shuffle([6, 7, 5, 8].filter(m => byM[m]))[0];
   G.anchor = mid ? byM[mid][0] : null;
   const seenLast = l => l.find(e => !SEEN.has(e.t)) || l[0];   // a fresh event of each month when there is one
