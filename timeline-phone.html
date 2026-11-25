@@ -207,7 +207,7 @@ body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; bord
         <li>הלוח הוא רשימה: למעלה הכי ישן, למטה הכי חדש. מסדרים 10 אירועים בכל סיבוב.</li>
         <li>כל סיבוב מתחיל עם קלף פתיחה גלוי באמצע הלוח, עם התאריך שלו. אחרי הקלף הנכון הראשון הוא יורד מהלוח.</li>
         <li>האירוע שצריך לסדר מופיע בתחתית המסך. בלוח יש כפתור + לפני הקלף הראשון, בין כל שני קלפים ואחרי האחרון: מקישים על ה-+ במקום הנכון, והאירוע נכנס לשם.</li>
-        <li>אם המקום נכון, האירוע נשאר ותאריכו נחשף, ונכנס לאלבום שלכם 📒. אם טעיתם, הוא חוזר לחפיסה. בשני המקרים מיד מגיע האירוע הבא.</li>
+        <li>אם המקום נכון, האירוע נשאר ותאריכו נחשף, ונכנס לאלבום שלכם 📒. אם טעיתם, הקלף נחשף עם התאריך שלו ויוצא מהסיבוב, כך שהוא לא יחזור באותו סיבוב. בשני המקרים מיד מגיע האירוע הבא.</li>
         <li>כשיש בלוח 10 אירועים, עוברים לסיבוב הבא עם לוח ריק.</li>
         <li>⭐ כל סיבוב שעוברים מזכה בכוכבים: ⭐⭐⭐ בלי טעויות, ⭐⭐ עם הטעות האחת שמותרת.</li>
         <li>משחק מלא: 5 סיבובים, ובכל סיבוב טווח השנים מצטמצם (כל התקופות, 1000, 500, 250 ו-100 שנה). עד 15 כוכבים.</li>
@@ -518,6 +518,7 @@ const lvlText = () => C().year ? "כל הרמות" : G.level;
 const placedCount = () => G.slots.filter(e => e && e !== G.anchor).length;
 let drawT = null;
 function draw() {
+  if (!G.pool.length && !G.bonus && !G.end && !G.slots.every(Boolean)) G.pool = roundPool(G.round - 1).filter(e => !G.used.has(e) && !G.slots.includes(e));
   const now = G.pool;
   if (G.end || G.hand || G.inRescue || !now.length || G.slots.every(Boolean)) return;
   let choices = now.length > 1 ? now.filter(e => e !== G.last) : now;
@@ -559,10 +560,10 @@ function drop(from, to) {
       G.misses++; G.hand = null; G.flaw = true; tally(e, false);
       sBad();
       if (G.bonus && G.rm < allow()) {   // the one mistake the bonus allows: the event goes back to the pool
-        G.rm++; G.pool.push(e); G.last = e;
-        say(`טעות. "${e.t}" חוזר לחפיסה. זו הייתה הטעות היחידה שמותרת: מעכשיו, טעות אחת והכוכבים הולכים.`, "bad");
+        G.rm++; G.last = e;   // a missed card leaves the round, shown with its date
+        say(`טעות. "${e.t}": ${fmt(e)}. זו הייתה הטעות היחידה שמותרת: מעכשיו, טעות אחת והכוכבים הולכים.`, "bad");
         render({ bad: Math.min(to, N - 1), badEv: e });
-        clearTimeout(drawT); drawT = setTimeout(() => { draw(); render(); }, 1300);
+        clearTimeout(drawT); drawT = setTimeout(() => { draw(); render(); }, 2600);
         return;
       }
       if (G.bonus) {
@@ -571,17 +572,17 @@ function drop(from, to) {
         return finish(`💥 טעות בסיבוב הבונוס: הכוכבים של המשחק אבדו (היו ${money(had)})`, true);
       }
       if (G.rescue) { G.rescue = false; say(`טעות. "${e.t}" היה ב${fmt(e)}.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e }); return lose(" גלגל ההצלה לא עזר."); }
-      G.rm++; G.pool.push(e); G.last = e;
+      G.rm++; G.last = e;   // a missed card leaves the round, shown with its date
       const minus = G.rm <= allow() ? ` הסיבוב שווה עכשיו ${stars(roundStars())}.` : "";
       if (G.rm > allow()) {
-        G.rm = allow(); say(`טעות. "${e.t}" חוזר לחפיסה.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e });
+        G.rm = allow(); say(`טעות. "${e.t}": ${fmt(e)}.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e });
         if (G.ru >= RESCUES) return lose();
         G.ru++; return offerRescue();
       }
       const left = allow() - G.rm;
-      say(`טעות. "${e.t}" חוזר לחפיסה.${minus} ` + (left ? (left === 1 ? "נשארה עוד טעות אחת בסיבוב." : `נשארו עוד ${left} טעויות בסיבוב.`) : G.ru < RESCUES ? `⚠ הטעות הבאה: גלגל הצלה (נשארו ${RESCUES - G.ru}).` : "⚠ הטעות הבאה מסיימת את המשחק."), "bad");
+      say(`טעות. "${e.t}": ${fmt(e)}.${minus} ` + (left ? (left === 1 ? "נשארה עוד טעות אחת בסיבוב." : `נשארו עוד ${left} טעויות בסיבוב.`) : G.ru < RESCUES ? `⚠ הטעות הבאה: גלגל הצלה (נשארו ${RESCUES - G.ru}).` : "⚠ הטעות הבאה מסיימת את המשחק."), "bad");
       render({ bad: Math.min(to, N - 1), badEv: e });
-      clearTimeout(drawT); drawT = setTimeout(() => { draw(); render(); }, 1300);
+      clearTimeout(drawT); drawT = setTimeout(() => { draw(); render(); }, 2600);
     }
   } else {
     if (from === to) return render();
@@ -798,7 +799,7 @@ function render(fx = {}) {
   const filled = G.slots.map((e, i) => e ? i : -1).filter(i => i >= 0), n = filled.length;
   // gap k (0..n) in this list = gap g of the 10 boxes: before the k-th card, or after the last one
   const toG = k => n === 0 ? 0 : k < n ? filled[k] : filled[n - 1] + 1;
-  const badCard = () => { const c = card(fx.badEv, false); c.classList.add("ev", "bad-here"); const s = document.createElement("div"); s.className = "slot"; s.appendChild(c); box.appendChild(s); setTimeout(() => s.remove(), 1000); };
+  const badCard = () => { const c = card(fx.badEv, true); c.classList.add("ev", "bad-here"); const s = document.createElement("div"); s.className = "slot"; s.appendChild(c); box.appendChild(s); setTimeout(() => s.remove(), 2500); };
   const gap = k => {
     if (fx.badEv && lastK === k) badCard();
     const z = document.createElement("button");
