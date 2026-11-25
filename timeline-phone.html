@@ -165,6 +165,11 @@ body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; bord
 .album summary { font: 800 17px var(--display); cursor: pointer; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; list-style: none; }
 .album summary::-webkit-details-marker { display: none; }
 .album summary .st { flex-basis: 100%; }
+/* a clear "open" button on every topic, so it is obvious the topic opens */
+.album summary::after { content: "📂 הקישו לפתיחה: הקלפים והסיפורים ▾"; flex-basis: 100%; margin-top: 8px; padding: 8px 10px; border-radius: 9px; text-align: center;
+  background: var(--accent); color: var(--accent-ink); font: 700 15px var(--display); }
+.album details[open] > summary::after { content: "סגירה ▴"; background: transparent; color: var(--accent); border: 2px solid var(--accent); padding: 6px 10px; }
+.album .hint { color: var(--muted); font: 600 15px var(--display); text-align: center; }
 .album summary small { color: var(--muted); font: 600 14px var(--display); }
 .album .bar2 { height: 6px; border-radius: 3px; background: var(--slot); margin-top: 6px; overflow: hidden; }
 .album .bar2 i { display: block; height: 100%; background: var(--accent); }
@@ -940,6 +945,9 @@ function showAlbum() {
     for (const e of hits.slice(0, 60)) ul.appendChild(albumRow(e, !album[e.t]));
     found.appendChild(ul);
   };
+  const hint = document.createElement("div"); hint.className = "hint";
+  hint.textContent = "כל נושא נפתח בהקשה: בפנים הקלפים שלו, ובכל קלף עם 📖 יש סיפור.";
+  body.appendChild(hint);
   const all = Object.values(stats).reduce((a, r) => [a[0] + r[0], a[1] + r[1]], [0, 0]);
   if (all[0] + all[1]) { const top = document.createElement("div"); top.className = "sum"; top.innerHTML = `<div><b>${all[0] + all[1]}</b><span>ניסיונות</span></div><div class="ok"><b>${all[0]}</b><span>✓ נכון</span></div><div class="no"><b>${all[1]}</b><span>✗ טעויות</span></div><div><b>${pct(all[0], all[1])}</b><span>הצלחה</span></div>`; body.appendChild(top); }
   if (!have.length && !(all[0] + all[1])) body.innerHTML = `<div class="empty">האלבום עוד ריק. כל אירוע שתניחו נכון בלוח ייכנס לכאן.</div>`;
