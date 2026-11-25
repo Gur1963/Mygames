@@ -157,6 +157,9 @@ body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; bord
 .album { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; flex-direction: column; }
 .album .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: max(10px, env(safe-area-inset-top, 0px)) 14px 10px; border-bottom: 1px solid var(--line); }
 .album .head h2 { font: 800 22px var(--display); margin: 0; }
+.album .search { padding: 8px 12px 0; }
+.album .search input { width: 100%; font: 500 17px var(--body); padding: 10px 12px; border-radius: 10px; border: 2px solid var(--line); background: var(--panel); color: var(--ink); }
+.album .search input:focus { outline: none; border-color: var(--accent); }
 .album .body { flex: 1; overflow-y: auto; padding: 10px 12px 24px; display: grid; gap: 8px; align-content: start; }
 .album details { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .album summary { font: 800 17px var(--display); cursor: pointer; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; list-style: none; }
@@ -208,14 +211,14 @@ body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; bord
         <li>כשהמשחק נגמר באמצע, הכוכבים מהסיבובים שהושלמו נשארים שלכם.</li>
         <li>✖2 בונוס: מי שמסיים בוחר 3 נושאים מיוחדים ומשחק לוח אחד, כפול או כלום על הכוכבים של המשחק.</li>
         <li>⚡ משחק קצר: "סיבוב חימום" (רמה 1) ו"שוברים את הראש" (רמה 2), ואז "כפול או כלום".</li>
-        <li>📒 האלבום: כל אירוע שהנחתם נכון נשמר בטלפון, לפי נושאים, עם התאריך. הקשה על קלף פותחת את הסיפור שלו (📖), וכפתור "ללמוד" מציג את כל הקלפים בנושא. לכל נושא רואים כמה קלפים ניסיתם, כמה נכון וכמה טעויות.</li>
+        <li>📊 סטטיסטיקה ולימוד: כל אירוע שהנחתם נכון נשמר בטלפון (האלבום), לפי נושאים, עם התאריך. הקשה על קלף פותחת את הסיפור שלו (📖), כפתור "ללמוד" מציג את כל הקלפים בנושא, ותיבת החיפוש מוצאת כל אירוע לפי מילה או שנה. לכל נושא רואים כמה קלפים ניסיתם, כמה נכון וכמה טעויות.</li>
       </ol>
     </details>
     <h2>איזה משחק?</h2>
     <div class="levels" id="modes"></div>
     <h2 id="lvlHead">רמת קושי: כמה מוכרים האירועים</h2>
     <div class="levels" id="levels"></div>
-    <div class="mine"><div id="starNote"></div><button class="btn ghost" id="albumBtn" type="button">📒 האלבום שלי</button></div>
+    <div class="mine"><div id="starNote"></div><button class="btn ghost" id="albumBtn" type="button">📊 סטטיסטיקה ולימוד</button></div>
     <p id="loadNote" style="margin:0;color:var(--muted);font-size:14px"></p>
     <button class="btn" id="startBtn" type="button" disabled>מתחילים</button>
   </section>
@@ -755,7 +758,7 @@ function finish(title, lost) {
   d.innerHTML = `<h2></h2>
     <div>סה"כ בטלפון הזה: <b>⭐ ${life.total}</b> · שיא במשחק: <b>${life.best}</b></div>
     <div>רמה <b>${lvlText()}</b> · סיבוב <b>${G.bonus ? "בונוס" : G.round}</b> · כל הטעויות: <b>${G.misses}</b> · זמן: <b>${clockText()}</b></div>
-    <div class="row"><button class="btn" type="button" id="againBtn">עוד משחק</button><button class="btn ghost" type="button" id="albumBtn2">📒 האלבום</button></div>`;
+    <div class="row"><button class="btn" type="button" id="againBtn">עוד משחק</button><button class="btn ghost" type="button" id="albumBtn2">📊 סטטיסטיקה ולימוד</button></div>`;
   d.querySelector("h2").textContent = title;
   d.hidden = false;
   $("againBtn").onclick = newGame;
@@ -918,8 +921,25 @@ function showAlbum() {
   for (const c in stats) byCat[c] = byCat[c] || [];
   const tries = c => (stats[c] || [0, 0])[0] + (stats[c] || [0, 0])[1];
   const cats = Object.keys(byCat).sort((a, b) => tries(b) - tries(a) || byCat[b].length - byCat[a].length);
-  box.innerHTML = `<div class="head"><h2>📒 האלבום שלי · ${have.length}</h2><button class="btn ghost" type="button" id="albumClose">סגירה</button></div><div class="body"></div>`;
-  const body = box.querySelector(".body");
+  box.innerHTML = `<div class="head"><h2>📊 סטטיסטיקה ולימוד</h2><button class="btn ghost" type="button" id="albumClose">סגירה</button></div>
+    <div class="search"><input type="search" id="albumFind" placeholder="🔍 חיפוש אירוע: מילה מהשם או שנה" autocomplete="off"></div>
+    <div class="body"></div><div class="body found" hidden></div>`;
+  const body = box.querySelector(".body"), found = box.querySelector(".found");
+  // search every card (collected or not) by words in its title, its topic or its year
+  const allCards = bank.concat(SETS.flatMap(st => st.events));
+  $("albumFind").oninput = ev => {
+    const q = ev.target.value.trim();
+    body.hidden = !!q; found.hidden = !q; found.innerHTML = "";
+    if (!q) return;
+    const words = q.split(/s+/);
+    const hits = allCards.filter(e => words.every(w => e.t.includes(w) || (e.cat || "").includes(w) || String(Math.abs(e.y)) === w)).sort((a, b) => cmp(a, b));
+    const head = document.createElement("div"); head.className = "st";
+    head.textContent = hits.length ? (hits.length > 60 ? `${hits.length} אירועים, מוצגים 60 הראשונים. אפשר להוסיף מילה כדי לצמצם.` : `${hits.length} אירועים`) : "לא נמצא אירוע כזה.";
+    found.appendChild(head);
+    const ul = document.createElement("ul");
+    for (const e of hits.slice(0, 60)) ul.appendChild(albumRow(e, !album[e.t]));
+    found.appendChild(ul);
+  };
   const all = Object.values(stats).reduce((a, r) => [a[0] + r[0], a[1] + r[1]], [0, 0]);
   if (all[0] + all[1]) { const top = document.createElement("div"); top.className = "sum"; top.innerHTML = `<div><b>${all[0] + all[1]}</b><span>ניסיונות</span></div><div class="ok"><b>${all[0]}</b><span>✓ נכון</span></div><div class="no"><b>${all[1]}</b><span>✗ טעויות</span></div><div><b>${pct(all[0], all[1])}</b><span>הצלחה</span></div>`; body.appendChild(top); }
   if (!have.length && !(all[0] + all[1])) body.innerHTML = `<div class="empty">האלבום עוד ריק. כל אירוע שתניחו נכון בלוח ייכנס לכאן.</div>`;
