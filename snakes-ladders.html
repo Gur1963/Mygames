@@ -899,7 +899,8 @@ document.querySelectorAll('a[href="quiz.html"], a[href="kids.html"], a[href="con
     e.preventDefault();
     let href = a.getAttribute("href");
     // a phone (touch screen, small) gets the timeline's phone version; computers and tablets keep the regular one
-    if (href === "timeline.html" && matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 600) href = "timeline-phone.html";
+    // it opens as the page itself, not in the frame: a phone stretches a frame to its full content, hiding the bottom of the screen
+    if (href === "timeline.html" && matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 600) return location.assign("timeline-phone.html?v=" + Date.now());
     $("inner").src = href + "?v=" + Date.now(); $("inner").hidden = false;
   };
 });

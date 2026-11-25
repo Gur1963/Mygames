@@ -33,7 +33,8 @@
 /* the page itself never scrolls (inside the site frame a phone would stretch it to full length):
    the content area scrolls and the event to place stays at the bottom of the screen */
 html, body { height: 100%; overflow: hidden; }
-body { display: flex; flex-direction: column; margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.4; direction: rtl; }
+body { height: 100dvh; }
+body { display: flex; flex-direction: column; margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.4; direction: rtl; }
 /* phone layout: the board runs top (oldest) to bottom (newest); the event to place sits fixed at the bottom of the screen */
 .wrap {
   flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
@@ -43,11 +44,11 @@ body { display: flex; flex-direction: column; margin: 0; background: var(--bg); 
 }
 body.setup-on .wrap { padding-bottom: 24px; }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-h1 { font-family: var(--display); font-weight: 800; font-size: 21px; margin: 0; }
+h1 { font-family: var(--display); font-weight: 800; font-size: 24px; margin: 0; }
 .back { color: var(--accent); font-weight: 700; text-decoration: none; padding: 6px 2px; }
 button { font: inherit; color: inherit; touch-action: manipulation; }
 button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-.btn { font: 700 16px var(--body); padding: 11px 18px; border-radius: 10px; cursor: pointer; border: 2px solid var(--accent); background: var(--accent); color: var(--accent-ink); }
+.btn { font: 700 18px var(--body); padding: 11px 18px; border-radius: 10px; cursor: pointer; border: 2px solid var(--accent); background: var(--accent); color: var(--accent-ink); }
 .btn.ghost { background: transparent; color: var(--accent); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 #setBtns button[aria-pressed="true"] { background: var(--good); border-color: var(--good); color: var(--card); }
@@ -57,11 +58,11 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
 .setup h2 { font: 800 19px var(--display); margin: 0; }
 .setup details { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .setup summary { font: 800 17px var(--display); cursor: pointer; }
-.setup ol { margin: 10px 0 0; padding-inline-start: 20px; display: grid; gap: 6px; font-size: 14px; }
+.setup ol { margin: 10px 0 0; padding-inline-start: 20px; display: grid; gap: 6px; font-size: 16px; }
 .levels { display: grid; gap: 8px; }
 .levels button { display: flex; gap: 12px; align-items: center; text-align: start; padding: 10px 12px; border-radius: 10px; border: 2px solid var(--line); background: transparent; cursor: pointer; }
 .levels button b { font: 800 20px var(--display); min-width: 26px; text-align: center; }
-.levels button span { color: var(--muted); font-size: 14px; }
+.levels button span { color: var(--muted); font-size: 16px; }
 .levels button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .levels button[aria-pressed="true"] b { color: var(--accent); }
 #startBtn { width: 100%; font-size: 19px; padding: 14px; }
@@ -70,40 +71,40 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
 .bar { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 6px 0; display: grid; gap: 4px; }
 .stats { display: grid; grid-template-columns: 1.1fr 1.4fr 1fr .9fr; gap: 6px; }
 .stats > div { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; text-align: center; }
-.stats span { display: block; color: var(--muted); font: 500 11px var(--display); }
-.stats b { font: 800 16px var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.sub { display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; font: 600 13px var(--display); color: var(--muted); }
+.stats span { display: block; color: var(--muted); font: 500 13px var(--display); }
+.stats b { font: 800 19px var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sub { display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; font: 600 15px var(--display); color: var(--muted); }
 .sub b { color: var(--ink); }
-.sub .lnk { margin-inline-start: auto; background: none; border: 0; color: var(--accent); font: 700 13px var(--display); padding: 4px 2px; cursor: pointer; }
+.sub .lnk { margin-inline-start: auto; background: none; border: 0; color: var(--accent); font: 700 15px var(--display); padding: 4px 2px; cursor: pointer; }
 .bar .warn { color: var(--bad); }
 .round-title { font: 800 24px var(--display); text-align: center; color: var(--accent); margin: 0; }
 .ladder { display: grid; gap: 4px; }
-.rung { border: 2px solid var(--line); border-radius: 8px; padding: 4px 8px; font: 800 14px var(--display); }
-.rung small { color: var(--muted); font: 500 12px var(--display); margin-inline-start: 6px; }
+.rung { border: 2px solid var(--line); border-radius: 8px; padding: 4px 8px; font: 800 16px var(--display); }
+.rung small { color: var(--muted); font: 500 14px var(--display); margin-inline-start: 6px; }
 .rung.now { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .rung.past { opacity: .5; }
 
 /* the board */
-.end-lbl { color: var(--muted); font: 700 13px var(--display); text-align: center; }
+.end-lbl { color: var(--muted); font: 700 15px var(--display); text-align: center; }
 .slots { display: flex; flex-direction: column; gap: 4px; }
 .slot { position: relative; display: flex; align-items: stretch; padding-inline-start: 24px; }
-.slot::before { content: attr(data-n); position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 22px; display: grid; place-content: center; font: 700 12px var(--display); color: var(--muted); }
+.slot::before { content: attr(data-n); position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 22px; display: grid; place-content: center; font: 700 14px var(--display); color: var(--muted); }
 /* a + before the first card, between every two cards, and after the last: tap it to put the event there */
-.ins { display: flex; min-height: 34px; border-radius: 9px; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg));
-  color: var(--accent); font: 800 14px var(--display); cursor: pointer; align-items: center; justify-content: center; gap: 6px; padding: 2px 8px; }
-.ins b { font-size: 22px; line-height: 1; }
+.ins { display: flex; min-height: 40px; border-radius: 9px; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  color: var(--accent); font: 800 17px var(--display); cursor: pointer; align-items: center; justify-content: center; gap: 6px; padding: 2px 8px; }
+.ins b { font-size: 26px; line-height: 1; }
 .ins:active { background: var(--accent); color: #fff; border-style: solid; }
-.ins.only { min-height: 90px; font-size: 17px; }
+.ins.only { min-height: 90px; font-size: 20px; }
 body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; border: 0; padding: 0; }
 .ev.bad-here { border-color: var(--bad); background: var(--bad-soft); animation: shake .45s; }
 .ev {
   flex: 1; min-width: 0; border-radius: 7px; background: var(--card); border: 2px solid var(--line); padding: 4px 8px;
   display: grid; grid-template-columns: 1fr auto; grid-template-areas: "cat date" "t date"; column-gap: 8px; align-items: center;
-  cursor: pointer; user-select: none; box-shadow: 0 1px 3px rgb(0 0 0 / .1); font-size: 14px; font-weight: 600; line-height: 1.25;
+  cursor: pointer; user-select: none; box-shadow: 0 1px 3px rgb(0 0 0 / .1); font-size: 17px; font-weight: 600; line-height: 1.25;
 }
-.ev .cat { grid-area: cat; font: 500 11px var(--display); color: var(--muted); }
+.ev .cat { grid-area: cat; font: 500 13px var(--display); color: var(--muted); }
 .ev .t { grid-area: t; }
-.ev .date { grid-area: date; font: 800 14px var(--display); color: var(--accent); text-align: end; max-width: 7.5em; }
+.ev .date { grid-area: date; font: 800 17px var(--display); color: var(--accent); text-align: end; max-width: 7.5em; }
 .ev .tag { display: none; }
 .ev.anchor { border-style: dashed; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--card)); cursor: default; }
 .ev.anchor .cat::before { content: "קלף פתיחה · "; color: var(--accent); font-weight: 800; }
@@ -117,12 +118,12 @@ body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; bord
 .dock { position: relative; flex: none; z-index: 15; background: var(--panel); border-top: 1px solid var(--line);
   box-shadow: 0 -6px 18px rgb(0 0 0 / .12); padding: 8px max(10px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)); }
 .dock > * { max-width: 560px; margin-inline: auto; }
-.msg { font: 700 14px var(--display); min-height: 20px; text-align: center; margin: 0 auto 6px; }
+.msg { font: 700 16px var(--display); min-height: 20px; text-align: center; margin: 0 auto 6px; }
 .msg.good { color: var(--good); } .msg.bad { color: var(--bad); }
 .hand { display: grid; gap: 6px; justify-items: stretch; }
-.hand .ev { grid-template-areas: "cat" "t"; grid-template-columns: 1fr; min-height: 70px; padding: 8px 12px; font-size: 17px; align-content: center; }
+.hand .ev { grid-template-areas: "cat" "t"; grid-template-columns: 1fr; min-height: 76px; padding: 8px 12px; font-size: 20px; align-content: center; }
 .hand .ev.picked { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
-.hand .tip { color: var(--muted); font-size: 13px; text-align: center; }
+.hand .tip { color: var(--muted); font-size: 15px; text-align: center; }
 .hand .lifeline { color: var(--accent); font: 800 16px var(--display); text-align: center; }
 .pool { min-height: 70px; border-radius: 10px; display: grid; place-content: center; text-align: center; opacity: .6;
   background: repeating-linear-gradient(45deg, var(--accent) 0 12px, color-mix(in srgb, var(--accent) 75%, #fff) 0 24px); color: #fff; font: 800 16px var(--display); text-shadow: 0 1px 3px rgb(0 0 0 / .4); }
@@ -134,17 +135,17 @@ body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; bord
   padding: 16px max(14px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
   display: grid; gap: 10px; justify-items: center; text-align: center; }
 .done.lost { border-top-color: var(--bad); }
-.done h2 { font: 800 20px var(--display); margin: 0; }
+.done h2 { font: 800 22px var(--display); margin: 0; }
 .done .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .done .row .btn { font-size: 15px; padding: 9px 12px; }
 .rescue { border-top-color: var(--accent); }
 .rescue h2 { font: 800 22px var(--display); margin: 0; }
-.rescue p { margin: 0; color: var(--muted); font-size: 14px; }
+.rescue p { margin: 0; color: var(--muted); font-size: 16px; }
 .rescue .bankline { font: 700 15px var(--display); color: inherit; }
 .rgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; max-width: 520px; }
 .rcard { min-height: 84px; border-radius: 10px; border: 2px solid var(--accent); cursor: pointer; padding: 6px; display: grid; place-content: center; gap: 3px;
-  font: 800 14px var(--display); color: #fff; background: repeating-linear-gradient(45deg, var(--accent) 0 12px, color-mix(in srgb, var(--accent) 80%, #fff) 0 24px); text-shadow: 0 1px 3px rgb(0 0 0 / .4); }
-.rcard.open { background: var(--card); color: inherit; text-shadow: none; font: 600 13px/1.3 var(--display); animation: flip .35s; }
+  font: 800 16px var(--display); color: #fff; background: repeating-linear-gradient(45deg, var(--accent) 0 12px, color-mix(in srgb, var(--accent) 80%, #fff) 0 24px); text-shadow: 0 1px 3px rgb(0 0 0 / .4); }
+.rcard.open { background: var(--card); color: inherit; text-shadow: none; font: 600 15px/1.3 var(--display); animation: flip .35s; }
 .rcard.open small { color: var(--muted); font-size: 11px; }
 .rcard.open.choose { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
 .rcard.used { opacity: .45; cursor: default; }
