@@ -344,15 +344,16 @@ const per = () => G.bonus ? 0 : C().per[G.round - 1];
 const allow = () => G.bonus ? (C().bonusAllow || 0) : C().allow[G.round - 1];
 const rname = r => C().names ? C().names[r - 1] : `סיבוב ${r}`;
 const noMiss = () => C().bonusAllow ? `טעות אחת מותרת, ובלי גלגל הצלה` : "בלי אף טעות, ובלי גלגל הצלה";
-let mode = "full";
-try { const m = localStorage.getItem("timeline-mode"); if (m === "short") mode = m; } catch (e) {}
+// on the phone the short game is the default (its own key, so a choice made on the computer version does not carry over)
+let mode = "short";
+try { const m = localStorage.getItem("timeline-phone-mode"); if (m === "full") mode = m; } catch (e) {}
 function renderModes() {
   const box = $("modes"); box.innerHTML = "";
-  for (const [k, n, txt] of [["full", "מלא", "5 סיבובים, הטווח מצטמצם בכל סיבוב, ברמה שתבחרו"], ["short", "קצר", "סיבוב חימום (רמה 1), שוברים את הראש (רמה 2), ואז כפול או כלום על 3 נושאים, עם טעות אחת מותרת"]]) {   // "year" (the year that was) is frozen for now: its code and events stay
+  for (const [k, n, txt] of [["short", "קצר", "סיבוב חימום (רמה 1), שוברים את הראש (רמה 2), ואז כפול או כלום על 3 נושאים, עם טעות אחת מותרת"], ["full", "מלא", "5 סיבובים, הטווח מצטמצם בכל סיבוב, ברמה שתבחרו"]]) {   // "year" (the year that was) is frozen for now: its code and events stay
     const b = document.createElement("button");
     b.type = "button"; b.setAttribute("aria-pressed", k === mode);
     b.innerHTML = `<b></b><span></span>`; b.querySelector("b").textContent = n; b.querySelector("span").textContent = txt;
-    b.onclick = () => { mode = k; try { localStorage.setItem("timeline-mode", mode); } catch (e) {} renderModes(); };
+    b.onclick = () => { mode = k; try { localStorage.setItem("timeline-phone-mode", mode); } catch (e) {} renderModes(); };
     box.appendChild(b);
   }
   $("levels").hidden = $("lvlHead").hidden = mode !== "full";
