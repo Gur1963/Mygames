@@ -30,13 +30,16 @@
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
-html, body { min-height: 100%; }
-body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.4; direction: rtl; }
+/* the page itself never scrolls (inside the site frame a phone would stretch it to full length):
+   the content area scrolls and the event to place stays at the bottom of the screen */
+html, body { height: 100%; overflow: hidden; }
+body { display: flex; flex-direction: column; margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.4; direction: rtl; }
 /* phone layout: the board runs top (oldest) to bottom (newest); the event to place sits fixed at the bottom of the screen */
 .wrap {
-  max-width: 560px; margin: 0 auto; padding-top: max(8px, env(safe-area-inset-top, 0px));
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  width: 100%; max-width: 560px; align-self: center; padding-top: max(8px, env(safe-area-inset-top, 0px));
   padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px));
-  padding-bottom: 210px; display: flex; flex-direction: column; gap: 10px;
+  padding-bottom: 16px; display: flex; flex-direction: column; gap: 10px;
 }
 body.setup-on .wrap { padding-bottom: 24px; }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -83,20 +86,16 @@ button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px soli
 /* the board */
 .end-lbl { color: var(--muted); font: 700 13px var(--display); text-align: center; }
 .slots { display: flex; flex-direction: column; gap: 4px; }
-.slot {
-  position: relative; min-height: 42px; border-radius: 9px; background: var(--slot);
-  border: 2px dashed var(--line); display: flex; align-items: stretch; padding: 2px 2px 2px 2px; padding-inline-start: 28px;
-}
-.slot::before { content: attr(data-n); position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 26px; display: grid; place-content: center; font: 700 13px var(--display); color: var(--muted); }
-.slot.empty::after { content: ""; align-self: center; color: var(--muted); font: 600 13px var(--display); }
-body.placing .slot.empty { cursor: pointer; border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
-body.placing .slot.empty::after { content: "הקישו כדי להניח כאן"; color: var(--accent); }
-.slot.bad-slot { border-color: var(--bad); border-style: solid; animation: shake .45s; }
-/* + between two cards that have no empty box between them, and before the first / after the last */
-.ins { display: none; height: 26px; border-radius: 8px; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg));
-  color: var(--accent); font: 800 14px var(--display); cursor: pointer; align-items: center; justify-content: center; gap: 6px; }
-body.placing:not(.moving) .ins { display: flex; }
-.ins b { font-size: 20px; line-height: 1; }
+.slot { position: relative; display: flex; align-items: stretch; padding-inline-start: 24px; }
+.slot::before { content: attr(data-n); position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 22px; display: grid; place-content: center; font: 700 12px var(--display); color: var(--muted); }
+/* a + before the first card, between every two cards, and after the last: tap it to put the event there */
+.ins { display: flex; min-height: 34px; border-radius: 9px; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  color: var(--accent); font: 800 14px var(--display); cursor: pointer; align-items: center; justify-content: center; gap: 6px; padding: 2px 8px; }
+.ins b { font-size: 22px; line-height: 1; }
+.ins:active { background: var(--accent); color: #fff; border-style: solid; }
+.ins.only { min-height: 90px; font-size: 17px; }
+body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; border: 0; padding: 0; }
+.ev.bad-here { border-color: var(--bad); background: var(--bad-soft); animation: shake .45s; }
 .ev {
   flex: 1; min-width: 0; border-radius: 7px; background: var(--card); border: 2px solid var(--line); padding: 4px 8px;
   display: grid; grid-template-columns: 1fr auto; grid-template-areas: "cat date" "t date"; column-gap: 8px; align-items: center;
@@ -115,7 +114,7 @@ body.placing:not(.moving) .ins { display: flex; }
 @keyframes shake { 0%,100% { transform: none; } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
 
 /* the event to place, fixed at the bottom */
-.dock { position: fixed; inset-inline: 0; bottom: 0; z-index: 15; background: var(--panel); border-top: 1px solid var(--line);
+.dock { position: relative; flex: none; z-index: 15; background: var(--panel); border-top: 1px solid var(--line);
   box-shadow: 0 -6px 18px rgb(0 0 0 / .12); padding: 8px max(10px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)); }
 .dock > * { max-width: 560px; margin-inline: auto; }
 .msg { font: 700 14px var(--display); min-height: 20px; text-align: center; margin: 0 auto 6px; }
@@ -165,12 +164,11 @@ body.placing:not(.moving) .ins { display: flex; }
     <details>
       <summary>איך משחקים</summary>
       <ol>
-        <li>הלוח הוא רשימה של 10 תיבות: למעלה הכי ישן, למטה הכי חדש.</li>
+        <li>הלוח הוא רשימה: למעלה הכי ישן, למטה הכי חדש. מסדרים 10 אירועים בכל סיבוב.</li>
         <li>כל סיבוב מתחיל עם קלף פתיחה גלוי באמצע הלוח, עם התאריך שלו. אחרי הקלף הנכון הראשון הוא יורד מהלוח.</li>
-        <li>האירוע שצריך לסדר מופיע בתחתית המסך. מקישים על תיבה ריקה, או על פס ה-➕ שבין שני קלפים, והאירוע נכנס לשם. הקלפים זזים לבד כדי לפנות מקום.</li>
+        <li>האירוע שצריך לסדר מופיע בתחתית המסך. בלוח יש כפתור + לפני הקלף הראשון, בין כל שני קלפים ואחרי האחרון: מקישים על ה-+ במקום הנכון, והאירוע נכנס לשם.</li>
         <li>אם המקום נכון, האירוע נשאר ותאריכו נחשף. אם טעיתם, הוא חוזר לקופה. בשני המקרים מיד מגיע האירוע הבא.</li>
-        <li>אפשר להזיז קלף שכבר בלוח: מקישים עליו ואז על תיבה ריקה.</li>
-        <li>כשכל 10 התיבות מלאות, עוברים לסיבוב הבא עם לוח ריק.</li>
+        <li>כשיש בלוח 10 אירועים, עוברים לסיבוב הבא עם לוח ריק.</li>
         <li>משחק מלא: 5 סיבובים, ובכל סיבוב טווח השנים מצטמצם (כל התקופות, 1000, 500, 250 ו-100 שנה). כל קלף נכון מכניס 100 ₪ בסיבוב 1, ואחר כך 400, 1,000, 1,500 ו-3,000, עד 60,000 ₪.</li>
         <li>בכל סיבוב מותרות 2 טעויות, וכל טעות מורידה מהקופה כמו שקלף נכון מכניס. אחריהן מגיע גלגל הצלה 🛟 (עד 2 בסיבוב): 9 קלפים הפוכים עם נושאים, הראשון חינם וכל נוסף עולה כמו קלף נכון. בוחרים, חושפים, ומניחים אירוע אחד. נכון = ממשיכים, טעות = הביתה בידיים ריקות.</li>
         <li>אחרי סיבוב 3 ואחרי סיבוב 4 אפשר לפרוש עם הכסף.</li>
@@ -412,7 +410,7 @@ function newGame() {
   const L = cfg.year ? 3 : cfg.levels ? cfg.levels[0] : level, list = cfg.year ? bank.filter(e => e.y === cfg.year && e.m && isIL(e)) : levelList(L);
   const wins = cfg.year ? [{ a: cfg.year, w: 1 }] : cfg.levels ? [null, cfg.width ? shortWindow(levelList(cfg.levels[1]), cfg.width) : null] : windows(list);
   G = { cfg, level: L, list, extra: extraList(L), wins, used: new Set(), round: 0, rm: 0, bank: 0, slots: [], pool: [], hand: null, misses: 0, t0: null, last: null, end: null };
-  $("setup").hidden = true; $("game").hidden = false; document.body.classList.remove("setup-on"); scrollTo(0, 0);
+  $("setup").hidden = true; $("game").hidden = false; document.body.classList.remove("setup-on"); document.querySelector(".wrap").scrollTop = 0;
   clearInterval(tick); tick = setInterval(showClock, 500);
   startRound(1);
 }
@@ -744,63 +742,45 @@ function card(e, showDate) {
   if (showDate) c.querySelector(".date").textContent = fmt(e);
   return c;
 }
-// the event in hand is always ready to place: tap an empty box or a + strip.
-// tapping a card already on the board picks it up instead (tap an empty box to move it, or tap it again to put it down)
+// the board on a phone shows only the cards already placed, oldest on top, with a + before the first,
+// between every two and after the last; tapping a + puts the event there (empty boxes don't matter, only the order)
+let lastK = null;   // where the last tap put the event, to show a wrong one there for a moment
 function render(fx = {}) {
   const box = $("slots"); box.innerHTML = "";
-  if (picked === "hand" && (!G.hand || G.end)) picked = null;
-  if (picked !== "hand" && (typeof picked !== "number" || !G.slots[picked] || G.slots[picked] === G.anchor)) picked = null;
-  if (picked === null && G.hand && !G.end) picked = "hand";
-  // a + is needed only where two cards touch (or before the first box / after the last): elsewhere an empty box does the job
-  const gapNeeded = g => g === 0 ? !!G.slots[0] : g === N ? !!G.slots[N - 1] : !!(G.slots[g - 1] && G.slots[g]);
-  const gap = g => {
-    if (!gapNeeded(g)) return;
+  picked = G.hand && !G.end ? "hand" : null;
+  const filled = G.slots.map((e, i) => e ? i : -1).filter(i => i >= 0), n = filled.length;
+  // gap k (0..n) in this list = gap g of the 10 boxes: before the k-th card, or after the last one
+  const toG = k => n === 0 ? 0 : k < n ? filled[k] : filled[n - 1] + 1;
+  const badCard = () => { const c = card(fx.badEv, false); c.classList.add("ev", "bad-here"); const s = document.createElement("div"); s.className = "slot"; s.appendChild(c); box.appendChild(s); setTimeout(() => s.remove(), 1000); };
+  const gap = k => {
+    if (fx.badEv && lastK === k) badCard();
     const z = document.createElement("button");
-    z.type = "button"; z.className = "ins"; z.dataset.g = g;
+    z.type = "button"; z.className = "ins" + (n === 0 ? " only" : "");
     z.innerHTML = `<b>+</b><span></span>`;
-    z.querySelector("span").textContent = g === 0 ? "לפני כולם" : g === N ? "אחרי כולם" : "כאן, בין שני הקלפים";
-    z.onclick = () => { if (picked === "hand") drop("hand", g); };
+    z.querySelector("span").textContent = n === 0 ? "הניחו כאן" : k === 0 ? "לפני כולם" : k === n ? "אחרי כולם" : "כאן";
+    z.onclick = () => { if (picked === "hand") { lastK = k; drop("hand", toG(k)); } };
     box.appendChild(z);
   };
-  G.slots.forEach((e, i) => {
-    gap(i);
-    const s = document.createElement("div");
-    s.className = "slot" + (e ? "" : " empty"); s.dataset.i = i; s.dataset.n = i + 1;
-    if (e) {
-      const c = card(e, true);
-      if (fx.good === i) c.classList.add("good");
-      if (e === G.anchor) c.classList.add("anchor");
-      else {
-        if (picked === i) c.classList.add("picked");
-        c.onclick = ev => { ev.stopPropagation(); if (G.end) return; picked = picked === i ? null : i; render(); };
-      }
-      s.appendChild(c);
-    }
-    if (e && fx.bad === i) s.classList.add("bad-slot");
-    else if (fx.bad === i) {
-      const c = card(fx.badEv, false); c.classList.add("bad"); c.style.cursor = "default"; s.appendChild(c);
-      setTimeout(() => c.remove(), 900);
-    }
-    if (!e) {
-      s.tabIndex = 0;
-      s.onclick = () => { if (picked !== null) drop(picked, i); };
-      s.onkeydown = k => { if (k.key === "Enter" || k.key === " ") { k.preventDefault(); s.onclick(); } };
-    }
+  filled.forEach((i, k) => {
+    gap(k);
+    const e = G.slots[i], s = document.createElement("div");
+    s.className = "slot"; s.dataset.n = k + 1;
+    const c = card(e, true);
+    if (fx.good === i) c.classList.add("good");
+    if (e === G.anchor) c.classList.add("anchor");
+    s.appendChild(c);
     box.appendChild(s);
   });
-  gap(N);
+  gap(n);
   document.body.classList.toggle("placing", picked !== null);
-  document.body.classList.toggle("moving", typeof picked === "number");
   const h = $("hand"); h.innerHTML = "";
   const full = G.slots.every(Boolean);
   if (G.hand) {
     if (G.rescue) { const l = document.createElement("div"); l.className = "lifeline"; l.textContent = "🛟 גלגל הצלה"; h.appendChild(l); }
-    const c = card(G.hand, false);
-    if (picked === "hand") c.classList.add("picked");
-    c.onclick = () => { picked = "hand"; render(); };
+    const c = card(G.hand, false); c.classList.add("picked"); c.style.cursor = "default";
     h.appendChild(c);
     const tip = document.createElement("div"); tip.className = "tip";
-    tip.textContent = typeof picked === "number" ? "מזיזים קלף מהלוח: הקישו על תיבה ריקה, או שוב על הקלף כדי לבטל" : "הקישו על תיבה ריקה בלוח, או על פס ה-+ שבין שני קלפים";
+    tip.textContent = n ? "הקישו על + במקום הנכון בלוח: לפני, בין או אחרי הקלפים" : "הקישו על + בלוח";
     h.appendChild(tip);
   } else if (!full) {
     const p = document.createElement("div");
