@@ -123,6 +123,7 @@ body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; bord
 .hand { display: grid; gap: 6px; justify-items: stretch; }
 .hand .ev { grid-template-areas: "cat" "t"; grid-template-columns: 1fr; min-height: 76px; padding: 8px 12px; font-size: 20px; align-content: center; }
 .hand .ev.picked { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+.hand .swap { font-size: 15px; padding: 7px 12px; justify-self: center; }
 .hand .tip { color: var(--muted); font-size: 15px; text-align: center; }
 .hand .lifeline { color: var(--accent); font: 800 16px var(--display); text-align: center; }
 .pool { min-height: 70px; border-radius: 10px; display: grid; place-content: center; text-align: center; opacity: .6;
@@ -186,12 +187,13 @@ body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; bord
         <li>האירוע שצריך לסדר מופיע בתחתית המסך. בלוח יש כפתור + לפני הקלף הראשון, בין כל שני קלפים ואחרי האחרון: מקישים על ה-+ במקום הנכון, והאירוע נכנס לשם.</li>
         <li>אם המקום נכון, האירוע נשאר ותאריכו נחשף, ונכנס לאלבום שלכם 📒. אם טעיתם, הוא חוזר לחפיסה. בשני המקרים מיד מגיע האירוע הבא.</li>
         <li>כשיש בלוח 10 אירועים, עוברים לסיבוב הבא עם לוח ריק.</li>
-        <li>⭐ כל סיבוב שעוברים מזכה בכוכבים: ⭐⭐⭐ בלי טעויות, ⭐⭐ עם טעות אחת, ⭐ עם שתי טעויות או אחרי גלגל הצלה.</li>
+        <li>⭐ כל סיבוב שעוברים מזכה בכוכבים: ⭐⭐⭐ בלי טעויות, ⭐⭐ עם הטעות האחת שמותרת.</li>
         <li>משחק מלא: 5 סיבובים, ובכל סיבוב טווח השנים מצטמצם (כל התקופות, 1000, 500, 250 ו-100 שנה). עד 15 כוכבים.</li>
-        <li>בכל סיבוב מותרות 2 טעויות. אחריהן מגיע גלגל הצלה 🛟 (עד 2 בסיבוב): 9 קלפים הפוכים עם נושאים. שני קלפים חינם, וכל קלף נוסף עולה כוכב אחד. בוחרים, חושפים, ומניחים אירוע אחד. נכון = ממשיכים, טעות = המשחק נגמר.</li>
+        <li>בכל סיבוב מותרת טעות אחת. הטעות השנייה מסיימת את המשחק.</li>
+        <li>🔄 החלפת קלף: פעם אחת בכל סיבוב אפשר להחליף את האירוע שצריך להניח באירוע אחר.</li>
         <li>כשהמשחק נגמר באמצע, הכוכבים מהסיבובים שהושלמו נשארים שלכם.</li>
         <li>✖2 בונוס: מי שמסיים בוחר 3 נושאים מיוחדים ומשחק לוח אחד, כפול או כלום על הכוכבים של המשחק.</li>
-        <li>⚡ משחק קצר: "סיבוב חימום" (רמה 1) ו"שוברים את הראש" (רמה 2), ואז "כפול או כלום" עם טעות אחת מותרת.</li>
+        <li>⚡ משחק קצר: "סיבוב חימום" (רמה 1) ו"שוברים את הראש" (רמה 2), ואז "כפול או כלום".</li>
         <li>📒 האלבום: כל אירוע שהנחתם נכון נשמר בטלפון, לפי נושאים, עם התאריך.</li>
       </ol>
     </details>
@@ -326,8 +328,8 @@ const WIDTHS = [0, 1000, 500, 250, 100];
 // prize = what each round adds; per = what each right placement pays (a lifeline card past the first costs the same);
 // allow = mistakes per round before the lifeline; canStop = the first round after which you may leave with the money
 const MODES = {
-  full: { rounds: 5, prize: [1000, 4000, 10000, 15000, 30000], allow: [2, 2, 2, 2, 2], canStop: 3, bonusAllow: 0 },
-  short: { rounds: 2, prize: [5000, 15000], allow: [2, 2], canStop: 99, levels: [1, 2], width: 0, bonusAllow: 1,
+  full: { rounds: 5, prize: [1000, 4000, 10000, 15000, 30000], allow: [1, 1, 1, 1, 1], canStop: 3, bonusAllow: 1 },
+  short: { rounds: 2, prize: [5000, 15000], allow: [1, 1], canStop: 99, levels: [1, 2], width: 0, bonusAllow: 1,
     names: ["🔥 סיבוב חימום", "🧠 שוברים את הראש"], bonusName: "✖2 כפול או כלום",
     perfect: [3000, 5000], bonusPerfect: 10000 },   // extra money for a round with no mistakes
   // last year's events, one from each month: in 2027 it becomes 2026 by itself
@@ -336,14 +338,15 @@ const MODES = {
 };
 for (const k in MODES) MODES[k].per = MODES[k].prize.map(v => v / N);
 const C = () => G.cfg;
-const RESCUES = 2;   // lifelines per round: a right lifeline placement earns one more, a wrong one ends the game
+const RESCUES = 0;   // the phone version has no lifeline (it was bought with money): one mistake per round, then the game ends
+const SWAPS = 1;     // instead: the card in hand may be swapped for another, once a round
 // bonus round after the last round: one topic from sets.json, double or nothing, no mistakes and no lifeline
 let SETS = [];
 const PICK = 3;   // topics the player picks for the bonus board
 const per = () => G.bonus ? 0 : C().per[G.round - 1];
 const allow = () => G.bonus ? (C().bonusAllow || 0) : C().allow[G.round - 1];
 const rname = r => C().names ? C().names[r - 1] : `סיבוב ${r}`;
-const noMiss = () => C().bonusAllow ? `טעות אחת מותרת, ובלי גלגל הצלה` : "בלי אף טעות, ובלי גלגל הצלה";
+const noMiss = () => C().bonusAllow ? "טעות אחת מותרת" : "בלי אף טעות";
 // on the phone the short game is the default (its own key, so a choice made on the computer version does not carry over)
 let mode = "short";
 try { const m = localStorage.getItem("timeline-phone-mode"); if (m === "full") mode = m; } catch (e) {}
@@ -455,7 +458,7 @@ function startRound(r) {
   G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
   if (C().levels) { G.level = C().levels[r - 1]; G.list = levelList(G.level); G.extra = extraList(G.level); }
   $("lvl").textContent = lvlText();
-  G.round = r; G.rm = 0; G.ru = 0; G.flaw = false; G.slots = Array(N).fill(null); G.pool = roundPool(r - 1); G.hand = null; G.last = null;
+  G.round = r; G.rm = 0; G.ru = 0; G.sw = 0; G.flaw = false; G.slots = Array(N).fill(null); G.pool = roundPool(r - 1); G.hand = null; G.last = null;
   // an opening card with its date in the middle; the first event is placed against it, then it leaves the board
   if (C().year) yearBoard(); else G.anchor = anchorFor(r - 1);
   if (G.anchor) { G.slots[4] = G.anchor; G.used.add(G.anchor); markSeen(G.anchor); }
@@ -550,11 +553,11 @@ function drop(from, to) {
       const minus = G.rm <= allow() ? ` הסיבוב שווה עכשיו ${stars(roundStars())}.` : "";
       if (G.rm > allow()) {
         G.rm = allow(); say(`טעות. "${e.t}" חוזר לחפיסה.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e });
-        if (G.ru >= RESCUES) return lose(" גם גלגלי ההצלה נגמרו.");
+        if (G.ru >= RESCUES) return lose();
         G.ru++; return offerRescue();
       }
       const left = allow() - G.rm;
-      say(`טעות. "${e.t}" חוזר לחפיסה.${minus} ` + (left ? (left === 1 ? "נשארה עוד טעות אחת בסיבוב." : `נשארו עוד ${left} טעויות בסיבוב.`) : G.ru < RESCUES ? `⚠ הטעות הבאה: גלגל הצלה (נשארו ${RESCUES - G.ru}).` : "⚠ גלגלי ההצלה נגמרו: הטעות הבאה מסיימת את המשחק."), "bad");
+      say(`טעות. "${e.t}" חוזר לחפיסה.${minus} ` + (left ? (left === 1 ? "נשארה עוד טעות אחת בסיבוב." : `נשארו עוד ${left} טעויות בסיבוב.`) : G.ru < RESCUES ? `⚠ הטעות הבאה: גלגל הצלה (נשארו ${RESCUES - G.ru}).` : "⚠ הטעות הבאה מסיימת את המשחק."), "bad");
       render({ bad: Math.min(to, N - 1), badEv: e });
       clearTimeout(drawT); drawT = setTimeout(() => { draw(); render(); }, 1300);
     }
@@ -619,7 +622,7 @@ function offerBonus() {
 function startBonus(picked) {
   clearTimeout(nextT); clearTimeout(drawT);
   const s = { name: picked.map(x => x.name).join(" · "), icon: picked.map(x => x.icon).join(""), events: picked.flatMap(x => x.events) };
-  G.bonus = s; G.round = C().rounds + 1; G.rm = 0; G.ru = 0; G.flaw = false; G.anchor = null; G.hand = null; G.last = null;
+  G.bonus = s; G.round = C().rounds + 1; G.rm = 0; G.ru = 0; G.sw = 0; G.flaw = false; G.anchor = null; G.hand = null; G.last = null;
   G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
   G.slots = Array(N).fill(null);
   // an opening card from the middle of the topic's years (one of the 3 closest), then the events from the rest
@@ -804,6 +807,15 @@ function render(fx = {}) {
     const tip = document.createElement("div"); tip.className = "tip";
     tip.textContent = n ? "הקישו על + במקום הנכון בלוח: לפני, בין או אחרי הקלפים" : "הקישו על + בלוח";
     h.appendChild(tip);
+    if (!G.rescue && G.pool.some(x => x !== G.hand)) {
+      const sw = document.createElement("button");
+      sw.type = "button"; sw.className = "btn ghost swap";
+      const left = SWAPS - (G.sw || 0);
+      sw.textContent = left > 0 ? "🔄 החלפת קלף (פעם אחת בסיבוב)" : "🔄 ההחלפה של הסיבוב נוצלה";
+      sw.disabled = left <= 0;
+      sw.onclick = swapCard;
+      h.appendChild(sw);
+    }
   } else if (!full) {
     const p = document.createElement("div");
     p.className = "pool"; p.innerHTML = `האירוע הבא… <small>(${G.pool.length} בחפיסה)</small>`;
@@ -812,7 +824,7 @@ function render(fx = {}) {
   h.hidden = full || !!G.end || !!G.inRescue;
   $("dock").hidden = !!G.end || !!G.inRescue;
   const c = C();
-  $("ladder").innerHTML = c.allow.map((v, i) => `<div class="rung${i + 1 === G.round ? " now" : i + 1 < G.round ? " past" : ""}">${rname(i + 1)}: עד ⭐⭐⭐<small>סיבוב ${i + 1}${c.levels ? ` · רמה ${c.levels[i]}` : ""} · עד ${c.allow[i]} טעויות + ${RESCUES} 🛟</small></div>`).join("");
+  $("ladder").innerHTML = c.allow.map((v, i) => `<div class="rung${i + 1 === G.round ? " now" : i + 1 < G.round ? " past" : ""}">${rname(i + 1)}: עד ⭐⭐⭐<small>סיבוב ${i + 1}${c.levels ? ` · רמה ${c.levels[i]}` : ""} · ${c.allow[i] === 1 ? "טעות אחת" : `עד ${c.allow[i]} טעויות`} · 🔄 החלפה אחת</small></div>`).join("");
   $("of").textContent = "/" + c.rounds;
   $("bank").textContent = money(G.bank);
   $("placed").textContent = placedCount();
@@ -826,6 +838,15 @@ function render(fx = {}) {
   showClock();
 }
 
+// the card in hand goes aside (not back to the pool) and another is drawn
+function swapCard() {
+  if (!G.hand || G.end || (G.sw || 0) >= SWAPS) return;
+  const old = G.hand;
+  G.sw = (G.sw || 0) + 1; G.hand = null; G.last = old;
+  draw();
+  say("🔄 הקלף הוחלף בקלף חדש.", "good");
+  render();
+}
 // ---------- the album (on this phone only): every event placed right, by topic ----------
 let album = {};
 try { album = JSON.parse(localStorage.getItem("timeline-album") || "{}"); } catch (e) {}
