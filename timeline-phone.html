@@ -520,7 +520,7 @@ let drawT = null;
 function draw() {
   if (!G.pool.length && !G.bonus && !G.end && !G.slots.every(Boolean)) G.pool = roundPool(G.round - 1).filter(e => !G.used.has(e) && !G.slots.includes(e));
   const now = G.pool;
-  if (G.end || G.hand || G.inRescue || !now.length || G.slots.every(Boolean)) return;
+  if (G.end || G.ending || G.hand || G.inRescue || !now.length || G.slots.every(Boolean)) return;
   let choices = now.length > 1 ? now.filter(e => e !== G.last) : now;
   const unseen = choices.filter(e => !SEEN.has(e.t));   // new ones first; a missed one waits in the pool
   if (unseen.length) choices = unseen;
@@ -569,14 +569,14 @@ function drop(from, to) {
       if (G.bonus) {
         say(`טעות. "${e.t}" היה ב${fmt(e)}.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e });
         const had = G.bank; G.bank = 0;
-        return finish(`💥 טעות בסיבוב הבונוס: הכוכבים של המשחק אבדו (היו ${money(had)})`, true);
+        G.ending = true; $("hand").hidden = true; const g = G; return setTimeout(() => G === g && finish(`💥 טעות בסיבוב הבונוס: הכוכבים של המשחק אבדו (היו ${money(had)})`, true), END_DELAY);
       }
       if (G.rescue) { G.rescue = false; say(`טעות. "${e.t}" היה ב${fmt(e)}.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e }); return lose(" גלגל ההצלה לא עזר."); }
       G.rm++; G.last = e;   // a missed card leaves the round, shown with its date
       const minus = G.rm <= allow() ? ` הסיבוב שווה עכשיו ${stars(roundStars())}.` : "";
       if (G.rm > allow()) {
         G.rm = allow(); say(`טעות. "${e.t}": ${fmt(e)}.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e });
-        if (G.ru >= RESCUES) return lose();
+        if (G.ru >= RESCUES) { say(`טעות. "${e.t}": ${fmt(e)}. זו הייתה הטעות השנייה בסיבוב, והמשחק נגמר.`, "bad"); return lose(); }
         G.ru++; return offerRescue();
       }
       const left = allow() - G.rm;
@@ -659,9 +659,13 @@ function startBonus(picked) {
   say(`סיבוב בונוס: ${s.icon} ${s.name}. כפול או כלום, ${C().bonusAllow ? "טעות אחת מותרת" : "בלי טעויות"}!`, "good");
   draw(); render();
 }
+// the game-ending mistake: the missed card stays on screen with its date for a moment before the end screen
+const END_DELAY = 2800;
 function lose(why = "") {
   clearTimeout(drawT);
-  finish(`😬 נגמרו הטעויות בסיבוב ${G.round}.${why} המשחק נגמר` + (G.bank ? `, ונשארים לכם ${money(G.bank)} מהסיבובים שהושלמו` : ""), true);
+  G.ending = true; $("hand").hidden = true;
+  const g = G;   // a new game started meanwhile must not be ended by this timer
+  setTimeout(() => G === g && finish(`😬 נגמרו הטעויות בסיבוב ${G.round}.${why} המשחק נגמר` + (G.bank ? `, ונשארים לכם ${money(G.bank)} מהסיבובים שהושלמו` : ""), true), END_DELAY);
 }
 // ---------- lifeline: 9 face-down cards, each with a topic; flip two, place one of them right to stay in the game ----------
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -844,7 +848,7 @@ function render(fx = {}) {
     p.className = "pool"; p.innerHTML = `האירוע הבא… <small>(${G.pool.length} בחפיסה)</small>`;
     h.appendChild(p);
   }
-  h.hidden = full || !!G.end || !!G.inRescue;
+  h.hidden = full || !!G.end || !!G.inRescue || !!G.ending;
   $("dock").hidden = !!G.end || !!G.inRescue;
   const c = C();
   $("ladder").innerHTML = c.allow.map((v, i) => `<div class="rung${i + 1 === G.round ? " now" : i + 1 < G.round ? " past" : ""}">${rname(i + 1)}: עד ⭐⭐⭐<small>סיבוב ${i + 1}${c.levels ? ` · רמה ${c.levels[i]}` : ""} · ${c.allow[i] === 1 ? "טעות אחת" : `עד ${c.allow[i]} טעויות`} · 🔄 החלפה אחת</small></div>`).join("");
