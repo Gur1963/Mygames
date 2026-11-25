@@ -895,7 +895,13 @@ async function openBoard() {
 }
 // opened with a fresh address each time: always the latest version, not a cached copy
 document.querySelectorAll('a[href="quiz.html"], a[href="kids.html"], a[href="conquest.html"], a[href="memory.html"], a[href="timeline.html"]').forEach(a => {
-  a.onclick = e => { e.preventDefault(); $("inner").src = a.getAttribute("href") + "?v=" + Date.now(); $("inner").hidden = false; };
+  a.onclick = e => {
+    e.preventDefault();
+    let href = a.getAttribute("href");
+    // a phone (touch screen, small) gets the timeline's phone version; computers and tablets keep the regular one
+    if (href === "timeline.html" && matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 600) href = "timeline-phone.html";
+    $("inner").src = href + "?v=" + Date.now(); $("inner").hidden = false;
+  };
 });
 // kids mode comes back through #board while this page is still loaded under it
 window.addEventListener("hashchange", () => {

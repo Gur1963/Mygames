@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ציר הזמן · טלפון</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Timeline game, phone version: same rules and events as timeline.html, laid out for a phone screen.
+   The board is a vertical list (top = oldest); the event to place is fixed at the bottom; everything is tap, no dragging. */
+:root {
+  --bg: #f3f1ec; --panel: #fdfcf9; --ink: #1f1c17; --muted: #6a6457; --line: #dcd6c8;
+  --accent: #b5541c; --accent-ink: #ffffff; --slot: #ebe6da; --card: #ffffff;
+  --good: #1d7a46; --good-soft: #def2e5; --bad: #b3261e; --bad-soft: #f8e2df;
+  --display: "Rubik", "Segoe UI", Arial, sans-serif;
+  --body: "Assistant", "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17150f; --panel: #211e17; --ink: #ece7dc; --muted: #a9a190; --line: #3a352a;
+    --accent: #e98a4f; --accent-ink: #1a120b; --slot: #29251c; --card: #2e2a21;
+    --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17150f; --panel: #211e17; --ink: #ece7dc; --muted: #a9a190; --line: #3a352a;
+  --accent: #e98a4f; --accent-ink: #1a120b; --slot: #29251c; --card: #2e2a21;
+  --good: #5cc48a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1f1d; color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.4; direction: rtl; }
+/* phone layout: the board runs top (oldest) to bottom (newest); the event to place sits fixed at the bottom of the screen */
+.wrap {
+  max-width: 560px; margin: 0 auto; padding-top: max(8px, env(safe-area-inset-top, 0px));
+  padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px));
+  padding-bottom: 210px; display: flex; flex-direction: column; gap: 10px;
+}
+body.setup-on .wrap { padding-bottom: 24px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+h1 { font-family: var(--display); font-weight: 800; font-size: 21px; margin: 0; }
+.back { color: var(--accent); font-weight: 700; text-decoration: none; padding: 6px 2px; }
+button { font: inherit; color: inherit; touch-action: manipulation; }
+button:focus-visible, .ev:focus-visible, .slot:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn { font: 700 16px var(--body); padding: 11px 18px; border-radius: 10px; cursor: pointer; border: 2px solid var(--accent); background: var(--accent); color: var(--accent-ink); }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+#setBtns button[aria-pressed="true"] { background: var(--good); border-color: var(--good); color: var(--card); }
+
+/* opening screen */
+.setup { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; }
+.setup h2 { font: 800 19px var(--display); margin: 0; }
+.setup details { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.setup summary { font: 800 17px var(--display); cursor: pointer; }
+.setup ol { margin: 10px 0 0; padding-inline-start: 20px; display: grid; gap: 6px; font-size: 14px; }
+.levels { display: grid; gap: 8px; }
+.levels button { display: flex; gap: 12px; align-items: center; text-align: start; padding: 10px 12px; border-radius: 10px; border: 2px solid var(--line); background: transparent; cursor: pointer; }
+.levels button b { font: 800 20px var(--display); min-width: 26px; text-align: center; }
+.levels button span { color: var(--muted); font-size: 14px; }
+.levels button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.levels button[aria-pressed="true"] b { color: var(--accent); }
+#startBtn { width: 100%; font-size: 19px; padding: 14px; }
+
+/* status bar: four numbers on one line, the rest below */
+.bar { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 6px 0; display: grid; gap: 4px; }
+.stats { display: grid; grid-template-columns: 1.1fr 1.4fr 1fr .9fr; gap: 6px; }
+.stats > div { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; text-align: center; }
+.stats span { display: block; color: var(--muted); font: 500 11px var(--display); }
+.stats b { font: 800 16px var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sub { display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; font: 600 13px var(--display); color: var(--muted); }
+.sub b { color: var(--ink); }
+.sub .lnk { margin-inline-start: auto; background: none; border: 0; color: var(--accent); font: 700 13px var(--display); padding: 4px 2px; cursor: pointer; }
+.bar .warn { color: var(--bad); }
+.round-title { font: 800 24px var(--display); text-align: center; color: var(--accent); margin: 0; }
+.ladder { display: grid; gap: 4px; }
+.rung { border: 2px solid var(--line); border-radius: 8px; padding: 4px 8px; font: 800 14px var(--display); }
+.rung small { color: var(--muted); font: 500 12px var(--display); margin-inline-start: 6px; }
+.rung.now { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.rung.past { opacity: .5; }
+
+/* the board */
+.end-lbl { color: var(--muted); font: 700 13px var(--display); text-align: center; }
+.slots { display: flex; flex-direction: column; gap: 4px; }
+.slot {
+  position: relative; min-height: 42px; border-radius: 9px; background: var(--slot);
+  border: 2px dashed var(--line); display: flex; align-items: stretch; padding: 2px 2px 2px 2px; padding-inline-start: 28px;
+}
+.slot::before { content: attr(data-n); position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 26px; display: grid; place-content: center; font: 700 13px var(--display); color: var(--muted); }
+.slot.empty::after { content: ""; align-self: center; color: var(--muted); font: 600 13px var(--display); }
+body.placing .slot.empty { cursor: pointer; border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+body.placing .slot.empty::after { content: "הקישו כדי להניח כאן"; color: var(--accent); }
+.slot.bad-slot { border-color: var(--bad); border-style: solid; animation: shake .45s; }
+/* + between two cards that have no empty box between them, and before the first / after the last */
+.ins { display: none; height: 26px; border-radius: 8px; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  color: var(--accent); font: 800 14px var(--display); cursor: pointer; align-items: center; justify-content: center; gap: 6px; }
+body.placing:not(.moving) .ins { display: flex; }
+.ins b { font-size: 20px; line-height: 1; }
+.ev {
+  flex: 1; min-width: 0; border-radius: 7px; background: var(--card); border: 2px solid var(--line); padding: 4px 8px;
+  display: grid; grid-template-columns: 1fr auto; grid-template-areas: "cat date" "t date"; column-gap: 8px; align-items: center;
+  cursor: pointer; user-select: none; box-shadow: 0 1px 3px rgb(0 0 0 / .1); font-size: 14px; font-weight: 600; line-height: 1.25;
+}
+.ev .cat { grid-area: cat; font: 500 11px var(--display); color: var(--muted); }
+.ev .t { grid-area: t; }
+.ev .date { grid-area: date; font: 800 14px var(--display); color: var(--accent); text-align: end; max-width: 7.5em; }
+.ev .tag { display: none; }
+.ev.anchor { border-style: dashed; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--card)); cursor: default; }
+.ev.anchor .cat::before { content: "קלף פתיחה · "; color: var(--accent); font-weight: 800; }
+.ev.picked { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+.ev.good { animation: good .8s; }
+.ev.bad { border-color: var(--bad); background: var(--bad-soft); animation: shake .45s; }
+@keyframes good { 0% { background: var(--good-soft); border-color: var(--good); } 100% { } }
+@keyframes shake { 0%,100% { transform: none; } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
+
+/* the event to place, fixed at the bottom */
+.dock { position: fixed; inset-inline: 0; bottom: 0; z-index: 15; background: var(--panel); border-top: 1px solid var(--line);
+  box-shadow: 0 -6px 18px rgb(0 0 0 / .12); padding: 8px max(10px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)); }
+.dock > * { max-width: 560px; margin-inline: auto; }
+.msg { font: 700 14px var(--display); min-height: 20px; text-align: center; margin: 0 auto 6px; }
+.msg.good { color: var(--good); } .msg.bad { color: var(--bad); }
+.hand { display: grid; gap: 6px; justify-items: stretch; }
+.hand .ev { grid-template-areas: "cat" "t"; grid-template-columns: 1fr; min-height: 70px; padding: 8px 12px; font-size: 17px; align-content: center; }
+.hand .ev.picked { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+.hand .tip { color: var(--muted); font-size: 13px; text-align: center; }
+.hand .lifeline { color: var(--accent); font: 800 16px var(--display); text-align: center; }
+.pool { min-height: 70px; border-radius: 10px; display: grid; place-content: center; text-align: center; opacity: .6;
+  background: repeating-linear-gradient(45deg, var(--accent) 0 12px, color-mix(in srgb, var(--accent) 75%, #fff) 0 24px); color: #fff; font: 800 16px var(--display); text-shadow: 0 1px 3px rgb(0 0 0 / .4); }
+.pool br { display: none; }
+
+/* round end, bonus choice and the lifeline: a sheet over the bottom of the screen */
+.done, .rescue { position: fixed; inset-inline: 0; bottom: 0; z-index: 25; max-height: 82vh; overflow-y: auto;
+  background: var(--panel); border-top: 3px solid var(--good); border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px rgb(0 0 0 / .25);
+  padding: 16px max(14px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+  display: grid; gap: 10px; justify-items: center; text-align: center; }
+.done.lost { border-top-color: var(--bad); }
+.done h2 { font: 800 20px var(--display); margin: 0; }
+.done .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.done .row .btn { font-size: 15px; padding: 9px 12px; }
+.rescue { border-top-color: var(--accent); }
+.rescue h2 { font: 800 22px var(--display); margin: 0; }
+.rescue p { margin: 0; color: var(--muted); font-size: 14px; }
+.rescue .bankline { font: 700 15px var(--display); color: inherit; }
+.rgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; max-width: 520px; }
+.rcard { min-height: 84px; border-radius: 10px; border: 2px solid var(--accent); cursor: pointer; padding: 6px; display: grid; place-content: center; gap: 3px;
+  font: 800 14px var(--display); color: #fff; background: repeating-linear-gradient(45deg, var(--accent) 0 12px, color-mix(in srgb, var(--accent) 80%, #fff) 0 24px); text-shadow: 0 1px 3px rgb(0 0 0 / .4); }
+.rcard.open { background: var(--card); color: inherit; text-shadow: none; font: 600 13px/1.3 var(--display); animation: flip .35s; }
+.rcard.open small { color: var(--muted); font-size: 11px; }
+.rcard.open.choose { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+.rcard.used { opacity: .45; cursor: default; }
+.rcard.picked { outline: 4px solid var(--good); outline-offset: 2px; filter: saturate(1.4); }
+.rcard:not(.open) small { font: 700 12px var(--display); opacity: .9; }
+@keyframes flip { 0% { transform: rotateY(90deg); } 100% { transform: none; } }
+</style>
+</head>
+<body class="setup-on">
+<div class="wrap">
+  <div class="top">
+    <h1>⏳ ציר הזמן</h1>
+    <a class="back" href="index.html" target="_top">← לתפריט</a>
+  </div>
+
+  <section class="setup" id="setup">
+    <details>
+      <summary>איך משחקים</summary>
+      <ol>
+        <li>הלוח הוא רשימה של 10 תיבות: למעלה הכי ישן, למטה הכי חדש.</li>
+        <li>כל סיבוב מתחיל עם קלף פתיחה גלוי באמצע הלוח, עם התאריך שלו. אחרי הקלף הנכון הראשון הוא יורד מהלוח.</li>
+        <li>האירוע שצריך לסדר מופיע בתחתית המסך. מקישים על תיבה ריקה, או על פס ה-➕ שבין שני קלפים, והאירוע נכנס לשם. הקלפים זזים לבד כדי לפנות מקום.</li>
+        <li>אם המקום נכון, האירוע נשאר ותאריכו נחשף. אם טעיתם, הוא חוזר לקופה. בשני המקרים מיד מגיע האירוע הבא.</li>
+        <li>אפשר להזיז קלף שכבר בלוח: מקישים עליו ואז על תיבה ריקה.</li>
+        <li>כשכל 10 התיבות מלאות, עוברים לסיבוב הבא עם לוח ריק.</li>
+        <li>משחק מלא: 5 סיבובים, ובכל סיבוב טווח השנים מצטמצם (כל התקופות, 1000, 500, 250 ו-100 שנה). כל קלף נכון מכניס 100 ₪ בסיבוב 1, ואחר כך 400, 1,000, 1,500 ו-3,000, עד 60,000 ₪.</li>
+        <li>בכל סיבוב מותרות 2 טעויות, וכל טעות מורידה מהקופה כמו שקלף נכון מכניס. אחריהן מגיע גלגל הצלה 🛟 (עד 2 בסיבוב): 9 קלפים הפוכים עם נושאים, הראשון חינם וכל נוסף עולה כמו קלף נכון. בוחרים, חושפים, ומניחים אירוע אחד. נכון = ממשיכים, טעות = הביתה בידיים ריקות.</li>
+        <li>אחרי סיבוב 3 ואחרי סיבוב 4 אפשר לפרוש עם הכסף.</li>
+        <li>✖2 בונוס: מי שמסיים בוחר 3 נושאים מיוחדים ומשחק לוח אחד, כפול או כלום.</li>
+        <li>⚡ משחק קצר: "סיבוב חימום" (רמה 1, 500 ₪ לקלף), "שוברים את הראש" (רמה 2, 1,500 ₪ לקלף), ואז "כפול או כלום" עם טעות אחת מותרת. ⭐ סיבוב בלי טעויות: עוד 3,000 / 5,000 / 10,000 ₪.</li>
+      </ol>
+    </details>
+    <h2>איזה משחק?</h2>
+    <div class="levels" id="modes"></div>
+    <h2 id="lvlHead">רמת קושי: כמה מוכרים האירועים</h2>
+    <div class="levels" id="levels"></div>
+    <p id="loadNote" style="margin:0;color:var(--muted);font-size:14px"></p>
+    <button class="btn" id="startBtn" type="button" disabled>מתחילים</button>
+  </section>
+
+  <section id="game" hidden>
+    <div style="display:grid;gap:8px">
+      <h2 class="round-title" id="roundTitle" hidden></h2>
+      <div class="bar">
+        <div class="stats">
+          <div><span>סיבוב</span><b id="round">1</b><b id="of">/5</b></div>
+          <div><span>בקופה</span><b id="bank">0 ₪</b></div>
+          <div><span>טעויות</span><b id="misses">0</b></div>
+          <div><span>זמן</span><b id="clock">0:00</b></div>
+        </div>
+        <div class="sub">
+          <span>רמה <b id="lvl">1</b></span>
+          <span>על הלוח <b id="placed">0</b>/10</span>
+          <span id="era"></span>
+          <button class="lnk" id="ladderBtn" type="button">💰 הסולם</button>
+          <button class="lnk" id="restartBtn" type="button" style="margin-inline-start:0">משחק חדש</button>
+        </div>
+        <div class="ladder" id="ladder" hidden></div>
+      </div>
+      <div class="end-lbl">⬆ הכי ישן</div>
+      <div class="slots" id="slots"></div>
+      <div class="end-lbl">⬇ הכי חדש</div>
+    </div>
+  </section>
+</div>
+<div class="dock" id="dock" hidden>
+  <p class="msg" id="msg" aria-live="polite"></p>
+  <div class="hand" id="hand"></div>
+</div>
+<div class="rescue" id="rescue" hidden></div>
+<div class="done" id="done" hidden></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const N = 10;
+const MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+let bank = [];
+let G = null;     // { slots: [event|null], pool: [event], hand: event|null, misses, t0, last }
+let tick = null;
+
+// ---------- dates ----------
+function fmt(e) {
+  const yr = e.y < 0 ? `${-e.y} לפנה״ס` : String(e.y);
+  let s = e.d ? `${e.d} ב${MONTHS[e.m - 1]} ${yr}` : e.m ? `${MONTHS[e.m - 1]} ${yr}` : yr;
+  return e.approx ? "בערך " + s : s;
+}
+// negative = a before b; 0 = can't tell apart (same year and one lacks a month, etc.)
+function cmp(a, b) {
+  if (a.y !== b.y) return a.y - b.y;
+  if (!a.m || !b.m) return 0;
+  if (a.m !== b.m) return a.m - b.m;
+  if (!a.d || !b.d) return 0;
+  return a.d - b.d;
+}
+// every filled box must be no later than every filled box to its left (higher index)
+function inOrder(slots) {
+  const f = slots.map((e, i) => [e, i]).filter(x => x[0]);
+  for (let i = 0; i < f.length; i++) for (let j = i + 1; j < f.length; j++) if (cmp(f[i][0], f[j][0]) > 0) return false;
+  return true;
+}
+
+// ---------- sound ----------
+let ac = null;
+function tone(notes) {
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    let t = ac.currentTime;
+    for (const [f, d] of notes) {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = "triangle"; o.frequency.value = f; o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(.18, t); g.gain.exponentialRampToValueAtTime(.001, t + d);
+      o.start(t); o.stop(t + d); t += d * .8;
+    }
+  } catch (e) {}
+}
+const sGood = () => tone([[523, .12], [784, .2]]);
+const sBad = () => { tone([[220, .18], [165, .3]]); try { navigator.vibrate?.(120); } catch (e) {} };
+const sWin = () => tone([[523, .14], [659, .14], [784, .14], [1047, .4]]);
+// end-of-game music, original tunes: [start s, Hz, length s, wave, glide-to Hz]
+function music(notes, vol = .14) {
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const t0 = ac.currentTime + .05;
+    for (const [t, f, d, type = "triangle", f2] of notes) {
+      const o = ac.createOscillator(), g = ac.createGain(), a = t0 + t;
+      o.type = type; o.frequency.setValueAtTime(f, a);
+      if (f2) o.frequency.exponentialRampToValueAtTime(f2, a + d);
+      g.gain.setValueAtTime(.0001, a); g.gain.exponentialRampToValueAtTime(vol, a + .03);
+      g.gain.setValueAtTime(vol, a + d * .7); g.gain.exponentialRampToValueAtTime(.0001, a + d);
+      o.connect(g); g.connect(ac.destination); o.start(a); o.stop(a + d + .05);
+    }
+  } catch (e) {}
+}
+// winners: a rising fanfare over C-major chords, ending on a held chord
+const sFanfare = () => music([
+  [0, 392, .12], [.12, 523, .12], [.24, 659, .12], [.36, 784, .34], [.72, 659, .12], [.84, 784, .5],
+  [1.4, 880, .14], [1.54, 988, .14], [1.68, 1047, 1.1],
+  [0, 131, .7, "sine"], [0, 196, .7, "sine"], [.72, 165, .65, "sine"], [.72, 262, .65, "sine"],
+  [1.4, 196, .28, "sine"], [1.68, 131, 1.2, "sine"], [1.68, 262, 1.2, "sine"], [1.68, 330, 1.2, "sine"], [1.68, 392, 1.2, "sine"],
+]);
+// losers: a slow sinking lament, the last note sagging down
+const sLament = () => music([
+  [0, 294, .6, "sawtooth"], [.65, 277, .6, "sawtooth"], [1.3, 262, .6, "sawtooth"], [1.95, 247, 1.5, "sawtooth", 220],
+  [0, 147, 3.4, "sine"], [1.3, 131, 2.1, "sine"],
+], .09);
+
+// ---------- levels ----------
+const LEVELS = [
+  { n: 1, txt: "אירועים שכולם מכירים" },
+  { n: 2, txt: "אירועים מוכרים" },
+  { n: 3, txt: "לחובבי היסטוריה וטריוויה" },
+  { n: 4, txt: "קשה: אירועים פחות מוכרים" },
+  { n: 5, txt: "קשה מאוד: אירועים נדירים" },
+];
+// years the events come from, by round (a round is a full board); the last round is 100 years
+const WIDTHS = [0, 1000, 500, 250, 100];
+// two games: the full one (5 rounds, the player picks the level) and the short one
+// (an easy round at level 1, a harder round at level 2, both from all eras, then the bonus round)
+// prize = what each round adds; per = what each right placement pays (a lifeline card past the first costs the same);
+// allow = mistakes per round before the lifeline; canStop = the first round after which you may leave with the money
+const MODES = {
+  full: { rounds: 5, prize: [1000, 4000, 10000, 15000, 30000], allow: [2, 2, 2, 2, 2], canStop: 3, bonusAllow: 0 },
+  short: { rounds: 2, prize: [5000, 15000], allow: [2, 2], canStop: 99, levels: [1, 2], width: 0, bonusAllow: 1,
+    names: ["🔥 סיבוב חימום", "🧠 שוברים את הראש"], bonusName: "✖2 כפול או כלום",
+    perfect: [3000, 5000], bonusPerfect: 10000 },   // extra money for a round with no mistakes
+  // last year's events, one from each month: in 2027 it becomes 2026 by itself
+  year: { rounds: 1, prize: [10000], allow: [2], canStop: 99, bonusAllow: 0, noBonus: true, year: new Date().getFullYear() - 1,
+    names: [`📅 השנה שהייתה בישראל: ${new Date().getFullYear() - 1}`] },   // width 0 = all eras
+};
+for (const k in MODES) MODES[k].per = MODES[k].prize.map(v => v / N);
+const C = () => G.cfg;
+const RESCUES = 2;   // lifelines per round: a right lifeline placement earns one more, a wrong one ends the game
+// bonus round after the last round: one topic from sets.json, double or nothing, no mistakes and no lifeline
+let SETS = [];
+const PICK = 3;   // topics the player picks for the bonus board
+const per = () => G.bonus ? 0 : C().per[G.round - 1];
+const allow = () => G.bonus ? (C().bonusAllow || 0) : C().allow[G.round - 1];
+const rname = r => C().names ? C().names[r - 1] : `סיבוב ${r}`;
+const noMiss = () => C().bonusAllow ? `טעות אחת מותרת, ובלי גלגל הצלה` : "בלי אף טעות, ובלי גלגל הצלה";
+let mode = "full";
+try { const m = localStorage.getItem("timeline-mode"); if (m === "short") mode = m; } catch (e) {}
+function renderModes() {
+  const box = $("modes"); box.innerHTML = "";
+  for (const [k, n, txt] of [["full", "מלא", "5 סיבובים, הטווח מצטמצם בכל סיבוב, ברמה שתבחרו"], ["short", "קצר", "סיבוב חימום (רמה 1), שוברים את הראש (רמה 2), ואז כפול או כלום על 3 נושאים, עם טעות אחת מותרת"]]) {   // "year" (the year that was) is frozen for now: its code and events stay
+    const b = document.createElement("button");
+    b.type = "button"; b.setAttribute("aria-pressed", k === mode);
+    b.innerHTML = `<b></b><span></span>`; b.querySelector("b").textContent = n; b.querySelector("span").textContent = txt;
+    b.onclick = () => { mode = k; try { localStorage.setItem("timeline-mode", mode); } catch (e) {} renderModes(); };
+    box.appendChild(b);
+  }
+  $("levels").hidden = $("lvlHead").hidden = mode !== "full";
+}
+// the short game's hard round: a random 500-year window with enough level-3 events
+function shortWindow(list, w) {
+  const cnt = a => list.filter(e => e.y >= a && e.y < a + w).length;
+  // a full window (never past this year), every start equally likely, not weighted toward the crowded modern years
+  const starts = [];
+  for (let a = THIS_YEAR - w + 1; a > -3000; a -= 25) if (cnt(a) >= 25) starts.push(a);
+  const a = starts.length ? starts[Math.floor(Math.random() * starts.length)] : null;
+  return a === null ? null : { a, w };
+}
+const money = n => n.toLocaleString("he-IL") + " ₪";
+const THIS_YEAR = new Date().getFullYear();
+let level = 1;
+try { level = Math.min(5, Math.max(1, +localStorage.getItem("timeline-level") || 1)); } catch (e) {}
+function renderLevels() {
+  const box = $("levels"); box.innerHTML = "";
+  for (const L of LEVELS) {
+    const b = document.createElement("button");
+    b.type = "button"; b.setAttribute("aria-pressed", L.n === level);
+    b.innerHTML = `<b>${L.n}</b><span></span>`; b.querySelector("span").textContent = L.txt;
+    b.onclick = () => { level = L.n; try { localStorage.setItem("timeline-level", level); } catch (e) {} renderLevels(); };
+    box.appendChild(b);
+  }
+}
+// nested windows for one game, chosen from the narrowest out, so every round still has events to draw
+function windows(list) {
+  const inW = (w, e) => e.y >= w.a && e.y < w.a + w.w;
+  const starts = list.filter(e => list.filter(x => x.y >= e.y && x.y < e.y + 100).length >= 12).map(e => e.y);
+  const out = Array(5);
+  out[4] = { a: starts[Math.floor(Math.random() * starts.length)], w: 100 };
+  for (let r = 3; r >= 1; r--) {
+    const inner = out[r + 1], w = WIDTHS[r];
+    let lo = inner.a + inner.w - w, hi = inner.a;
+    hi = Math.max(lo, Math.min(hi, THIS_YEAR - w + 1));   // don't reach far into the future when there's room
+    out[r] = { a: lo + Math.floor(Math.random() * (hi - lo + 1)), w };
+  }
+  out[0] = null;
+  return out;
+}
+const yr = y => y < 0 ? `${-y} לפנה״ס` : String(y);
+function rangeText(w) { return w ? `${yr(w.a)} עד ${yr(Math.min(w.a + w.w - 1, THIS_YEAR))}` : "כל התקופות"; }
+const inWin = (w, e) => !w || (e.y >= w.a && e.y < w.a + w.w);
+// the events for round r: prefer ones not used yet and not needed by the narrower rounds after it
+// events shown in recent games (titles, newest last), so the next games bring new ones
+const SEEN_MAX = 150;   // about the last two games
+let seenList = [];
+try { seenList = JSON.parse(localStorage.getItem("timeline-seen") || "[]"); } catch (e) {}
+let SEEN = new Set(seenList);
+function markSeen(e) {
+  seenList = seenList.filter(t => t !== e.t); seenList.push(e.t);
+  if (seenList.length > SEEN_MAX) seenList = seenList.slice(-SEEN_MAX);
+  SEEN = new Set(seenList);
+  try { localStorage.setItem("timeline-seen", JSON.stringify(seenList)); } catch (err) {}
+}
+// the events for round r: not used earlier in this game, not shown in recent games, and not needed by the narrower rounds after it;
+// each condition is dropped (least important first) only when it would leave fewer than a board's worth
+function roundPool(r) {
+  const w = G.wins[r], all = G.list.filter(e => inWin(w, e));
+  const later = e => !C().levels && G.wins.slice(r + 1).some(x => inWin(x, e));   // the short game's rounds use different levels
+  const fresh = all.filter(e => !G.used.has(e));
+  const unseen = fresh.filter(e => !SEEN.has(e.t));
+  const extra = G.extra.filter(e => inWin(w, e) && !G.used.has(e) && !SEEN.has(e.t));
+  const tiers = [unseen.filter(e => !later(e)), unseen, unseen.concat(extra.filter(e => !later(e))), unseen.concat(extra), fresh.filter(e => !later(e)), fresh, all];
+  return tiers.find(t => t.length >= N) || all;
+}
+
+// ---------- game ----------
+const levelList = L => bank.filter(e => e.f === L);
+// the nearest other level tops up when this level's unseen events run out
+const extraList = L => bank.filter(e => e.f === (L < 5 ? L + 1 : 4));
+function newGame() {
+  const cfg = MODES[mode];
+  const L = cfg.year ? 3 : cfg.levels ? cfg.levels[0] : level, list = cfg.year ? bank.filter(e => e.y === cfg.year && e.m && isIL(e)) : levelList(L);
+  const wins = cfg.year ? [{ a: cfg.year, w: 1 }] : cfg.levels ? [null, cfg.width ? shortWindow(levelList(cfg.levels[1]), cfg.width) : null] : windows(list);
+  G = { cfg, level: L, list, extra: extraList(L), wins, used: new Set(), round: 0, rm: 0, bank: 0, slots: [], pool: [], hand: null, misses: 0, t0: null, last: null, end: null };
+  $("setup").hidden = true; $("game").hidden = false; document.body.classList.remove("setup-on"); scrollTo(0, 0);
+  clearInterval(tick); tick = setInterval(showClock, 500);
+  startRound(1);
+}
+let nextT = null;
+function startRound(r) {
+  clearTimeout(nextT); clearTimeout(drawT);
+  G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
+  if (C().levels) { G.level = C().levels[r - 1]; G.list = levelList(G.level); G.extra = extraList(G.level); }
+  $("lvl").textContent = lvlText();
+  G.round = r; G.rm = 0; G.ru = 0; G.flaw = false; G.slots = Array(N).fill(null); G.pool = roundPool(r - 1); G.hand = null; G.last = null;
+  // an opening card with its date in the middle; the first event is placed against it, then it leaves the board
+  if (C().year) yearBoard(); else G.anchor = anchorFor(r - 1);
+  if (G.anchor) { G.slots[4] = G.anchor; G.used.add(G.anchor); markSeen(G.anchor); }
+  $("done").hidden = true;
+  say(r === 1 ? "" : C().names ? `${rname(r)}: רמה ${G.level}, אירועים מ${rangeText(G.wins[r - 1])}` : `סיבוב ${r}: אירועים מ${rangeText(G.wins[r - 1])}`, "good");
+  draw(); render();
+}
+// the opening card: an event of this round's years that is not in the pool, from the middle of the pool's years
+// (so the first event is as likely to go before it as after it), closest level first, unseen first
+function anchorFor(r) {
+  const w = G.wins[r], inPool = new Set(G.pool);
+  const ys = G.pool.map(e => e.y).sort((a, b) => a - b), mid = ys[Math.floor(ys.length / 2)] ?? 1900;
+  const ok = bank.filter(e => inWin(w, e) && !inPool.has(e) && !G.used.has(e));
+  for (const d of [0, 1, 2, 3, 4]) {
+    const near = ok.filter(e => Math.abs(e.f - G.level) === d), fresh = near.filter(e => !SEEN.has(e.t));
+    const from = (fresh.length ? fresh : near).sort((a, b) => Math.abs(a.y - mid) - Math.abs(b.y - mid)).slice(0, 8);
+    if (from.length) return from[Math.floor(Math.random() * from.length)];
+  }
+  return null;
+}
+// "the year that was": one event from each month, the opening card from June or July, the pool from the other months
+function yearBoard() {
+  const byM = {};
+  for (const e of shuffle(G.list.slice())) (byM[e.m] = byM[e.m] || []).push(e);
+  // only well-known events: levels 1-3 (or a month's best level when it has none of those)
+  for (const m in byM) { const best = Math.max(3, Math.min(...byM[m].map(e => e.f))); byM[m] = byM[m].filter(e => e.f <= best); }
+  const mid = shuffle([6, 7, 5, 8].filter(m => byM[m]))[0];
+  G.anchor = mid ? byM[mid][0] : null;
+  const seenLast = l => l.find(e => !SEEN.has(e.t)) || l[0];   // a fresh event of each month when there is one
+  G.pool = shuffle(Object.keys(byM).filter(m => +m !== mid).map(m => seenLast(byM[m])));
+}
+// Israeli events: the Israel topic, or marked il (an Israeli in sport, film, music...)
+const isIL = e => e.cat === "ישראל" || e.il;
+const lvlText = () => C().year ? "כל הרמות" : G.level;
+const placedCount = () => G.slots.filter(e => e && e !== G.anchor).length;
+let drawT = null;
+function draw() {
+  const now = G.pool;
+  if (G.end || G.hand || G.inRescue || !now.length || G.slots.every(Boolean)) return;
+  let choices = now.length > 1 ? now.filter(e => e !== G.last) : now;
+  const unseen = choices.filter(e => !SEEN.has(e.t));   // new ones first; a missed one waits in the pool
+  if (unseen.length) choices = unseen;
+  const e = choices[Math.floor(Math.random() * choices.length)];
+  G.pool.splice(G.pool.indexOf(e), 1);
+  G.hand = e; G.used.add(e); markSeen(e);
+  if (!G.t0) G.t0 = Date.now();
+}
+// put e before the card now at box g (g = 0..10); cards slide toward the nearest empty box
+function insertAt(slots, e, g) {
+  const t = slots.slice();
+  if (g < N && !t[g]) { t[g] = e; return t; }
+  let best = -1, cost = k => k >= g ? k - g : g - 1 - k;
+  for (let k = 0; k < N; k++) if (!t[k] && (best < 0 || cost(k) < cost(best))) best = k;
+  if (best >= g) { for (let k = best; k > g; k--) t[k] = t[k - 1]; t[g] = e; }
+  else { for (let k = best; k < g - 1; k++) t[k] = t[k + 1]; t[g - 1] = e; }
+  return t;
+}
+// from = "hand" (to = a gap, see insertAt) or a box index (to = an empty box)
+function drop(from, to) {
+  if (G.end) return;
+  if (from !== "hand" && G.slots[to]) return render();
+  if (from === "hand") {
+    const e = G.hand, test = insertAt(G.slots, e, to);
+    if (inOrder(test)) {
+      to = test.indexOf(e);
+      G.slots = test; G.hand = null;
+      G.used.add(e);
+      const hadAnchor = !!G.anchor;
+      if (G.anchor) { const a = G.slots.indexOf(G.anchor); if (a >= 0) G.slots[a] = null; G.anchor = null; }
+      if (!G.rescue) G.bank += per();
+      if (G.bonus) { sGood(); say(`נכון! ${fmt(e)} · עוד ${N - placedCount()} להכפלה` + (hadAnchor ? " · קלף הפתיחה ירד מהלוח" : ""), "good"); draw(); render({ good: to }); if (G.slots.every(Boolean)) roundDone(); return; }
+      sGood(); say((G.rescue ? `🛟 ניצלתם! נכון! ${fmt(e)} (בלי כסף על קלף בגלגל) · ` + (G.ru < RESCUES ? `נשאר לכם עוד גלגל הצלה ${RESCUES - G.ru === 1 ? "אחד" : RESCUES - G.ru} בסיבוב` : "זה היה גלגל ההצלה האחרון בסיבוב") : `נכון! ${fmt(e)} · +${money(per())}`) + (hadAnchor ? " · קלף הפתיחה ירד מהלוח" : ""), "good"); G.rescue = false;
+      draw(); render({ good: to });
+      if (G.slots.every(Boolean)) roundDone();
+    } else {
+      G.misses++; G.hand = null; G.flaw = true;
+      sBad();
+      if (G.bonus && G.rm < allow()) {   // the one mistake the bonus allows: the event goes back to the pool
+        G.rm++; G.pool.push(e); G.last = e;
+        say(`טעות. "${e.t}" חוזר לקופה. זו הייתה הטעות היחידה שמותרת: מעכשיו, טעות אחת והכול הולך.`, "bad");
+        render({ bad: Math.min(to, N - 1), badEv: e });
+        clearTimeout(drawT); drawT = setTimeout(() => { draw(); render(); }, 1300);
+        return;
+      }
+      if (G.bonus) {
+        say(`טעות. "${e.t}" היה ב${fmt(e)}.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e });
+        const had = G.bank; G.bank = 0;
+        return finish(`💥 טעות בסיבוב הבונוס: הולכים הביתה בידיים ריקות (היו בקופה ${money(had)})`, true);
+      }
+      if (G.rescue) { G.rescue = false; say(`טעות. "${e.t}" היה ב${fmt(e)}.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e }); return lose(" גלגל ההצלה לא עזר."); }
+      G.rm++; G.pool.push(e); G.last = e;
+      const fine = Math.min(G.bank, per()); G.bank -= fine;
+      const lostPf = G.rm === 1 && C().perfect && C().perfect[G.round - 1] ? ` (בונוס הסיבוב המושלם ירד)` : "";
+      const minus = (fine ? ` −${money(fine)}.` : "") + lostPf;
+      if (G.rm > allow()) {
+        G.rm = allow(); say(`טעות.${minus} "${e.t}" חוזר לקופה.`, "bad"); render({ bad: Math.min(to, N - 1), badEv: e });
+        if (G.ru >= RESCUES) return lose(" גם גלגלי ההצלה נגמרו.");
+        G.ru++; return offerRescue();
+      }
+      const left = allow() - G.rm;
+      say(`טעות.${minus} "${e.t}" חוזר לקופה. ` + (left ? (left === 1 ? "נשארה עוד טעות אחת בסיבוב." : `נשארו עוד ${left} טעויות בסיבוב.`) : G.ru < RESCUES ? `⚠ הטעות הבאה: גלגל הצלה (נשארו ${RESCUES - G.ru}).` : "⚠ גלגלי ההצלה נגמרו: הטעות הבאה מסיימת את המשחק."), "bad");
+      render({ bad: Math.min(to, N - 1), badEv: e });
+      clearTimeout(drawT); drawT = setTimeout(() => { draw(); render(); }, 1300);
+    }
+  } else {
+    if (from === to) return render();
+    const test = G.slots.slice(); test[to] = test[from]; test[from] = null;
+    if (!inOrder(test)) { say("שם הוא שובר את הסדר, אז הוא חזר למקומו.", "bad"); return render(); }
+    G.slots = test; say("");
+    render();
+  }
+}
+function roundDone() {
+  if (!G.bonus) sWin();   // the bonus ends in finish(), which plays the fanfare
+  render();
+  const d = $("done"); d.classList.remove("lost");
+  if (G.bonus) {
+    G.bank *= 2;
+    const bp = !G.flaw && C().bonusPerfect ? C().bonusPerfect : 0; G.bank += bp;
+    return finish(`🏆🏆 סיבוב הבונוס הושלם, הכסף הוכפל!${bp ? ` ⭐ סיבוב מושלם בלי טעויות: עוד ${money(bp)}!` : ""} זכיתם ב-${money(G.bank)}`);
+  }
+  const pf = !G.flaw && C().perfect ? C().perfect[G.round - 1] || 0 : 0;
+  const pfMiss = G.flaw && C().perfect && C().perfect[G.round - 1] ? ` (בונוס סיבוב מושלם של ${money(C().perfect[G.round - 1])} הפסדתם בגלל טעות)` : "";
+  G.pf = pf; G.pfMiss = pfMiss; if (pf) { G.bank += pf; say(`⭐ סיבוב מושלם בלי טעויות! עוד ${money(pf)} לקופה`, "good"); render(); }
+  if (G.round === C().rounds) return C().noBonus ? finish(`🏆 סידרתם את כל השנה! זכיתם ב-${money(G.bank)}`) : offerBonus();
+  const r = G.round + 1, next = `${rname(r)}: ${C().levels ? `רמה ${C().levels[r - 1]}, ` : ""}${money(C().per[r - 1])} לכל קלף נכון, עד ${C().allow[r - 1]} טעויות, אירועים מ${rangeText(G.wins[r - 1])}`;
+  if (G.round < C().canStop) {
+    d.innerHTML = `<h2>✔ ${rname(G.round)} הושלם!${pf ? ` ⭐ סיבוב מושלם: +${money(pf)}!` : ""} בקופה ${money(G.bank)}</h2>${pfMiss ? `<div>${pfMiss}</div>` : ""}
+      <div>עוד רגע ${next}</div>
+      <button class="btn" type="button" id="againBtn">ל${C().names ? "סיבוב הבא" : `סיבוב ${r}`} עכשיו</button>`;
+    d.hidden = false;
+    $("againBtn").onclick = () => startRound(r);
+    nextT = setTimeout(() => startRound(r), 3500);
+    return;
+  }
+  d.innerHTML = `<h2>✔ סיבוב ${G.round} הושלם! בקופה ${money(G.bank)}</h2>
+    <div>לפרוש עכשיו עם הכסף, או להמשיך? אם תיכשלו בסיבוב הבא, תלכו הביתה בידיים ריקות.</div>
+    <div>${next}</div>
+    <div class="row"><button class="btn" type="button" id="stopBtn">💰 לפרוש עם ${money(G.bank)}</button>
+    <button class="btn ghost" type="button" id="goBtn">להמשיך (עד ${money(G.bank + C().prize[r - 1])})</button></div>`;
+  d.hidden = false;
+  $("stopBtn").onclick = () => finish(`💰 פרשתם עם ${money(G.bank)}`);
+  $("goBtn").onclick = () => startRound(r);
+}
+// after round 5: take the money, or pick a topic and play one more board, double or nothing
+function offerBonus() {
+  const sets = SETS.filter(s => s.events.length >= N);
+  const all = C().rounds === 2 ? "את שני הסיבובים" : `את כל ${C().rounds} הסיבובים`;
+  if (!sets.length) return finish(`🏆 סיימתם ${all}! זכיתם ב-${money(G.bank)}`);
+  const d = $("done"); d.classList.remove("lost");
+  d.innerHTML = `<h2>🏆 סיימתם ${all}!${G.pf ? ` ⭐ סיבוב מושלם: +${money(G.pf)}!` : ""} בקופה ${money(G.bank)}</h2>${G.pfMiss ? `<div>${G.pfMiss}</div>` : ""}
+    <div><b>${C().bonusName || "סיבוב בונוס: כפול או כלום"}.</b> בחרו ${PICK} נושאים, והאירועים בלוח יגיעו משלושתם, מעורבבים. ${noMiss()}: מסיימים את הלוח, והכסף מוכפל ל-${money(G.bank * 2)}. ${C().bonusAllow ? "טעות שנייה" : "טעות אחת"}, והולכים הביתה בידיים ריקות.</div>
+    <div class="row" id="setBtns"></div>
+    <div class="row"><button class="btn" type="button" id="goBonus" disabled></button>
+    <button class="btn ghost" type="button" id="stopBtn">💰 לקחת ${money(G.bank)} וללכת</button></div>`;
+  const row = d.querySelector("#setBtns"), go = $("goBonus"), chosen = [];
+  const sync = () => {
+    row.querySelectorAll("button").forEach((b, i) => { const on = chosen.includes(sets[i]); b.className = "btn ghost"; b.setAttribute("aria-pressed", on); b.textContent = (on ? "✓ " : "") + `${sets[i].icon} ${sets[i].name}`; });
+    go.disabled = chosen.length !== PICK;
+    go.textContent = chosen.length === PICK ? "✖2 יוצאים לבונוס" : `בחרתם ${chosen.length} מתוך ${PICK}`;
+  };
+  for (const s of sets) {
+    const b = document.createElement("button"); b.type = "button";
+    b.textContent = `${s.icon} ${s.name}`;
+    b.onclick = () => { const k = chosen.indexOf(s); if (k >= 0) chosen.splice(k, 1); else if (chosen.length < PICK) chosen.push(s); sync(); };
+    row.appendChild(b);
+  }
+  go.onclick = () => startBonus(chosen);
+  sync();
+  d.hidden = false;
+  $("stopBtn").onclick = () => finish(`💰 לקחתם ${money(G.bank)} והלכתם הביתה`);
+}
+// the bonus board mixes the chosen topics: the opening card from the middle of all their years,
+// then the same number of events from each topic (the cards show which topic each event is from)
+function startBonus(picked) {
+  clearTimeout(nextT); clearTimeout(drawT);
+  const s = { name: picked.map(x => x.name).join(" · "), icon: picked.map(x => x.icon).join(""), events: picked.flatMap(x => x.events) };
+  G.bonus = s; G.round = C().rounds + 1; G.rm = 0; G.ru = 0; G.flaw = false; G.anchor = null; G.hand = null; G.last = null;
+  G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
+  G.slots = Array(N).fill(null);
+  // an opening card from the middle of the topic's years (one of the 3 closest), then the events from the rest
+  const ys = s.events.map(e => e.y).sort((a, b) => a - b), mid = ys[Math.floor(ys.length / 2)];
+  const near = shuffle(s.events.slice()).sort((a, b) => Math.abs(a.y - mid) - Math.abs(b.y - mid));
+  G.anchor = s.events.length > N ? near[Math.floor(Math.random() * Math.min(3, near.length))] : null;
+  const each = Math.ceil((N + 5) / picked.length);
+  G.pool = shuffle(picked.flatMap(x => shuffle(x.events.filter(e => e !== G.anchor)).slice(0, each)));
+  if (G.anchor) G.slots[4] = G.anchor;
+  $("done").hidden = true;
+  say(`סיבוב בונוס: ${s.icon} ${s.name}. כפול או כלום, ${C().bonusAllow ? "טעות אחת מותרת" : "בלי טעויות"}!`, "good");
+  draw(); render();
+}
+function lose(why = "") {
+  clearTimeout(drawT);
+  const had = G.bank;
+  G.bank = 0;
+  finish(`😬 נגמרו הטעויות בסיבוב ${G.round}.${why} הולכים הביתה בידיים ריקות` + (had ? ` (היו בקופה ${money(had)})` : ""), true);
+}
+// ---------- lifeline: 9 face-down cards, each with a topic; flip two, place one of them right to stay in the game ----------
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// lifeline cards are hard on purpose: events from inside the years already on the board (and just around them),
+// as close as possible to a card on the board without tying with it; a topic gets a card only if it has such an event
+function rescueCards() {
+  const w = G.wins[G.round - 1], board = G.slots.filter(Boolean), onBoard = new Set(board);
+  const ok = e => (!C().year || isIL(e)) && inWin(w, e) && !G.used.has(e) && !onBoard.has(e) && !G.pool.includes(e) && board.every(b => cmp(b, e) !== 0);
+  const ys = board.map(e => e.y), lo = Math.min(...ys), hi = Math.max(...ys);
+  const near = e => Math.min(...ys.map(y => Math.abs(y - e.y)));   // years to the closest card on the board
+  // the board's years, widened step by step until there are enough events for 9 cards
+  let list = [];
+  for (const [m, least] of [[0.1, 5], [0.25, 10], [0.5, 25], [1, 50], [2, 100], [4, 250], [0, Infinity]]) {
+    const pad = Math.max(least, (hi - lo) * m);
+    list = bank.filter(e => ok(e) && e.y >= lo - pad && e.y <= hi + pad);
+    if (new Set(list.map(e => e.cat)).size >= 6 && list.length >= 12) break;
+  }
+  // within a topic: inside the board's years first, then the closest levels, then the closest to a board card; unseen first
+  const rank = e => [(e.y >= lo && e.y <= hi) ? 0 : 1, Math.abs(e.f - G.level) > 1 ? 1 : 0, SEEN.has(e.t) ? 1 : 0, near(e)];
+  const better = (a, b) => { const x = rank(a), y = rank(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i]; return 0; };
+  const byCat = {};
+  for (const e of list) (byCat[e.cat] = byCat[e.cat] || []).push(e);
+  for (const c in byCat) byCat[c] = shuffle(byCat[c]).sort(better);   // shuffle first so equal ranks vary between games
+  const cats = shuffle(Object.keys(byCat)), cards = [];
+  // one card per topic, then more from the topics that have more, until 9
+  for (let round = 0; cards.length < 9 && round < 9; round++)
+    for (const c of cats) { const e = byCat[c][round]; if (e && cards.length < 9) cards.push({ cat: c, e }); }
+  return shuffle(cards);
+}
+function offerRescue() {
+  clearTimeout(drawT);
+  const cards = rescueCards();
+  if (cards.length < 2) return lose();
+  G.inRescue = { cards, sel: [], shown: false };
+  setTimeout(showRescue, 900);
+}
+// pick cards face down (the first is free, every other costs a placement's worth while the bank can pay),
+// then "done" turns them all over at once, and one of them is placed
+function showRescue() {
+  const R = G.inRescue; if (!R) return;
+  const box = $("rescue"), price = per(), n = R.sel.length;
+  const cost = n === 0 ? 0 : price, canBuy = G.bank >= cost;
+  box.innerHTML = `<h2>🛟 גלגל הצלה!</h2>
+    <p></p><p class="bankline"></p>
+    <div class="rgrid"></div>
+    <button class="btn" type="button" id="selDone"></button>`;
+  const [p1, p2] = box.querySelectorAll("p"), done = $("selDone");
+  if (!R.shown) {
+    p1.textContent = `עברתם את ${allow()} הטעויות. גלגל הצלה ${G.ru} מתוך ${RESCUES} בסיבוב: טעות כאן מסיימת את המשחק. בחרו קלפים לפי הנושא: הראשון חינם, כל קלף נוסף עולה ${money(price)}. הקלפים נחשפים רק כשמסיימים לבחור.`;
+    p2.textContent = `בקופה: ${money(G.bank)} · נבחרו ${n} קלפים` + (n && !canBuy ? " · אין מספיק כסף לעוד קלף" : "");
+    done.textContent = n ? `סיימתי לבחור: לחשוף ${n === 1 ? "את הקלף" : `את ${n} הקלפים`}` : "בחרו לפחות קלף אחד";
+    done.disabled = !n;
+    done.onclick = () => { R.shown = true; showRescue(); };
+  } else {
+    p1.textContent = "לחצו על אחד האירועים כדי להניח אותו על הלוח. קלף נכון = ממשיכים (בלי כסף), טעות = הביתה.";
+    p2.textContent = `בקופה: ${money(G.bank)}`;
+    done.hidden = true;
+  }
+  R.cards.forEach((c, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "rcard";
+    const picked = R.sel.includes(i);
+    if (R.shown && picked) {
+      b.classList.add("open", "choose");
+      b.innerHTML = "<small></small><span></span>";
+      b.querySelector("small").textContent = c.cat; b.querySelector("span").textContent = c.e.t;
+      b.onclick = () => chooseRescue(c.e);
+    } else {
+      b.innerHTML = "<span></span><small></small>";
+      b.querySelector("span").textContent = (picked ? "✓ " : "") + c.cat;
+      if (R.shown) { b.classList.add("used"); b.querySelector("small").textContent = ""; }
+      else if (picked) {   // picked: click again to put it back (and get the money back)
+        b.classList.add("picked");
+        b.querySelector("small").textContent = "נבחר · לחיצה מבטלת";
+        b.onclick = () => { const k = R.sel.indexOf(i); R.sel.splice(k, 1); if (R.sel.length) G.bank += price; render(); showRescue(); };
+      } else {
+        b.querySelector("small").textContent = cost ? money(cost) : "חינם";
+        if (!canBuy) b.classList.add("used");
+        else b.onclick = () => { G.bank -= cost; R.sel.push(i); render(); showRescue(); };
+      }
+    }
+    box.querySelector(".rgrid").appendChild(b);
+  });
+  box.hidden = false; $("hand").hidden = true;
+  box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+function chooseRescue(e) {
+  G.inRescue = null; $("rescue").hidden = true;
+  G.hand = e; G.rescue = true; G.used.add(e); markSeen(e);
+  render();
+  say("🛟 הניחו את האירוע במקום הנכון כדי להישאר במשחק.", "good");
+}
+function finish(title, lost) {
+  G.end = Date.now(); G.hand = null; G.inRescue = null; G.rescue = false; $("rescue").hidden = true;
+  setTimeout(lost ? sLament : sFanfare, 400);
+  render();
+  const d = $("done");
+  d.classList.toggle("lost", !!lost);
+  d.innerHTML = `<h2></h2>
+    <div>רמה <b>${lvlText()}</b> · סיבוב <b>${G.bonus ? "בונוס" : G.round}</b> · כל הטעויות: <b>${G.misses}</b> · זמן: <b>${clockText()}</b></div>
+    <button class="btn" type="button" id="againBtn">עוד משחק</button>`;
+  d.querySelector("h2").textContent = title;
+  d.hidden = false;
+  $("againBtn").onclick = newGame;
+}
+function clockText() {
+  if (!G.t0) return "0:00";
+  const s = Math.floor(((G.end || Date.now()) - G.t0) / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+function showClock() { if (G) $("clock").textContent = clockText(); }
+function say(t, kind) { const m = $("msg"); m.textContent = t; m.className = "msg" + (kind ? " " + kind : ""); }
+
+// ---------- drawing the screen ----------
+let picked = null;   // what a tap on the board places: "hand" (the event to place) or a box index (a card being moved)
+function card(e, showDate) {
+  const c = document.createElement("div");
+  c.className = "ev"; c.tabIndex = 0;
+  c.onkeydown = k => { if (k.key === "Enter" || k.key === " ") { k.preventDefault(); k.stopPropagation(); c.click(); } };
+  c.innerHTML = `<span class="cat"></span><span class="t"></span>${showDate ? '<span class="date"></span>' : ""}`;
+  c.querySelector(".cat").textContent = e.cat || "";
+  c.querySelector(".t").textContent = e.t;
+  if (showDate) c.querySelector(".date").textContent = fmt(e);
+  return c;
+}
+// the event in hand is always ready to place: tap an empty box or a + strip.
+// tapping a card already on the board picks it up instead (tap an empty box to move it, or tap it again to put it down)
+function render(fx = {}) {
+  const box = $("slots"); box.innerHTML = "";
+  if (picked === "hand" && (!G.hand || G.end)) picked = null;
+  if (picked !== "hand" && (typeof picked !== "number" || !G.slots[picked] || G.slots[picked] === G.anchor)) picked = null;
+  if (picked === null && G.hand && !G.end) picked = "hand";
+  // a + is needed only where two cards touch (or before the first box / after the last): elsewhere an empty box does the job
+  const gapNeeded = g => g === 0 ? !!G.slots[0] : g === N ? !!G.slots[N - 1] : !!(G.slots[g - 1] && G.slots[g]);
+  const gap = g => {
+    if (!gapNeeded(g)) return;
+    const z = document.createElement("button");
+    z.type = "button"; z.className = "ins"; z.dataset.g = g;
+    z.innerHTML = `<b>+</b><span></span>`;
+    z.querySelector("span").textContent = g === 0 ? "לפני כולם" : g === N ? "אחרי כולם" : "כאן, בין שני הקלפים";
+    z.onclick = () => { if (picked === "hand") drop("hand", g); };
+    box.appendChild(z);
+  };
+  G.slots.forEach((e, i) => {
+    gap(i);
+    const s = document.createElement("div");
+    s.className = "slot" + (e ? "" : " empty"); s.dataset.i = i; s.dataset.n = i + 1;
+    if (e) {
+      const c = card(e, true);
+      if (fx.good === i) c.classList.add("good");
+      if (e === G.anchor) c.classList.add("anchor");
+      else {
+        if (picked === i) c.classList.add("picked");
+        c.onclick = ev => { ev.stopPropagation(); if (G.end) return; picked = picked === i ? null : i; render(); };
+      }
+      s.appendChild(c);
+    }
+    if (e && fx.bad === i) s.classList.add("bad-slot");
+    else if (fx.bad === i) {
+      const c = card(fx.badEv, false); c.classList.add("bad"); c.style.cursor = "default"; s.appendChild(c);
+      setTimeout(() => c.remove(), 900);
+    }
+    if (!e) {
+      s.tabIndex = 0;
+      s.onclick = () => { if (picked !== null) drop(picked, i); };
+      s.onkeydown = k => { if (k.key === "Enter" || k.key === " ") { k.preventDefault(); s.onclick(); } };
+    }
+    box.appendChild(s);
+  });
+  gap(N);
+  document.body.classList.toggle("placing", picked !== null);
+  document.body.classList.toggle("moving", typeof picked === "number");
+  const h = $("hand"); h.innerHTML = "";
+  const full = G.slots.every(Boolean);
+  if (G.hand) {
+    if (G.rescue) { const l = document.createElement("div"); l.className = "lifeline"; l.textContent = "🛟 גלגל הצלה"; h.appendChild(l); }
+    const c = card(G.hand, false);
+    if (picked === "hand") c.classList.add("picked");
+    c.onclick = () => { picked = "hand"; render(); };
+    h.appendChild(c);
+    const tip = document.createElement("div"); tip.className = "tip";
+    tip.textContent = typeof picked === "number" ? "מזיזים קלף מהלוח: הקישו על תיבה ריקה, או שוב על הקלף כדי לבטל" : "הקישו על תיבה ריקה בלוח, או על פס ה-+ שבין שני קלפים";
+    h.appendChild(tip);
+  } else if (!full) {
+    const p = document.createElement("div");
+    p.className = "pool"; p.innerHTML = `האירוע הבא… <small>(${G.pool.length} בקופה)</small>`;
+    h.appendChild(p);
+  }
+  h.hidden = full || !!G.end || !!G.inRescue;
+  $("dock").hidden = !!G.end || !!G.inRescue;
+  const c = C();
+  $("ladder").innerHTML = c.per.map((v, i) => `<div class="rung${i + 1 === G.round ? " now" : i + 1 < G.round ? " past" : ""}">${money(v)} לקלף נכון<small>סיבוב ${i + 1}${c.levels ? ` · רמה ${c.levels[i]}` : ""} · עד ${c.allow[i]} טעויות + ${RESCUES} 🛟${c.perfect && c.perfect[i] ? ` · ⭐ בלי טעויות: +${money(c.perfect[i])}` : ""}${i + 1 >= c.canStop && i + 1 < c.rounds ? " · 🏁" : ""}</small></div>`).join("");
+  $("of").textContent = "/" + c.rounds;
+  $("bank").textContent = money(G.bank);
+  $("placed").textContent = placedCount();
+  if (G.bonus) $("ladder").innerHTML += `<div class="rung now">✖2 או כלום<small>בונוס · ${G.bonus.icon} ${G.bonus.name} · ${C().bonusAllow ? "טעות אחת מותרת" : "בלי טעויות"}${C().bonusPerfect ? ` · ⭐ בלי טעויות: +${money(C().bonusPerfect)}` : ""}</small></div>`;
+  $("round").textContent = G.bonus ? "בונוס" : G.round;
+  $("of").hidden = !!G.bonus;
+  $("era").textContent = G.bonus ? G.bonus.name : rangeText(G.wins[G.round - 1]);
+  $("misses").textContent = G.bonus && !allow() ? "אסור" : `${G.rm}/${allow()}`;
+  const tt = $("roundTitle"); tt.hidden = !c.names; if (c.names) tt.textContent = G.bonus ? c.bonusName : c.names[G.round - 1];
+  $("misses").classList.toggle("warn", G.rm >= allow());
+  showClock();
+}
+
+// ---------- boot ----------
+$("startBtn").onclick = newGame;
+$("ladderBtn").onclick = () => { $("ladder").hidden = !$("ladder").hidden; };
+$("restartBtn").onclick = () => {
+  if (!G.end && !confirm("להתחיל משחק חדש? המשחק הנוכחי יימחק.")) return;
+  clearInterval(tick); clearTimeout(nextT); clearTimeout(drawT); renderLevels(); renderModes(); $("game").hidden = true; $("setup").hidden = false;
+  $("dock").hidden = $("done").hidden = $("rescue").hidden = true; document.body.classList.add("setup-on");
+};
+renderLevels(); renderModes();
+fetch("questions/events.json", { cache: "no-cache" })
+  .then(r => { if (!r.ok) throw 0; return r.json(); })
+  .then(d => { bank = d.events; $("loadNote").textContent = `במאגר ${bank.length} אירועים: היסטוריה, ישראל, מדע, ספורט, ספרות, קולנוע, מוזיקה, אמנות, גאוגרפיה, לידות ופטירות.`; $("startBtn").disabled = false; })
+  .catch(() => { $("loadNote").textContent = "לא הצלחתי לטעון את מאגר האירועים. נסו לרענן את הדף."; });
+fetch("questions/sets.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : { sets: [] }).then(d => { SETS = d.sets || []; }).catch(() => {});
+</script>
+</body>
+</html>
