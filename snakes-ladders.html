@@ -79,9 +79,11 @@ a.btn { display: inline-block; text-decoration: none; }
 /* phones (touch, short side under 600px, in any orientation): the doors are compact rows, one under the other */
 /* the doors share the screen height equally, however many there are */
 /* ---- phone menu: colourful tiles that fill the whole first screen, sharing the height by their number ---- */
-body.phone .wrap:has(#menu:not([hidden])) { height: 100dvh; display: flex; flex-direction: column; padding-block: max(10px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
+body.phone .wrap:has(#menu:not([hidden])) { height: 100vh; height: var(--appH, 100dvh); display: flex; flex-direction: column; padding-block: max(10px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
 body.phone:has(#menu:not([hidden])) { background: radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--accent) 16%, var(--bg)), var(--bg)); }
-body.phone .wrap:has(#menu:not([hidden])) > h1 { text-align: center; font-size: clamp(24px, 3.6vh, 32px); margin: 2px 0 10px; letter-spacing: .5px; }
+/* the tiles take the whole screen: no page title on the phone menu */
+body.phone .wrap:has(#menu:not([hidden])) > h1 { display: none; }
+body.phone:has(#menu:not([hidden])) { margin: 0; overflow: hidden; }
 body.phone .menu { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: clamp(8px, 1.4vh, 14px); width: 100%; max-width: 560px; margin-inline: auto; }
 body.phone .menu .door {
   flex: 1 1 0; min-height: 0; position: relative; overflow: hidden; isolation: isolate;
@@ -106,8 +108,10 @@ body.phone .door[href="memory.html"] { --c1: #f0708c; --c2: #c23d61; }
 body.phone .door[href="timeline.html"] { --c1: #f3a83b; --c2: #c9701a; }
 /* a phone on its side: three columns, the rows share the height */
 @media (orientation: landscape) {
-  body.phone .menu { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr; max-width: none; }
-  body.phone .wrap:has(#menu:not([hidden])) > h1 { font-size: 22px; margin-block: 0 8px; }
+  /* 3 on top, 2 below, both rows full width (no empty corner) */
+  body.phone .menu { display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: 1fr; max-width: none; }
+  body.phone .menu .door { grid-column: span 2; }
+  body.phone .menu .door:nth-child(n+4) { grid-column: span 3; }
   body.phone .menu .door i { width: clamp(48px, 14vh, 80px); font-size: clamp(26px, 8vh, 46px); }
 }
 /* computer screens: the menu fills the page */
@@ -360,7 +364,12 @@ const LETTERS = ["א", "ב", "ג", "ד"];
 const $ = id => document.getElementById(id);
 // a phone gets the compact one-column menu (computers and tablets keep their layout)
 const IS_PHONE = matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 600;
-if (IS_PHONE) document.body.classList.add("phone");
+if (IS_PHONE) {
+  document.body.classList.add("phone");
+  // the real visible height (some phone browsers do not know 100dvh), kept up to date when the phone turns
+  const fit = () => document.documentElement.style.setProperty("--appH", innerHeight + "px");
+  fit(); addEventListener("resize", fit); addEventListener("orientationchange", () => setTimeout(fit, 300));
+}
 
 // ---------- sound: short effects synthesized with Web Audio, so there are no audio files ----------
 let audio = null, soundOn = true;
