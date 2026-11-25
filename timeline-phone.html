@@ -159,13 +159,21 @@ body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; bord
 .album .head h2 { font: 800 22px var(--display); margin: 0; }
 .album .body { flex: 1; overflow-y: auto; padding: 10px 12px 24px; display: grid; gap: 8px; align-content: start; }
 .album details { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-.album summary { font: 800 17px var(--display); cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+.album summary { font: 800 17px var(--display); cursor: pointer; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; list-style: none; }
+.album summary::-webkit-details-marker { display: none; }
+.album summary .st { flex-basis: 100%; }
 .album summary small { color: var(--muted); font: 600 14px var(--display); }
 .album .bar2 { height: 6px; border-radius: 3px; background: var(--slot); margin-top: 6px; overflow: hidden; }
 .album .bar2 i { display: block; height: 100%; background: var(--accent); }
 .album ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
 .album li { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 6px; font-size: 16px; }
 .album li b { color: var(--accent); font: 800 15px var(--display); white-space: nowrap; }
+.album .sum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.album .sum > div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px; text-align: center; }
+.album .sum b { display: block; font: 800 22px var(--display); }
+.album .sum span { color: var(--muted); font: 600 13px var(--display); }
+.album .st { color: var(--muted); font: 600 15px var(--display); margin-top: 4px; }
+.album .ok, .album .sum .ok b { color: var(--good); } .album .no, .album .sum .no b { color: var(--bad); }
 .album .empty { color: var(--muted); text-align: center; padding: 30px 10px; }
 .new-tag { color: var(--accent); }
 @keyframes flip { 0% { transform: rotateY(90deg); } 100% { transform: none; } }
@@ -194,7 +202,7 @@ body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; bord
         <li>כשהמשחק נגמר באמצע, הכוכבים מהסיבובים שהושלמו נשארים שלכם.</li>
         <li>✖2 בונוס: מי שמסיים בוחר 3 נושאים מיוחדים ומשחק לוח אחד, כפול או כלום על הכוכבים של המשחק.</li>
         <li>⚡ משחק קצר: "סיבוב חימום" (רמה 1) ו"שוברים את הראש" (רמה 2), ואז "כפול או כלום".</li>
-        <li>📒 האלבום: כל אירוע שהנחתם נכון נשמר בטלפון, לפי נושאים, עם התאריך.</li>
+        <li>📒 האלבום: כל אירוע שהנחתם נכון נשמר בטלפון, לפי נושאים, עם התאריך. לכל נושא רואים כמה קלפים ניסיתם, כמה נכון וכמה טעויות.</li>
       </ol>
     </details>
     <h2>איזה משחק?</h2>
@@ -528,13 +536,13 @@ function drop(from, to) {
       G.used.add(e);
       const hadAnchor = !!G.anchor;
       if (G.anchor) { const a = G.slots.indexOf(G.anchor); if (a >= 0) G.slots[a] = null; G.anchor = null; }
-      const isNew = addToAlbum(e);
+      const isNew = addToAlbum(e); tally(e, true);
       if (G.bonus) { sGood(); say(`נכון! ${fmt(e)} · עוד ${N - placedCount()} להכפלה` + (isNew ? " · 📒 חדש באלבום" : "") + (hadAnchor ? " · קלף הפתיחה ירד מהלוח" : ""), "good"); draw(); render({ good: to }); if (G.slots.every(Boolean)) roundDone(); return; }
       sGood(); say((G.rescue ? `🛟 ניצלתם! נכון! ${fmt(e)} · ` + (G.ru < RESCUES ? `נשאר לכם עוד גלגל הצלה ${RESCUES - G.ru === 1 ? "אחד" : RESCUES - G.ru} בסיבוב` : "זה היה גלגל ההצלה האחרון בסיבוב") : `נכון! ${fmt(e)}`) + (isNew ? " · 📒 חדש באלבום" : "") + (hadAnchor ? " · קלף הפתיחה ירד מהלוח" : ""), "good"); G.rescue = false;
       draw(); render({ good: to });
       if (G.slots.every(Boolean)) roundDone();
     } else {
-      G.misses++; G.hand = null; G.flaw = true;
+      G.misses++; G.hand = null; G.flaw = true; tally(e, false);
       sBad();
       if (G.bonus && G.rm < allow()) {   // the one mistake the bonus allows: the event goes back to the pool
         G.rm++; G.pool.push(e); G.last = e;
@@ -856,6 +864,15 @@ function addToAlbum(e) {
   try { localStorage.setItem("timeline-album", JSON.stringify(album)); } catch (err) {}
   return true;
 }
+// every placement on this phone, by topic: [right, wrong]
+let stats = {};
+try { stats = JSON.parse(localStorage.getItem("timeline-stats") || "{}"); } catch (e) {}
+function tally(e, ok) {
+  const c = e.cat || "אחר", r = stats[c] = stats[c] || [0, 0];
+  r[ok ? 0 : 1]++;
+  try { localStorage.setItem("timeline-stats", JSON.stringify(stats)); } catch (err) {}
+}
+const pct = (a, b) => a + b ? Math.round(100 * a / (a + b)) + "%" : "";
 function showAlbum() {
   const box = $("album"), have = Object.entries(album);
   const totals = {};
@@ -863,15 +880,19 @@ function showAlbum() {
   for (const st of SETS) for (const e of st.events) totals[e.cat] = (totals[e.cat] || 0) + 1;
   const byCat = {};
   for (const [t, e] of have) (byCat[e.cat] = byCat[e.cat] || []).push({ t, ...e });
-  const cats = Object.keys(totals).filter(c => byCat[c]).concat(Object.keys(byCat).filter(c => !totals[c]))
-    .sort((a, b) => (byCat[b] || []).length - (byCat[a] || []).length);
+  for (const c in stats) byCat[c] = byCat[c] || [];
+  const tries = c => (stats[c] || [0, 0])[0] + (stats[c] || [0, 0])[1];
+  const cats = Object.keys(byCat).sort((a, b) => tries(b) - tries(a) || byCat[b].length - byCat[a].length);
   box.innerHTML = `<div class="head"><h2>📒 האלבום שלי · ${have.length}</h2><button class="btn ghost" type="button" id="albumClose">סגירה</button></div><div class="body"></div>`;
   const body = box.querySelector(".body");
-  if (!have.length) body.innerHTML = `<div class="empty">האלבום עוד ריק. כל אירוע שתניחו נכון בלוח ייכנס לכאן.</div>`;
+  const all = Object.values(stats).reduce((a, r) => [a[0] + r[0], a[1] + r[1]], [0, 0]);
+  if (all[0] + all[1]) { const top = document.createElement("div"); top.className = "sum"; top.innerHTML = `<div><b>${all[0] + all[1]}</b><span>ניסיונות</span></div><div class="ok"><b>${all[0]}</b><span>✓ נכון</span></div><div class="no"><b>${all[1]}</b><span>✗ טעויות</span></div><div><b>${pct(all[0], all[1])}</b><span>הצלחה</span></div>`; body.appendChild(top); }
+  if (!have.length && !(all[0] + all[1])) body.innerHTML = `<div class="empty">האלבום עוד ריק. כל אירוע שתניחו נכון בלוח ייכנס לכאן.</div>`;
   for (const c of cats) {
-    const list = byCat[c].sort((a, b) => cmp(a, b)), tot = totals[c] || list.length;
+    const list = byCat[c].sort((a, b) => cmp(a, b)), tot = totals[c] || list.length || 1, st = stats[c] || [0, 0];
     const det = document.createElement("details");
-    det.innerHTML = `<summary><span></span><small>${list.length} מתוך ${tot}</small></summary><div class="bar2"><i style="width:${Math.max(2, Math.round(100 * list.length / tot))}%"></i></div><ul></ul>`;
+    det.innerHTML = `<summary><span></span><small>📒 ${list.length} מתוך ${tot}</small>
+      <div class="st">${st[0] + st[1]} ניסיונות · <span class="ok">✓ ${st[0]}</span> · <span class="no">✗ ${st[1]}</span>${st[0] + st[1] ? ` · ${pct(st[0], st[1])} הצלחה` : ""}</div></summary><div class="bar2"><i style="width:${Math.max(2, Math.round(100 * list.length / tot))}%"></i></div><ul></ul>`;
     det.querySelector("summary span").textContent = c;
     const ul = det.querySelector("ul");
     det.addEventListener("toggle", () => {   // the list is drawn only when opened
