@@ -166,7 +166,13 @@ body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; bord
 .album .bar2 { height: 6px; border-radius: 3px; background: var(--slot); margin-top: 6px; overflow: hidden; }
 .album .bar2 i { display: block; height: 100%; background: var(--accent); }
 .album ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
-.album li { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 6px; font-size: 16px; }
+.album li { border-top: 1px solid var(--line); padding-top: 6px; font-size: 16px; cursor: pointer; }
+.album li .row1 { display: flex; justify-content: space-between; gap: 10px; }
+.album li.not-mine .row1 span { color: var(--muted); }
+.album li .story { margin-top: 6px; background: color-mix(in srgb, var(--accent) 8%, var(--panel)); border-radius: 8px; padding: 10px 12px; cursor: default; }
+.album li .story p { margin: 0 0 6px; font-size: 16px; line-height: 1.55; }
+.album li .story a { color: var(--accent); font: 700 14px var(--display); }
+.album .learn { margin-top: 8px; font-size: 15px; padding: 6px 12px; }
 .album li b { color: var(--accent); font: 800 15px var(--display); white-space: nowrap; }
 .album .sum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .album .sum > div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px; text-align: center; }
@@ -202,7 +208,7 @@ body:not(.placing) .ins { visibility: hidden; min-height: 8px; height: 8px; bord
         <li>כשהמשחק נגמר באמצע, הכוכבים מהסיבובים שהושלמו נשארים שלכם.</li>
         <li>✖2 בונוס: מי שמסיים בוחר 3 נושאים מיוחדים ומשחק לוח אחד, כפול או כלום על הכוכבים של המשחק.</li>
         <li>⚡ משחק קצר: "סיבוב חימום" (רמה 1) ו"שוברים את הראש" (רמה 2), ואז "כפול או כלום".</li>
-        <li>📒 האלבום: כל אירוע שהנחתם נכון נשמר בטלפון, לפי נושאים, עם התאריך. לכל נושא רואים כמה קלפים ניסיתם, כמה נכון וכמה טעויות.</li>
+        <li>📒 האלבום: כל אירוע שהנחתם נכון נשמר בטלפון, לפי נושאים, עם התאריך. הקשה על קלף פותחת את הסיפור שלו (📖), וכפתור "ללמוד" מציג את כל הקלפים בנושא. לכל נושא רואים כמה קלפים ניסיתם, כמה נכון וכמה טעויות.</li>
       </ol>
     </details>
     <h2>איזה משחק?</h2>
@@ -873,7 +879,36 @@ function tally(e, ok) {
   try { localStorage.setItem("timeline-stats", JSON.stringify(stats)); } catch (err) {}
 }
 const pct = (a, b) => a + b ? Math.round(100 * a / (a + b)) + "%" : "";
+// short stories for the cards (questions/expand.json), loaded the first time the album opens
+let EXP = null;
+function loadExp() {
+  if (EXP) return Promise.resolve(EXP);
+  return fetch("questions/expand.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : { x: {} }).then(d => (EXP = d.x || {})).catch(() => (EXP = {}));
+}
+const topicCards = c => bank.filter(e => e.cat === c).concat(SETS.flatMap(st => st.events.filter(e => e.cat === c)));
+// one card in the album: tap it to open its story (or a Wikipedia search when it has none yet)
+function albumRow(e, notMine) {
+  const li = document.createElement("li");
+  const story = EXP && EXP[e.t];
+  li.className = (notMine ? "not-mine " : "") + (story ? "has-story" : "");
+  li.innerHTML = "<div class=\"row1\"><span></span><b></b></div>";
+  li.querySelector("span").textContent = (story ? "📖 " : "") + e.t;
+  li.querySelector("b").textContent = fmt(e);
+  li.onclick = () => {
+    const open = li.querySelector(".story");
+    if (open) return open.remove();
+    const d = document.createElement("div"); d.className = "story";
+    const p = document.createElement("p"); p.textContent = story || "לקלף הזה עוד אין הרחבה.";
+    const a = document.createElement("a");
+    a.href = "https://he.wikipedia.org/w/index.php?search=" + encodeURIComponent(e.t.replace(/["״]/g, ""));
+    a.target = "_blank"; a.rel = "noopener"; a.textContent = "לחיפוש בוויקיפדיה ←";
+    d.onclick = ev => ev.stopPropagation();
+    d.append(p, a); li.appendChild(d);
+  };
+  return li;
+}
 function showAlbum() {
+  if (!EXP) return loadExp().then(showAlbum);
   const box = $("album"), have = Object.entries(album);
   const totals = {};
   for (const e of bank) totals[e.cat] = (totals[e.cat] || 0) + 1;
@@ -895,10 +930,21 @@ function showAlbum() {
       <div class="st">${st[0] + st[1]} ניסיונות · <span class="ok">✓ ${st[0]}</span> · <span class="no">✗ ${st[1]}</span>${st[0] + st[1] ? ` · ${pct(st[0], st[1])} הצלחה` : ""}</div></summary><div class="bar2"><i style="width:${Math.max(2, Math.round(100 * list.length / tot))}%"></i></div><ul></ul>`;
     det.querySelector("summary span").textContent = c;
     const ul = det.querySelector("ul");
-    det.addEventListener("toggle", () => {   // the list is drawn only when opened
-      if (!det.open || ul.childElementCount) return;
-      for (const e of list) { const li = document.createElement("li"); li.innerHTML = "<span></span><b></b>"; li.querySelector("span").textContent = e.t; li.querySelector("b").textContent = fmt(e); ul.appendChild(li); }
-    });
+    // the list is drawn only when opened; "learn" adds the topic's cards not collected yet
+    let learn = false;
+    const fill = () => {
+      ul.innerHTML = "";
+      const mine = new Set(list.map(e => e.t));
+      const rows = learn ? list.concat(topicCards(c).filter(e => !mine.has(e.t))).sort((a, b) => cmp(a, b)) : list;
+      for (const e of rows) ul.appendChild(albumRow(e, !mine.has(e.t)));
+    };
+    const lb = document.createElement("button");
+    lb.type = "button"; lb.className = "btn ghost learn";
+    const lbText = () => { lb.textContent = learn ? "📒 רק הקלפים שאספתי" : `📖 ללמוד: כל ${tot} הקלפים בנושא`; };
+    lb.onclick = () => { learn = !learn; lbText(); fill(); };
+    lbText();
+    det.querySelector(".bar2").after(lb);
+    det.addEventListener("toggle", () => { if (det.open && !ul.childElementCount) fill(); });
     body.appendChild(det);
   }
   box.hidden = false;
