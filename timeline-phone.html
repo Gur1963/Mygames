@@ -899,7 +899,7 @@ function loadExp() {
   return fetch("questions/expand.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : { x: {} }).then(d => (EXP = d.x || {})).catch(() => (EXP = {}));
 }
 const topicCards = c => bank.filter(e => e.cat === c).concat(SETS.flatMap(st => st.events.filter(e => e.cat === c)));
-// one card in the album: tap it to open its story (or a Wikipedia search when it has none yet)
+// one card in the album: tap it to open its story (and a web search for more)
 function albumRow(e, notMine) {
   const li = document.createElement("li");
   const story = EXP && EXP[e.t];
@@ -913,8 +913,8 @@ function albumRow(e, notMine) {
     const d = document.createElement("div"); d.className = "story";
     const p = document.createElement("p"); p.textContent = story || "לקלף הזה עוד אין הרחבה.";
     const a = document.createElement("a");
-    a.href = "https://he.wikipedia.org/w/index.php?search=" + encodeURIComponent(e.t.replace(/["״]/g, ""));
-    a.target = "_blank"; a.rel = "noopener"; a.textContent = "לחיפוש בוויקיפדיה ←";
+    a.href = "https://www.google.com/search?hl=iw&q=" + encodeURIComponent(e.t.replace(/["״]/g, "") + " " + (e.y < 0 ? -e.y + " לפנה״ס" : e.y));
+    a.target = "_blank"; a.rel = "noopener"; a.textContent = "לחיפוש ברשת ←";
     d.onclick = ev => ev.stopPropagation();
     d.append(p, a); li.appendChild(d);
   };
